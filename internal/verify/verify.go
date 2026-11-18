@@ -128,7 +128,13 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 		}
 	}
 	sx, _ := speech.ReadWav(srcWav)
-	syncCheck(rx, sx, src.AudioStart, m, r)
+	mapT := func(g render.MSeg, t float64) float64 { // source-of-segment time → audio-source time
+		if g.Source != m.Audio && src.Sync != nil {
+			return src.Sync.Map(t)
+		}
+		return t
+	}
+	syncCheck(rx, sx, src.AudioStart, mapT, m, r)
 	if o.Model != "" {
 		wordCheck(renderWav, tmp, m, o, r)
 	}
@@ -290,7 +296,7 @@ func mse(a, b []byte) float64 {
 
 // --- sync ------------------------------------------------------------------------------------
 
-func syncCheck(rx, sx []float64, audioStart float64, m *render.Manifest, r *Report) {
+func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, float64) float64, m *render.Manifest, r *Report) {
 	win, maxLag := int(0.5*sr), int(0.15*sr)
 	var measured []SegSync
 	worst := 0.0
@@ -305,7 +311,7 @@ func syncCheck(rx, sx []float64, audioStart float64, m *render.Manifest, r *Repo
 				break
 			}
 			to := g.OutStart + d*frac
-			so := g.In + d*frac - audioStart
+			so := mapT(g, g.In+d*frac) - audioStart
 			oi, si := int(to*sr)-win/2, int(so*sr)-win/2
 			if oi < 0 || oi+win > len(rx) || si-maxLag < 0 || si+win+maxLag > len(sx) {
 				continue

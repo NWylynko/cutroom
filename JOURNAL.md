@@ -2,6 +2,27 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 10 · 2026-11-18 · sync + audio source (round-1 correctness bug) + 5 small friction fixes
+Did: `internal/align`: 10 ms log-envelope FFT cross-correlation (coarse, whole files), then 40 × 2 s
+waveform windows band-passed to 300–3000 Hz, xcorr ±60 ms, robust line fit (3×MAD outlier rejection,
+silent windows skipped — L05) → offset + drift + residual + overlap. `sync <src> [--to cam]` stores it
+in cutroom.json. `edit audio <src>` (refuses unsynced), `timeline` shows the sound source; validation
+ERROR `audio-not-synced` (render refuses with the exact fix); renderer maps recorder audio through the
+fit in ≤ 10 s pieces (≤ ½ sample drift error per piece, no resampling); manifest + `check` measure
+sync through the same mapping. Friction: dry runs say "would …" + DRY RUN line; out-of-range
+`--from/--to` explains they are seconds; suspects already cut are marked; whisper `[BLANK_AUDIO]` /
+`(music)` annotations stripped (the "[" was being glued to the previous word as punctuation);
+`init` names cutroom.json; `init --remove` (refuses sources in use). Guide: recorder recipe.
+Tests: TestL05_RecorderFixture, FFT round trip, annotation stripping. e2e 66/66 incl. the round-1
+failure (hand-set `"audio": "mic"`) now refused, and the grader passing the recorder task done
+with cutroom alone.
+Measured: recorder fixture: offset 1.700055 s (truth 1.700), drift −42.7 ppm (truth −50; 30 s is too
+short to pin drift — mapping error < 1 ms either way), residual 0.02 ms, 37/38 windows. Before
+band-passing: 21 of 38 windows rejected and residual 0.21 ms (camera mic band-limited vs full-band
+recorder — real pairs differ the same way). Render + check: sync worst 6 ms; grader: audio from the
+recorder, sync worst 6 ms.
+Next: perceive the render (`look`/`listen --output`), then eval round 2.
+
 ### 9 · 2026-11-18 · `check` (friction #1 from round 1)
 Did: render writes `<out>.cutroom.json` (segments with file-relative output times, sources, settings,
 timeline hash). `internal/verify` measures the file: frames vs manifest, audio vs video length, size /

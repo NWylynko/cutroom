@@ -11,6 +11,7 @@ import (
 	"github.com/cutroom/cutroom/internal/project"
 	"github.com/cutroom/cutroom/internal/speech"
 	"github.com/cutroom/cutroom/internal/timecode"
+	"github.com/cutroom/cutroom/internal/timeline"
 )
 
 func init() {
@@ -211,6 +212,20 @@ func runTranscript(c *Ctx) (*Result, error) {
 		hi = v.Float()
 	}
 	inRange := func(a, b float64) bool { return b > lo && a < hi }
+	if lo >= t.Duration || (c.Has("to") && hi <= 0) {
+		return nil, Errf(ExitUsage, "out-of-range", fmt.Sprintf("%s is %.3f s long; --from/--to are times in seconds (or m:ss), not word numbers", t.Source, t.Duration),
+			"--from %s is past the end of %s", c.Str("from"), t.Source)
+	}
+	tl, _ := timeline.Load(p.Dir)
+	cutNote := func(a, b float64) string {
+		if tl == nil {
+			return ""
+		}
+		if !tl.Kept(t.Source, a+0.01) && !tl.Kept(t.Source, (a+b)/2) && !tl.Kept(t.Source, b-0.01) {
+			return "  (already cut)"
+		}
+		return ""
+	}
 	var lines []string
 	trunc := func(note string) {
 		if !c.Bool("all") && len(lines) > maxLines {
@@ -247,7 +262,7 @@ func runTranscript(c *Ctx) (*Result, error) {
 		for _, s := range t.Suspects {
 			if inRange(s.Start, s.End) {
 				sel = append(sel, s)
-				lines = append(lines, fmt.Sprintf("%s–%s  %-14s %s", clock(s.Start), clock(s.End), s.Kind, s.Detail))
+				lines = append(lines, fmt.Sprintf("%s–%s  %-14s %s%s", clock(s.Start), clock(s.End), s.Kind, s.Detail, cutNote(s.Start, s.End)))
 			}
 		}
 		if len(sel) == 0 {

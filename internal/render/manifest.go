@@ -5,6 +5,7 @@ import (
 	"os"
 	"time"
 
+	"github.com/cutroom/cutroom/internal/align"
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
@@ -42,10 +43,11 @@ type MSeg struct {
 }
 
 type MSource struct {
-	Path       string    `json:"path"`
-	Size       int64     `json:"size"`
-	ModTime    time.Time `json:"mtime"`
-	AudioStart float64   `json:"audio_start"`
+	Path       string      `json:"path"`
+	Size       int64       `json:"size"`
+	ModTime    time.Time   `json:"mtime"`
+	AudioStart float64     `json:"audio_start"`
+	Sync       *align.Sync `json:"sync,omitempty"`
 }
 
 func ManifestPath(out string) string { return out + ".cutroom.json" }
@@ -70,11 +72,11 @@ func writeManifest(tl *timeline.Timeline, srcs map[string]Source, chunks []Chunk
 			m.Segments = append(m.Segments, MSeg{ID: g.ID, Source: g.Source, In: g.In, Out: g.Out,
 				OutStart: round6(g.OutStart - res.RangeStart), Frames: tl.Frames(g), Zoom: g.Zoom})
 			s := srcs[g.Source]
-			m.Sources[g.Source] = MSource{s.Path, s.Size, s.ModTime, s.AudioStart}
+			m.Sources[g.Source] = MSource{s.Path, s.Size, s.ModTime, s.AudioStart, s.Sync}
 		}
 	}
 	if s, ok := srcs[tl.Audio]; ok {
-		m.Sources[tl.Audio] = MSource{s.Path, s.Size, s.ModTime, s.AudioStart}
+		m.Sources[tl.Audio] = MSource{s.Path, s.Size, s.ModTime, s.AudioStart, s.Sync}
 	}
 	b, _ := json.MarshalIndent(m, "", "  ")
 	return os.WriteFile(ManifestPath(res.Output), b, 0o644)

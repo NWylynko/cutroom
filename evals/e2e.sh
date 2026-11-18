@@ -93,6 +93,26 @@ expect "undo"                       'undid: edit cut'                 cutroom ed
 expect "history"                    'edit tighten'                    cutroom edit history
 expect "unknown op suggests"        'did you mean `cutroom edit cut`' cutroom edit cutt
 popd >/dev/null
+# separate recorder: the round-1 bug (hand-set audio rendered 1.7 s late) must now be refused
+S="$W/sync"; mkdir -p "$S"; cp $FIX/talk.mp4 $FIX/recorder.wav "$S/"; pushd "$S" >/dev/null
+cutroom init talk.mp4 --source mic=recorder.wav >/dev/null; cutroom transcribe talk --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+expect "edit audio refuses unsynced"  'cutroom sync mic --to talk'      cutroom edit audio mic
+python3 -c "import json;t=json.load(open('timeline.json'));t['audio']='mic';json.dump(t,open('timeline.json','w'))"
+expect "render refuses hand-set unsynced audio" 'audio-not-synced|have not been aligned' cutroom render
+cutroom edit undo >/dev/null; cutroom edit tighten >/dev/null
+expect "sync measures offset"         'offset \+1\.70[01] s'             cutroom sync mic
+expect "edit audio after sync"        'takes its sound from mic'        cutroom edit audio mic
+expect "timeline shows audio source"  'sound from mic'                  cutroom timeline
+expect "render with recorder audio"   'wrote out/final.mp4'             cutroom render
+expect "check passes synced render"   '^PASS'                           cutroom check
+popd >/dev/null
+g=$(go run ./evals/grade -fixtures $FIX recorder "$S" 2>&1)
+grep -q 'GRADE recorder: PASS' <<<"$g" && ok "grader passes recorder task via sync" || bad "grader passes recorder task via sync" "$(grep FAIL <<<"$g")"
+pushd "$S" >/dev/null
+expect "dry run says would"           '^would cut .*DRY RUN|would cut'  cutroom edit cut --text "Then install Linux on it." --dry-run
+expect "transcript range past end"    'not word numbers'                cutroom transcript talk --words --from 38 --to 63
+expect "init --remove in use refused" 'used by the timeline'            cutroom init --remove mic
+popd >/dev/null
 expect "no project → fix"      'run `cutroom init'                   cutroom inspect --project "$W/nothing-here"
 
 echo "e2e: $pass passed, $fail failed"

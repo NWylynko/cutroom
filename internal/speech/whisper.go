@@ -86,8 +86,16 @@ func parseWhisper(b []byte) ([]RawWord, error) {
 		}
 		probs = nil
 	}
+	depth := 0 // inside [..] or (..) annotations such as [BLANK_AUDIO] or (music)
 	for _, seg := range d.Transcription {
 		for _, t := range seg.Tokens {
+			if o := strings.Count(t.Text, "[") + strings.Count(t.Text, "("); o > 0 || depth > 0 {
+				depth += o - strings.Count(t.Text, "]") - strings.Count(t.Text, ")")
+				if depth < 0 {
+					depth = 0
+				}
+				continue
+			}
 			if strings.HasPrefix(t.Text, "[_") || strings.HasPrefix(t.Text, "<|") || t.Text == "" {
 				continue
 			}

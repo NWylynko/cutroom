@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cutroom/cutroom/internal/align"
 	"github.com/cutroom/cutroom/internal/media"
 )
 
@@ -24,6 +25,7 @@ type Source struct {
 	Size    int64        `json:"size_bytes"`
 	ModTime time.Time    `json:"mtime"`
 	Facts   *media.Facts `json:"facts"`
+	Sync    *align.Sync  `json:"sync,omitempty"` // how this source's audio lines up with another source
 }
 
 type Project struct {

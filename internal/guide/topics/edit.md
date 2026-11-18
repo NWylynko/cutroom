@@ -24,6 +24,8 @@ by your first edit as the whole first video source. Sources are never touched.
 - `cutroom edit cut 16.9-17.4` cuts a source time range (for sounds, not words).
 - `cutroom edit keep --from "…" --to "…"` keeps only that span (e.g. to start a short).
 - Explicit cuts are pinned: a later `tighten` never moves them.
+- `cutroom edit audio <source>` takes the sound from another source (a recorder) once
+  `cutroom sync <source>` has aligned it.
 - `--dry-run` previews; `cutroom edit undo` reverts the last edit; `cutroom edit history` lists them.
 
 Times in `edit` are **source** times (what `transcript` prints). Times in `timeline` output

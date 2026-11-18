@@ -10,6 +10,7 @@ import (
 
 	"github.com/cutroom/cutroom/internal/media"
 	"github.com/cutroom/cutroom/internal/project"
+	"github.com/cutroom/cutroom/internal/timeline"
 )
 
 func init() {
@@ -24,8 +25,9 @@ Running init again adds new sources and re-inspects changed ones; it is safe to 
 Examples:
   cutroom init talk.mp4
   cutroom init --source cam=raw/IMG_0412.MOV --source mic=raw/zoom.wav`,
-		Flags: []Flag{{Name: "source", Kind: "string", Many: true, Help: "id=path of a source file"}},
-		Run:   runInit,
+		Flags: []Flag{{Name: "source", Kind: "string", Many: true, Help: "id=path of a source file"},
+			{Name: "remove", Kind: "string", Help: "Remove a source id from the project (the file itself is not touched)"}},
+		Run: runInit,
 	})
 	Register(&Command{
 		Name:     "inspect",
@@ -75,6 +77,26 @@ func runInit(c *Ctx) (*Result, error) {
 	p, created, err := loadOrNew(c.Dir)
 	if err != nil {
 		return nil, err
+	}
+	if id := c.Str("remove"); id != "" {
+		if created {
+			return nil, Errf(ExitUsage, "no-project", "nothing to remove from", "no project here")
+		}
+		if _, err := sourceByID(p, id); err != nil {
+			return nil, err
+		}
+		if tl, err := timeline.Load(p.Dir); err == nil {
+			for _, g := range tl.Segments {
+				if g.Source == id || tl.Audio == id {
+					return nil, Errf(ExitInvalid, "source-in-use", "cut its segments or `cutroom edit audio <other>` first", "source %q is used by the timeline", id)
+				}
+			}
+		}
+		delete(p.Sources, id)
+		if err := p.Save(); err != nil {
+			return nil, err
+		}
+		return &Result{Text: fmt.Sprintf("removed source %q from %s (the file is untouched)", id, project.File), Data: map[string]string{"removed": id}}, nil
 	}
 	type pending struct{ id, path string }
 	var todo []pending
@@ -139,9 +161,9 @@ func runInit(c *Ctx) (*Result, error) {
 	if err := p.Save(); err != nil {
 		return nil, Errf(ExitInvalid, "save-failed", "check the project directory is writable", "%v", err)
 	}
-	head := "project created in " + absDir(c.Dir)
+	head := "project created: wrote " + filepath.Join(absDir(c.Dir), project.File)
 	if !created {
-		head = "project updated in " + absDir(c.Dir)
+		head = "project updated: " + filepath.Join(absDir(c.Dir), project.File)
 	}
 	lines = append(lines, head)
 	for _, id := range p.IDs() {

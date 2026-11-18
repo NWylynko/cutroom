@@ -38,6 +38,25 @@ func TestParseWhisperMergesTokensAndPunctuation(t *testing.T) {
 	}
 }
 
+func TestParseWhisperDropsAnnotations(t *testing.T) {
+	js := `{"transcription":[{"tokens":[
+	 {"text":" ready","offsets":{"from":0,"to":100},"p":0.9,"t_dtw":5},
+	 {"text":".","offsets":{"from":100,"to":110},"p":0.9,"t_dtw":10},
+	 {"text":" [","offsets":{"from":200,"to":210},"p":0.9,"t_dtw":20},
+	 {"text":"BL","offsets":{"from":210,"to":220},"p":0.9,"t_dtw":21},
+	 {"text":"ANK_AUDIO]","offsets":{"from":220,"to":230},"p":0.9,"t_dtw":22},
+	 {"text":" (music)","offsets":{"from":300,"to":310},"p":0.9,"t_dtw":30},
+	 {"text":" Yes","offsets":{"from":400,"to":500},"p":0.9,"t_dtw":40}]}]}`
+	ws, _ := parseWhisper([]byte(js))
+	var got []string
+	for _, w := range ws {
+		got = append(got, w.Text)
+	}
+	if strings.Join(got, "|") != "ready.|Yes" {
+		t.Fatalf("annotations leaked: %v", got)
+	}
+}
+
 func TestL28_RefineStopsWordsAtPauses(t *testing.T) {
 	regions := []Region{{Start: 0.6, End: 4.2}, {Start: 6.3, End: 9.2}}
 	raw := []RawWord{{Text: "Hi", Start: 0.82}, {Text: "server.", Start: 3.88, End: 6.3}, {Text: "The", Start: 6.38}, {Text: "end.", Start: 8.9}}

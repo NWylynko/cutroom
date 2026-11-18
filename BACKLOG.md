@@ -7,13 +7,7 @@ Move done items to the journal, not here.
 - Final name (working name: cutroom) and license (proposed: Apache-2.0).
 
 ## NOW — friction from eval round 1 (ranks above features)
-- [friction][correctness] **Separate audio source silently misaligned**: recorder-sonnet: "render silently uses the unaligned audio when you point the timeline at the recorder". Add `sync <audio-src> --to <video-src>` (offset + drift, robust fit, L05) stored in cutroom.json; render maps audio through it; `edit audio <source>` sets the timeline's audio; validate/render ERROR if audio source ≠ video source and no sync exists. `timeline` shows the audio source.
 - [friction] **Perceive the render**: 5/8 wanted `look`/`listen`/`transcript` on out/final.mp4. `look --output <t>` and `listen --output <range>` (output time through the timeline, or a rendered file).
-- [friction] `transcript --words --from/--to` outside the source prints only a header → say "no words in range; source is N s".
-- [friction] `--dry-run` reads as done ("cut talk …") → "would cut …".
-- [friction] suspects already inside cut spans: mark "(cut)" in `transcript --suspects` when a timeline exists.
-- [friction] `listen` shows "BLANK_AUDIO]": strip whisper annotations (`[…]`, `(…)`) from heard text and transcripts.
-- [friction] `init` should name the files it wrote; add `init --remove <id>`.
 
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
@@ -23,6 +17,9 @@ Move done items to the journal, not here.
 - HDR fixture (HEVC 10-bit HLG tags via libx265) so `inspect` hdr warning has a test. [L23]
 - `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
 - `status`.
+
+## NEXT
+- **Eval round 2** (after the perceive-the-render item): rerun all 4 tasks × 2 models; target tool-only 8/8.
 
 ## M2 — decide/act
 - `look --cuts` / `look --output` once a timeline exists (frames either side of every cut).
@@ -41,7 +38,7 @@ Move done items to the journal, not here.
 - `captions` (SRT) with seam checks. [L49]
 
 ## M5 — multi-source & shorts
-- `sync` (offset + drift). [L05] Multi-take timelines. HDR tone-map path. [L23 L24 L25]
+- Multi-take timelines (segments from several video sources; sync per take). HDR tone-map path. [L23 L24 L25]
 - `short` preset + safe-zone check. [L41]
 
 ## M6 — interchange & polish

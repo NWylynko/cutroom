@@ -45,15 +45,19 @@ func runRender(c *Ctx) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	issues := e.tl.Validate(e.dur, e.tr)
+	issues := e.validate()
 	for _, is := range issues {
 		if is.Level == "error" {
-			return nil, Errf(ExitInvalid, "invalid-timeline", "fix it first: `cutroom timeline` lists the problems", "timeline error: %s", is.Message)
+			fix := "fix it first: `cutroom timeline` lists the problems"
+			if is.Fix != "" {
+				fix = is.Fix
+			}
+			return nil, Errf(ExitInvalid, "invalid-timeline", fix, "timeline error: %s", is.Message)
 		}
 	}
 	srcs := map[string]render.Source{}
 	for id, s := range e.p.Sources {
-		srcs[id] = render.Source{Path: e.p.Abs(s), HasAudio: s.Facts.Audio != nil, Size: s.Size, ModTime: s.ModTime}
+		srcs[id] = render.Source{Path: e.p.Abs(s), HasAudio: s.Facts.Audio != nil, Size: s.Size, ModTime: s.ModTime, Sync: s.Sync}
 		if s.Facts.Audio != nil {
 			v := srcs[id]
 			v.AudioStart = s.Facts.Audio.Start

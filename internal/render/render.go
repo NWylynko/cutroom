@@ -17,6 +17,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/cutroom/cutroom/internal/align"
 	"github.com/cutroom/cutroom/internal/deps"
 	"github.com/cutroom/cutroom/internal/timeline"
 )
@@ -30,6 +31,7 @@ type Source struct {
 	HasAudio   bool
 	Size       int64
 	ModTime    time.Time
+	Sync       *align.Sync // set when this source's audio is aligned to another source
 }
 
 type Options struct {
@@ -331,17 +333,34 @@ func renderAudio(tl *timeline.Timeline, srcs map[string]Source, chunks, all []Ch
 		for _, c := range cs {
 			for _, k := range c.Segments {
 				g := tl.Segments[k]
-				// the audio for a segment is the same source span as its frames, mapped through the
-				// source's audio start; frames × (SR/fps) samples exactly
+				// frames × (SR/fps) samples exactly, so audio length always equals video length
 				n := int64(math.Round(float64(tl.Frames(g)) * SR / tl.Rate()))
-				from := int64(math.Round((g.In - src.AudioStart) * SR))
-				// segments from another source than the audio source use the audio source at the same time
-				ps = append(ps, Piece{from, from + n})
+				if g.Source == tl.Audio {
+					from := int64(math.Round((g.In - src.AudioStart) * SR))
+					ps = append(ps, Piece{from, from + n})
+					continue
+				}
+				// audio from another device: map through its measured offset + drift (L05), in
+				// pieces of ≤ 10 s so drift never accumulates beyond half a sample per piece
+				const step = 10 * SR
+				for o := int64(0); o < n; o += step {
+					m := min(step, n-o)
+					t := g.In + float64(o)/SR
+					from := int64(math.Round((src.Sync.Map(t) - src.AudioStart) * SR))
+					ps = append(ps, Piece{from, from + m})
+				}
 			}
 		}
 		return ps
 	}
-	key := hash([]any{Version, full, pieces(all), o.Chain, o.Loudness, o.TruePeak})
+	for _, c := range all {
+		for _, k := range c.Segments {
+			if g := tl.Segments[k]; g.Source != tl.Audio && (src.Sync == nil || src.Sync.To != g.Source) {
+				return AudioResult{}, fmt.Errorf("audio source %q is not aligned to %q: run `cutroom sync %s --to %s`", tl.Audio, g.Source, tl.Audio, g.Source)
+			}
+		}
+	}
+	key := hash([]any{Version, full, pieces(all), o.Chain, o.Loudness, o.TruePeak, src.Sync})
 	allWav := filepath.Join(cache, "timeline-"+key+".wav")
 	if _, err := os.Stat(allWav); err != nil {
 		if _, err := Assemble(full, allWav, pieces(all), 20); err != nil {

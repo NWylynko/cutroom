@@ -16,4 +16,9 @@
 6. **Verify.** `cutroom check` measures the render: frames, sync, every word, stray sounds,
    loudness. Fix what fails, re-render, check again. See `cutroom guide verify`.
 
-Separate audio recorder? Add it as a source too (`cutroom init --source mic=recorder.wav`).
+## Separate audio recorder (a mic recorded apart from the camera)
+1. `cutroom init talk.mp4 --source mic=recorder.wav` — add both.
+2. `cutroom sync mic` — measures the offset and clock drift against the camera's own sound.
+3. `cutroom edit audio mic` — the timeline now takes its sound from the recorder, aligned.
+Transcribe and cut using the camera source as usual; renders and `check` use the alignment
+automatically. Never point the timeline at another source's audio without `sync`: cutroom refuses.

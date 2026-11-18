@@ -12,12 +12,12 @@ import (
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
-var editOps = []string{"cut", "keep", "tighten", "undo", "history", "reset"}
+var editOps = []string{"cut", "keep", "tighten", "audio", "undo", "history", "reset"}
 
 func init() {
 	Register(&Command{
 		Name:     "edit",
-		Args:     "<cut|keep|tighten|undo|history|reset> [range]",
+		Args:     "<cut|keep|tighten|audio|undo|history|reset> [range|source]",
 		MinArgs:  1,
 		MaxArgs:  2,
 		Category: "edit",
@@ -30,6 +30,7 @@ Every edit is checked afterwards and problems are printed. Use --dry-run to prev
   edit cut 16.9-17.4                             remove a source time range (seconds or m:ss.mmm)
   edit keep --from "Hi, today" --to "server is ready."   keep only this span (e.g. for a short)
   edit tighten [--min-cut 0.4]                   shorten every pause longer than the pads + min-cut
+  edit audio mic                                 take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
   edit undo | edit history | edit reset [--source id]
 
 Words are matched ignoring case, punctuation and um/uh. --from must match once (add --near <time>
@@ -190,6 +191,29 @@ func runEdit(c *Ctx) (*Result, error) {
 			lines = append(lines, fmt.Sprintf("kept %d pinned edge(s) from your explicit cuts", r.Skipped))
 		}
 		data = map[string]any{"tighten": r}
+	case "audio":
+		if len(c.Args) != 2 {
+			return nil, Errf(ExitUsage, "bad-args", "name the source: `cutroom edit audio mic`", "edit audio needs a source id")
+		}
+		s, err := sourceByID(e.p, c.Args[1])
+		if err != nil {
+			return nil, err
+		}
+		if s.Facts.Audio == nil {
+			return nil, Errf(ExitUsage, "no-audio", "pick a source with sound (`cutroom inspect`)", "source %q has no audio", s.ID)
+		}
+		for _, g := range e.tl.Segments {
+			if g.Source != s.ID && (s.Sync == nil || s.Sync.To != g.Source) {
+				return nil, Errf(ExitInvalid, "audio-not-synced", fmt.Sprintf("align it first: `cutroom sync %s --to %s`", s.ID, g.Source),
+					"%s has not been aligned to %s, so its sound would be out of sync", s.ID, g.Source)
+			}
+		}
+		e.tl.Audio = s.ID
+		label = "edit audio " + s.ID
+		lines = append(lines, fmt.Sprintf("the timeline now takes its sound from %s", s.ID))
+		if s.Sync != nil {
+			lines = append(lines, fmt.Sprintf("  aligned to %s: offset %+.3f s, drift %+.1f ppm", s.Sync.To, s.Sync.Offset, s.Sync.PPM))
+		}
 	case "cut", "keep":
 		res, desc, err := e.applySpan(c, op)
 		if err != nil {
@@ -199,11 +223,18 @@ func runEdit(c *Ctx) (*Result, error) {
 		lines = append(lines, res...)
 	}
 	e.tl.Recompute()
-	issues := e.tl.Validate(e.dur, e.tr)
+	issues := e.validate()
 	lines = append(lines, fmt.Sprintf("timeline: %d segments, %s (was %s)", len(e.tl.Segments), secs(e.tl.Duration()), secs(before)))
 	lines = append(lines, issueLines(issues, 6)...)
 	if c.Bool("dry-run") {
-		lines = append(lines, "dry run: nothing saved")
+		for i, l := range lines {
+			for _, v := range [][2]string{{"cut ", "would cut "}, {"kept only ", "would keep only "}, {"tightened: ", "would tighten: "}, {"timeline: ", "timeline would be: "}} {
+				if strings.HasPrefix(l, v[0]) {
+					lines[i] = v[1] + strings.TrimPrefix(l, v[0])
+				}
+			}
+		}
+		lines = append(lines, "DRY RUN: nothing was changed; run the same command without --dry-run to apply it")
 	} else {
 		if err := timeline.Checkpoint(e.p.Dir, cacheDir(e.p), label); err != nil {
 			return nil, err
@@ -457,7 +488,7 @@ func runTimeline(c *Ctx) (*Result, error) {
 		return nil, err
 	}
 	tl := e.tl
-	issues := tl.Validate(e.dur, e.tr)
+	issues := e.validate()
 	var lines []string
 	srcTotal := 0.0
 	for _, d := range e.dur {
@@ -466,8 +497,8 @@ func runTimeline(c *Ctx) (*Result, error) {
 	if d, ok := e.dur[tl.Video]; ok {
 		srcTotal = d
 	}
-	lines = append(lines, fmt.Sprintf("timeline: %d segments, %s output (%s fps, %dx%d), from %s of %s",
-		len(tl.Segments), secs(tl.Duration()), fpsStr(tl.FPS), tl.Width, tl.Height, secs(srcTotal), tl.Video))
+	lines = append(lines, fmt.Sprintf("timeline: %d segments, %s output (%s fps, %dx%d), from %s of %s; sound from %s",
+		len(tl.Segments), secs(tl.Duration()), fpsStr(tl.FPS), tl.Width, tl.Height, secs(srcTotal), tl.Video, orNone(tl.Audio)))
 	if c.Bool("joins") {
 		js := tl.Joins(e.tr)
 		if len(js) == 0 {
