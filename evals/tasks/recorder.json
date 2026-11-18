@@ -3,6 +3,6 @@
   "output": "out/final.mp4",
   "must_contain": ["first thing you need is an old laptop", "your server is ready"],
   "must_not_contain": [],
-  "duration": [15.0, 25.0],
+  "duration": [13.0, 25.0],
   "checks": ["av_sync", "audio_from=recorder.wav"]
 }

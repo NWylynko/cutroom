@@ -41,6 +41,20 @@ Run every 5th iteration and at each milestone. Three tiers:
   `evals/local/` (gitignored; never commit real footage or anything from it). A reviewer subagent
   (strongest model) gets the output transcript and a contact sheet and judges the edit as an editor would.
 
+### Running a T2 task (exact protocol)
+1. `make build fixtures`; `d=evals/work/runs/<round>-<task>-<model>`; `mkdir -p $d`; copy the task's
+   `fixtures` into `$d`.
+2. Spawn the subagent (Agent tool, `general-purpose`, `model` = haiku or sonnet). Prompt = the preamble
+   in `evals/tasks/README.md` with `<dir>` = the absolute `$d`, then the task brief verbatim, then the
+   contents of `evals/FRICTION_TEMPLATE.md`, then: "Put `<repo>/bin` first on PATH in every shell command
+   (`export PATH=<repo>/bin:$PATH`)." Nothing else — no hints about commands.
+3. When it returns: `go run ./evals/grade -fixtures evals/work/fixtures <task> $d` → pass/fail.
+   Read `$d/FRICTION.md` and the subagent's transcript summary; count commands and errors from it.
+4. Delete `$d` renders after recording results (disk guardrail).
+
+The grader is itself tested: `make grade-selftest` (known-good outputs pass, deliberately broken ones fail
+on the right check). Run it whenever the grader or fixtures change.
+
 Record every round in `evals/results/<date>-<n>.md`: per task × model: pass/fail, commands run, errors
 hit, guide lookups, wasted steps, friction items. Turn every friction item into a backlog item tagged
 `[friction]` with the quote that shows it. Friction ranks above new features.

@@ -6,9 +6,7 @@ Move done items to the journal, not here.
 ## Needs human
 - Final name (working name: cutroom) and license (proposed: Apache-2.0).
 
-## M0 — skeleton (finish)
-- Grader `go run ./evals/grade <task> <dir>`: independent whisper pass with loose phrase matching, duration bounds, named checks (`upright`, `no_rotation_meta`, `av_sync`, `frames_from_source`, `audio_from=`). Needed before the first T2 round. `frames_from_source`: testsrc frames carry a visible counter, so match output frames to source frames by pixel diff.
-- Eval runner notes in LOOP.md: exact subagent prompt (preamble + brief + friction template), how to collect metrics.
+## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
 
 ## M1 — perceive

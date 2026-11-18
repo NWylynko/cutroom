@@ -80,7 +80,8 @@ func main() {
 	m.Facts = map[string]any{"fps": "30", "vfr": false, "rotation": 0, "hdr": false, "audio_start": 0.0}
 	ff("-f", "lavfi", "-i", fmt.Sprintf("testsrc=size=1280x720:rate=30:duration=%.3f", dur), "-i", wav,
 		"-map", "0:v", "-map", "1:a", "-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
-		"-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-shortest", path("talk.mp4"))
+		// camera mic: band-limited and noisier than the separate recorder (lets graders tell them apart)
+		"-af", "highpass=f=180,lowpass=f=3500,volume=0.8", "-c:a", "aac", "-b:a", "128k", "-ar", "48000", "-shortest", path("talk.mp4"))
 	writeManifest(m)
 
 	// 2. talk-vfr.mp4 — dropped frames (VFR) and audio starting 0.085 s after video. [L02]

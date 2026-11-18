@@ -1,4 +1,4 @@
-.PHONY: build check e2e fixtures install
+.PHONY: build check e2e fixtures install grade-selftest
 
 build:
 	go build -o bin/cutroom ./cmd/cutroom
@@ -16,3 +16,6 @@ e2e: build fixtures
 
 install:
 	go install ./cmd/cutroom
+
+grade-selftest: fixtures
+	evals/grade/selftest.sh
