@@ -25,6 +25,12 @@
 - `cutroom listen 16.5-17.8` — a spectrogram with loudness and word timing drawn under it, plus what an
   isolated re-transcription of just that stretch hears. Use it to settle every doubt about a suspect:
   whether a sound is words, where a word really ends, whether a pause is clean. Red = sound with no words.
+- **The edit and the render:**
+  - `cutroom look --cuts` — every cut as a pair (last frame before | first frame after) with the
+    words either side and the pause. Check this once after editing: jump cuts that look wrong show here.
+  - `cutroom look --output 0:03-0:06` — frames of the edit in OUTPUT time (cuts marked in red).
+  - `cutroom listen --output 3-5` — listen to the current render around output 3–5 s, cuts marked.
+  - `--file out/final.mp4` on either command — any video file, in that file's time.
 Both write a PNG and print its path. **Open the PNG** with your image/file viewing tool; the text alone
 is a summary, not the picture.
 

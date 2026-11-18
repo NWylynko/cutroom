@@ -41,7 +41,8 @@ const (
 )
 
 // Listen analyses [a,b] of src. words/roomTone/speechDB come from the transcript when available.
-func Listen(src string, a, b float64, words []speech.Word, roomTone, speechDB float64, model, outPNG, tmp string) (*Listening, error) {
+// cuts are times (in src) to mark as cut points on the image.
+func Listen(src string, a, b float64, words []speech.Word, cuts []float64, roomTone, speechDB float64, model, outPNG, tmp string) (*Listening, error) {
 	d := b - a
 	wav := filepath.Join(tmp, "clip.wav")
 	if _, err := deps.Run("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f3(a), "-t", f3(d), "-i", src,
@@ -186,6 +187,14 @@ func Listen(src string, a, b float64, words []speech.Word, roomTone, speechDB fl
 		raster.Text(img, mono, xOf(rg.Start)+2, yw+60, raster.Red, "sound, no words")
 	}
 
+	// cut markers across spectrogram and loudness
+	for _, ct := range cuts {
+		if ct > a && ct < b {
+			x := xOf(ct)
+			raster.Fill(img, image.Rect(x-1, headerH, x+1, yw), raster.Red)
+			raster.Label(img, raster.Face("mono", 11), x+4, headerH+14, raster.White, raster.Red, "cut")
+		}
+	}
 	// axis
 	ya := yw + wordsH
 	step := niceStep(d)

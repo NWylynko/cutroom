@@ -77,6 +77,10 @@ popd >/dev/null
 g=$(go run ./evals/grade -fixtures $FIX tighten "$E" 2>&1)
 grep -q 'GRADE tighten: PASS' <<<"$g" && ok "independent grader passes the render" || bad "independent grader passes the render" "$(grep -E 'FAIL' <<<"$g")"
 pushd "$E" >/dev/null
+expect "look --cuts"                'cuts 1–4 of 4'                   cutroom look --cuts
+expect "look --output marks cut"    'red bar = a cut'                 cutroom look --output 3-5 --count 8
+expect "listen --output (render)"   'cuts in range: 0:03\.933'         cutroom listen --output 3-5
+expect "look --file"                'of out/final.mp4 at 0:03\.900 \(file time\)' cutroom look 3.9 --file out/final.mp4
 expect "check passes a good render" '^PASS out/final.mp4'              cutroom check
 # planted faults: each must be caught by the right check
 M=out/final.mp4.cutroom.json

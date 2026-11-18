@@ -2,6 +2,17 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 11 · 2026-11-18 · perceive the edit and the render (friction #3 from round 1)
+Did: contact sheets generalised to labelled cells (any file/time, cut markers). `look --cuts`
+(pairs: last frame before | first after each cut, words either side, measured pause; 12 cuts/page),
+`look --output <t|range>` (output time mapped through the timeline to source frames; red bar where a
+cut falls), `look --file <video>`; `listen --output <range>` (needs a render of the *current* timeline,
+else a clear stale/no-render error) and `listen --file`, both with words mapped through the render
+manifest and cuts drawn on the spectrogram. Guide `perceive` updated. e2e 70/70.
+Looked at all three new images: cut pairs show the expected source jumps; the output sheet marks the
+cut between output 3.857 and 4.143; the render spectrogram shows the cut centred in a clean 0.30 s pause.
+Next: eval round 2.
+
 ### 10 · 2026-11-18 · sync + audio source (round-1 correctness bug) + 5 small friction fixes
 Did: `internal/align`: 10 ms log-envelope FFT cross-correlation (coarse, whole files), then 40 × 2 s
 waveform windows band-passed to 300–3000 Hz, xcorr ±60 ms, robust line fit (3×MAD outlier rejection,

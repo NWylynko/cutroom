@@ -7,7 +7,6 @@ Move done items to the journal, not here.
 - Final name (working name: cutroom) and license (proposed: Apache-2.0).
 
 ## NOW — friction from eval round 1 (ranks above features)
-- [friction] **Perceive the render**: 5/8 wanted `look`/`listen`/`transcript` on out/final.mp4. `look --output <t>` and `listen --output <range>` (output time through the timeline, or a rendered file).
 
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
@@ -19,10 +18,9 @@ Move done items to the journal, not here.
 - `status`.
 
 ## NEXT
-- **Eval round 2** (after the perceive-the-render item): rerun all 4 tasks × 2 models; target tool-only 8/8.
+- **Eval round 2 — next iteration**: rerun all 4 tasks × 2 models; target tool-only 8/8. Add a 5th task that needs `look --cuts`/`check` judgement (e.g. a planted bad cut to find and fix).
 
 ## M2 — decide/act
-- `look --cuts` / `look --output` once a timeline exists (frames either side of every cut).
 - `edit zoom` (punch-ins with anchor; warn > 1.2× on 1080p) once render exists. [L40]
 - `edit move` / reorder and multi-source (takes) segments. 
 - `look`: untagged HD sources are converted with bt601 by ffmpeg but shown as bt709 by players; assume bt709 for untagged ≥720p (in_color_matrix) so `look` matches renders.

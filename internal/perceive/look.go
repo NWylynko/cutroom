@@ -52,80 +52,99 @@ type SheetFrame struct {
 	Saying string  `json:"saying,omitempty"` // word(s) being spoken at that moment
 }
 
-// Sheet builds a labelled contact sheet of n frames evenly spaced over [a, b].
+// Cell is one frame on a sheet: which file, which time, how to label it.
+type Cell struct {
+	Path  string  `json:"path"`
+	T     float64 `json:"time"`  // time in Path
+	Label string  `json:"label"` // first line (white)
+	Say   string  `json:"saying,omitempty"`
+	Cut   bool    `json:"cut_before,omitempty"` // draw a cut marker on the left edge
+}
+
+// Sheet builds a labelled contact sheet of n frames evenly spaced over [a, b] of one file.
 func Sheet(src string, a, b float64, n int, rate timecode.Rate, words []speech.Word) (image.Image, []SheetFrame, error) {
 	if n < 1 {
 		n = 1
 	}
-	cols := 4
-	switch {
-	case n <= 2:
-		cols = n
-	case n <= 6:
-		cols = 3
-	case n > 16:
-		cols = 6
+	var cells []Cell
+	var meta []SheetFrame
+	for i := 0; i < n; i++ {
+		t := a
+		if n > 1 {
+			t = a + (b-a)*float64(i)/float64(n-1)
+		}
+		if i == n-1 && n > 1 {
+			t = math.Max(a, b-0.5/rate.FPS()) // last frame inside the range
+		}
+		f := timecode.FromFloat(t).Frame(rate)
+		say := sayingAt(words, t)
+		cells = append(cells, Cell{Path: src, T: t, Label: fmt.Sprintf("%s f%d", timecode.FromFloat(t).Clock(), f), Say: say})
+		meta = append(meta, SheetFrame{Time: math.Round(t*1000) / 1000, Frame: f, Saying: say})
+	}
+	img, err := Cells(cells, 0)
+	return img, meta, err
+}
+
+// Cells lays out cells in a grid (cols 0 = automatic), each labelled, cut markers in red.
+func Cells(cells []Cell, cols int) (image.Image, error) {
+	n := len(cells)
+	if n == 0 {
+		return nil, fmt.Errorf("nothing to show")
+	}
+	if cols <= 0 {
+		cols = 4
+		switch {
+		case n <= 2:
+			cols = n
+		case n <= 6:
+			cols = 3
+		case n > 16:
+			cols = 6
+		}
 	}
 	rows := (n + cols - 1) / cols
 	thumbW := min(480, (MaxEdge-(cols+1)*8)/cols)
-	times := make([]float64, n)
-	for i := range times {
-		if n == 1 {
-			times[i] = a
-		} else {
-			times[i] = a + (b-a)*float64(i)/float64(n-1)
-		}
-	}
 	imgs := make([]image.Image, n)
 	errs := make([]error, n)
 	var wg sync.WaitGroup
 	sem := make(chan struct{}, 6)
-	for i := range times {
+	for i := range cells {
 		wg.Add(1)
 		go func(i int) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			t := times[i]
-			if i == n-1 && n > 1 {
-				t = math.Max(a, b-0.5/rate.FPS()) // last frame inside the range
-			}
-			imgs[i], errs[i] = Frame(src, t, thumbW, nil)
+			imgs[i], errs[i] = Frame(cells[i].Path, cells[i].T, thumbW, nil)
 		}(i)
 	}
 	wg.Wait()
 	for i, e := range errs {
 		if e != nil {
-			return nil, nil, fmt.Errorf("frame at %.3f: %w", times[i], e)
+			return nil, fmt.Errorf("frame at %.3f of %s: %w", cells[i].T, cells[i].Path, e)
 		}
 	}
 	th := imgs[0].Bounds().Dy() * thumbW / imgs[0].Bounds().Dx()
-	labelH := 22
-	pad := 8
+	labelH, pad := 40, 8
 	W := pad + cols*(thumbW+pad)
 	H := pad + rows*(th+labelH+pad)
 	sheet := image.NewRGBA(image.Rect(0, 0, W, H))
 	raster.Fill(sheet, sheet.Bounds(), raster.Panel)
 	face := raster.Face("mono", 13)
-	var meta []SheetFrame
 	for i, im := range imgs {
+		c := cells[i]
 		x := pad + (i%cols)*(thumbW+pad)
 		y := pad + (i/cols)*(th+labelH+pad)
 		r := image.Rect(x, y, x+thumbW, y+th)
 		xdraw.CatmullRom.Scale(sheet, r, im, im.Bounds(), draw.Src, nil)
-		t := times[i]
-		f := timecode.FromFloat(t).Frame(rate)
-		lbl := fmt.Sprintf("%s f%d", timecode.FromFloat(t).Clock(), f)
-		raster.Text(sheet, face, x, y+th+16, raster.White, lbl)
-		say := sayingAt(words, t)
-		if say != "" {
-			w := raster.Measure(face, lbl)
-			s := fit("\""+say+"\"", thumbW-w-10)
-			raster.Text(sheet, face, x+w+8, y+th+16, raster.Amber, s)
+		if c.Cut {
+			raster.Fill(sheet, image.Rect(x-pad+1, y, x-1, y+th), raster.Red)
 		}
-		meta = append(meta, SheetFrame{Time: math.Round(t*1000) / 1000, Frame: f, Saying: say})
+		raster.Text(sheet, face, x, y+th+16, raster.White, fit(c.Label, thumbW))
+		if c.Say != "" {
+			raster.Text(sheet, face, x, y+th+33, raster.Amber, fit("\""+c.Say+"\"", thumbW))
+		}
 	}
-	return sheet, meta, nil
+	return sheet, nil
 }
 
 // sayingAt returns the word spoken at t, or "" in a pause.

@@ -21,11 +21,11 @@ import (
 func init() {
 	Register(&Command{
 		Name:     "look",
-		Args:     "<time | start-end>",
-		MinArgs:  1,
+		Args:     "[time | start-end]",
+		MinArgs:  0,
 		MaxArgs:  1,
 		Category: "perceive",
-		Summary:  "See video: one frame at a time, or a labelled contact sheet of a range. Writes a PNG for you to view",
+		Summary:  "See video: a frame, a labelled contact sheet, every cut (--cuts), the edit (--output) or a render (--file)",
 		Help: `A time gives one frame (as a viewer would see it: rotation applied). A range gives a contact
 sheet: --count frames evenly spaced, each labelled with its time, frame number and the word being
 spoken. Open the PNG it prints (e.g. with your file/image reading tool) — the text output alone does
@@ -33,12 +33,20 @@ not show the picture.
 Examples:
   cutroom look 12.5
   cutroom look 0:06-0:12 --count 12
-  cutroom look 3 --source cam --crop 400,100,600,600     (full-resolution crop, e.g. to judge a face)`,
+  cutroom look 3 --source cam --crop 400,100,600,600     (full-resolution crop, e.g. to judge a face)
+  cutroom look --cuts                    every cut: last frame before | first frame after, with the words
+  cutroom look --output 0:03-0:06        OUTPUT times: frames of the edit, cuts marked in red
+  cutroom look 3.9 --file out/final.mp4  a frame of a rendered file (file time)
+Times are source times unless you pass --output (edit time) or --file (that file's time).`,
 		Flags: []Flag{
 			{Name: "source", Kind: "string", Help: "Source id (default: the first video source)"},
 			{Name: "count", Kind: "int", Default: "12", Help: "Frames in a contact sheet (1–36)"},
 			{Name: "width", Kind: "int", Default: "1280", Help: "Max width of a single frame in pixels"},
 			{Name: "crop", Kind: "string", Help: "x,y,w,h in displayed source pixels; shown at full resolution"},
+			{Name: "output", Kind: "bool", Help: "Times are output (edit) times, mapped through the timeline"},
+			{Name: "cuts", Kind: "bool", Help: "Show every cut: frame before | frame after, 12 cuts per page"},
+			{Name: "page", Kind: "int", Default: "1", Help: "Page of --cuts"},
+			{Name: "file", Kind: "string", Help: "Look at this video file (e.g. a render); times are file times"},
 		},
 		Run: runLook,
 	})
@@ -48,15 +56,19 @@ Examples:
 		MinArgs:  1,
 		MaxArgs:  1,
 		Category: "perceive",
-		Summary:  "Hear a stretch of audio: spectrogram + loudness + words as a PNG, and what an isolated re-transcription hears",
+		Summary:  "Hear a stretch of audio (a source, the edit with --output, or a file): spectrogram + loudness + words as a PNG, and what an isolated re-transcription hears",
 		Help: `Use it to settle doubts before cutting: a suspect sound, a word the transcript may have missed,
 the exact end of a word, whether a pause is clean. Ranges up to 30 s.
 The isolated re-transcription often hears words the long pass skipped (it has no context to smooth over).
 Red areas in the image are sounds with no transcript words.
 Examples:
   cutroom listen 16.5-17.8
-  cutroom listen 0:06-0:11 --source mic`,
+  cutroom listen 0:06-0:11 --source mic
+  cutroom listen --output 3-5        the RENDERED edit around output 3–5 s, cuts marked (needs a current render)
+  cutroom listen 3-5 --file out/final.mp4`,
 		Flags: []Flag{
+			{Name: "output", Kind: "bool", Help: "Range is in output time; listens to the current render (out/final.mp4 or preview)"},
+			{Name: "file", Kind: "string", Help: "Listen to this file (e.g. a render); range in file time"},
 			{Name: "source", Kind: "string", Help: "Source id (default: the first transcribed source, else the first with audio)"},
 			{Name: "pad", Kind: "float", Default: "0", Help: "Widen the range by this many seconds on each side"},
 		},
@@ -131,6 +143,12 @@ func relToCwd(path string) string {
 func stamp(t float64) string { return strings.ReplaceAll(strconv.FormatFloat(t, 'f', 3, 64), ".", "_") }
 
 func runLook(c *Ctx) (*Result, error) {
+	if c.Bool("cuts") || c.Bool("output") || c.Has("file") {
+		return lookEdit(c)
+	}
+	if len(c.Args) == 0 {
+		return nil, Errf(ExitUsage, "bad-args", "give a time or range (`cutroom look 12.5`, `cutroom look 6-12`), or use --cuts", "look needs a time")
+	}
 	p, err := needProject(c.Dir)
 	if err != nil {
 		return nil, err
@@ -222,6 +240,9 @@ func runLook(c *Ctx) (*Result, error) {
 }
 
 func runListen(c *Ctx) (*Result, error) {
+	if c.Bool("output") || c.Has("file") {
+		return listenFile(c)
+	}
 	p, err := needProject(c.Dir)
 	if err != nil {
 		return nil, err
@@ -277,7 +298,7 @@ func runListen(c *Ctx) (*Result, error) {
 	}
 	defer os.RemoveAll(tmp)
 	out := filepath.Join(lookDir(p), fmt.Sprintf("%s_listen_%s-%s.png", s.ID, stamp(a), stamp(b)))
-	L, err := perceive.Listen(p.Abs(s), a, b, words, room, peak, model, out, tmp)
+	L, err := perceive.Listen(p.Abs(s), a, b, words, nil, room, peak, model, out, tmp)
 	if err != nil {
 		return nil, Errf(ExitExternal, "listen-failed", "check the range is inside the source", "%v", err)
 	}
