@@ -2,6 +2,22 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 3 · 2026-11-18 · M1 init + inspect
+Did: `internal/media` (ffprobe facts; VFR from packet timestamps — no decode; rotation from the
+display matrix; HDR from transfer; AV offset; EBU R128 loudness + true peak), warnings tagged
+`handled` vs `ACTION` with lesson ids; `internal/project` (cutroom.json, ids from file names, staleness
+by size+mtime, source identity by `os.SameFile`); `init` (idempotent, adds/re-inspects) and `inspect`
+(ids, loose files, did-you-mean on ids); guide topic `workflow` (only lists what exists; future steps
+marked not available). Tests: TestL02_DetectVFRAndAudioOffset, TestL25_DetectRotation, clean/audio-only,
+project path identity. e2e 14/14.
+Measured: VFR scan via packets 37 ms on 885 frames. Fixture loudness: camera -20.4 LUFS, recorder -16.8.
+Surprises: (1) re-init added a duplicate source: stored relative path vs absolute compare with
+`--project .`; then macOS /var → /private/var symlink broke string compare again. Identity is now
+`os.SameFile`. (2) AAC stream copy keeps the priming frame: the stream starts 0.0637 s while speech
+content is at 0.085 s. Timestamp-based alignment places content correctly, so inspect reports the
+stream timestamp; the renderer must align audio by pts (not by "first sample = 0").
+Next: `transcribe` + `transcript` views.
+
 ### 2 · 2026-11-18 · independent grader + its self-test
 Did: `evals/grade` (shares no code with cutroom): own whisper pass with fuzzy in-order phrase
 counting; duration; A/V lengths; frame matching of output against the reference testsrc video (unique

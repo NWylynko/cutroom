@@ -173,6 +173,22 @@ func Run(name string, args ...string) ([]byte, error) {
 	return out, nil
 }
 
+// RunErr executes a tool whose useful output is on stderr (ffmpeg analysis filters).
+func RunErr(name string, args ...string) (string, error) {
+	cmd := exec.Command(name, args...)
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	cmd.Stdout = nil
+	if err := cmd.Run(); err != nil {
+		msg := strings.TrimSpace(stderr.String())
+		if len(msg) > 1500 {
+			msg = "…" + msg[len(msg)-1500:]
+		}
+		return stderr.String(), &ToolError{Tool: name, Err: err, Stderr: msg}
+	}
+	return stderr.String(), nil
+}
+
 type ToolError struct {
 	Tool   string
 	Err    error

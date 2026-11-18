@@ -19,5 +19,21 @@ expect "guide lists topics"   'Topics:'                             cutroom guid
 expect "typo suggests"        'did you mean `cutroom guide`'        cutroom giude
 expect "json envelope"        '"ok": true'                          cutroom guide --json
 
+# init / inspect on fixtures
+P="$W/proj"; mkdir -p "$P"; cp $FIX/talk.mp4 $FIX/talk-vfr.mp4 $FIX/talk-rot.mov $FIX/recorder.wav "$P/"
+pushd "$P" >/dev/null
+expect "init adds sources"     'talk-vfr .*\(added\)'               cutroom init talk.mp4 talk-vfr.mp4 talk-rot.mov --source mic=recorder.wav
+expect "init is idempotent"    '^project updated'                    cutroom init talk.mp4
+expect "no duplicate source"   '^\{|"unchanged": \[\s*$|"talk"'     cutroom init talk.mp4 --json
+n=$(python3 -c 'import json;print(len(json.load(open("cutroom.json"))["sources"]))')
+[ "$n" = 4 ] && ok "4 sources after re-init" || bad "4 sources after re-init" "got $n"
+expect "inspect vfr"           'VARIABLE frame rate \(11 gaps'        cutroom inspect talk-vfr
+expect "inspect rotation"      'rotated 180° by metadata'            cutroom inspect talk-rot
+expect "inspect audio-only"    'audio  pcm_s16le 48000 Hz mono'      cutroom inspect mic
+expect "unknown id suggests"   'did you mean source "talk"'          cutroom inspect tlk
+expect "inspect a loose file"  'no problems found'                   cutroom inspect --fast talk.mp4
+popd >/dev/null
+expect "no project → fix"      'run `cutroom init'                   cutroom inspect --project "$W/nothing-here"
+
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

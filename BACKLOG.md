@@ -10,7 +10,8 @@ Move done items to the journal, not here.
 - Fixtures on Linux: espeak-ng path untested.
 
 ## M1 — perceive
-- `init`, `inspect` (VFR, audio start, rotation, HDR, loudness) with warnings+fixes. [L02 L04 L23 L25]
+- HDR fixture (HEVC 10-bit HLG tags via libx265) so `inspect` hdr warning has a test. [L23]
+- `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
 - `transcribe` via whisper.cpp; suspects (long words, loud gaps, repeated n-grams); `transcript` views (`--phrases`, `--search`, `--suspects`, `--retakes`). [L28 L29 L36]
 - `look` (frame, range sheet) and `listen` (spectrogram + RMS + isolated transcript). [L30 L31 L34]
 - `status`.
