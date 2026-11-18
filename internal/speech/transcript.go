@@ -373,38 +373,46 @@ type Match struct {
 	Text        string
 }
 
-// Search finds every occurrence of the phrase (normalised, fillers ignored).
+// Search finds every occurrence of the phrase. Case and punctuation are ignored. Fillers (um, uh…)
+// in the transcript are skipped unless the query itself contains them, so quoting "is, um" can
+// pick out the take with the filler.
 func Search(words []Word, phrase string) []Match {
 	var q []string
 	for _, f := range strings.Fields(phrase) {
-		if n := Norm(f); n != "" {
+		if n := normRaw(f); n != "" {
 			q = append(q, n)
 		}
 	}
 	if len(q) == 0 {
 		return nil
 	}
-	var idx []int // indices of non-filler words
-	for i, w := range words {
-		if Norm(w.Text) != "" {
-			idx = append(idx, i)
-		}
-	}
 	var out []Match
-	for k := 0; k+len(q) <= len(idx); k++ {
-		ok := true
-		for j, t := range q {
-			if Norm(words[idx[k+j]].Text) != t {
-				ok = false
-				break
+	for start := 0; start < len(words); start++ {
+		if normRaw(words[start].Text) != q[0] {
+			continue
+		}
+		k, i := 0, start
+		for i < len(words) && k < len(q) {
+			w := normRaw(words[i].Text)
+			switch {
+			case w == q[k]:
+				k++
+				i++
+			case fillers[w] || w == "":
+				i++ // skip a filler the query doesn't mention
+			default:
+				i = len(words) + 1
 			}
 		}
-		if ok {
-			a, b := idx[k], idx[k+len(q)-1]
-			out = append(out, Match{a, b, words[a].Start, words[b].End, Text(words, a, b)})
+		if k == len(q) {
+			out = append(out, Match{start, i - 1, words[start].Start, words[i-1].End, Text(words, start, i-1)})
 		}
 	}
 	return out
+}
+
+func normRaw(s string) string {
+	return strings.Trim(nonAlnum.ReplaceAllString(strings.ToLower(s), ""), "'")
 }
 
 func round3(f float64) float64 { return math.Round(f*1000) / 1000 }

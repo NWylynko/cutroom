@@ -10,7 +10,8 @@
 3. **Perceive the content.** `cutroom transcribe`, then `cutroom transcript` to read it phrase by
    phrase, `--suspects` for retakes and stray sounds, `--search` to find exact words. See
    `cutroom guide perceive`. `cutroom look` shows frames; `cutroom listen` settles doubts about audio.
-4. **Edit the timeline.** *(not available in this version yet)*
+4. **Edit the timeline.** `cutroom edit tighten`, then `cutroom edit cut --from "…" --to "…"` for
+   retakes and asides; check `cutroom timeline` and `cutroom timeline --joins`. See `cutroom guide edit`.
 5. **Render** a preview, then the final. *(not available in this version yet)*
 6. **Verify** with `cutroom check` before calling anything done. *(not available in this version yet)*
 

@@ -52,6 +52,27 @@ cutroom look 12.5 --source talk --json >/dev/null; cutroom look 12.5 --source ta
 d=$(ffmpeg -v error -i .cutroom/look/talk_12_500.png -i .cutroom/look/talk-rot_12_500.png -lavfi "[0][1]psnr" -f null - 2>&1; ffmpeg -i .cutroom/look/talk_12_500.png -i .cutroom/look/talk-rot_12_500.png -lavfi "[0:v]crop=iw:ih-40:0:0[a];[1:v]crop=iw:ih-40:0:0[b];[a][b]psnr" -f null - 2>&1 | grep -o 'average:[0-9.inf]*')
 case "$d" in *average:inf*|*average:[3-9][0-9]*) ok "look shows rotated source upright";; *) bad "look shows rotated source upright" "$d";; esac
 popd >/dev/null
+
+# edit flow on a fresh project: reach the ground-truth edit of talk.mp4 by words
+E="$W/edit"; mkdir -p "$E"; cp $FIX/talk.mp4 "$E/"; pushd "$E" >/dev/null
+cutroom init talk.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null
+expect "timeline before edit → fix" 'make the first edit'             cutroom timeline
+expect "tighten creates timeline"   'created timeline from talk'      cutroom edit tighten
+expect "tighten flags retake"       'retake-kept'                     cutroom timeline
+expect "ambiguous --from lists"     'occurs 2 times'                  cutroom edit cut --from "The first thing you need is" --to "thing."
+expect "cut retake by words"        'removed\): "The first thing you need is, UM, the first thing\."' cutroom edit cut --from "The first thing you need is, um" --to "the first thing."
+expect "join pause is real"         'join: .*\(pause 0\.[23][0-9] s\)'  cutroom edit cut --from "By the way" --to "keyboard." --dry-run
+expect "dry run not saved"          'my cat'                          cutroom timeline
+expect "cut aside"                  'removed\): "By the way'           cutroom edit cut --from "By the way" --to "keyboard."
+expect "clean timeline"             'no problems found'               cutroom timeline
+out=$(cutroom timeline --json)
+dur=$(python3 -c 'import json,sys;print(json.load(sys.stdin)["result"]["duration"])' <<<"$out")
+python3 -c "import sys;d=float('$dur');sys.exit(0 if 13.0<=d<=18.5 else 1)" && ok "edited duration $dur in ground-truth bounds" || bad "edited duration" "$dur"
+if grep -qiE '"text": "[^"]*(UM|cat)' <<<"$out"; then bad "no retake/aside words left" "$out"; else ok "no retake/aside words left"; fi
+expect "undo"                       'undid: edit cut'                 cutroom edit undo
+expect "history"                    'edit tighten'                    cutroom edit history
+expect "unknown op suggests"        'did you mean `cutroom edit cut`' cutroom edit cutt
+popd >/dev/null
 expect "no project → fix"      'run `cutroom init'                   cutroom inspect --project "$W/nothing-here"
 
 echo "e2e: $pass passed, $fail failed"

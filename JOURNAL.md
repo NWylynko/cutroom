@@ -2,6 +2,25 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 6 · 2026-11-18 · M2 timeline + edit
+Did: `internal/timeline`: segments of kept source ranges, edges snapped to the frame grid anchored at
+the audio start (L01/L02), output duration from whole frames, source↔output mapping, Cut (pins
+explicit edges), Keep, CutWords (cuts inside the pauses with pads 0.22/0.10, warns on continuous
+speech), Tighten (pause − pads ≥ min-cut, trims edges, never moves pinned edges — L38/L39),
+Validate (out-of-source, short segments, repeated material, edge-in-word, retake-kept, kept-sound),
+Joins, KeptBetween, checkpoint/undo history. CLI `edit cut|keep|tighten|undo|history|reset` with
+`--text`, `--from/--to`, `--near`, `--occurrence`, `--dry-run`, auto-validation after every edit;
+`timeline` (segments with words, problems) and `timeline --joins`. Guide topic `edit`. Unit tests
+TestL01_EdgesOnFrameGrid, TestL39_*, TestL38_*; e2e reaches the ground-truth edit of talk.mp4 by
+words alone (13.767 s, no retake/aside words, "no problems found"). e2e 44/44.
+Surprises: (1) search dropped "um" from the *query*, so quoting the filler to pick the abandoned take
+was "ambiguous" — fillers are now skipped only in the transcript when the query lacks them.
+(2) `--to` matched at the same position as `--from` and silently cut 3 words; caught at once by the
+continuous-speech warning. --to now must start after --from starts and end at or after it ends.
+(3) The join pause printed after a cut ignored what tighten had already removed (said 2.84 s, real
+0.30 s); now measured from what the timeline keeps.
+Next: `render` (chunked, cached, frame/sample exact), then the first T2 eval round.
+
 ### 5 · 2026-11-18 · M1 look + listen (eval round deferred)
 Eval round due (5th iteration) deferred to right after `render` exists: every T2 task needs an output
 video, so a round now would only measure "can't do it". Logged in BACKLOG.

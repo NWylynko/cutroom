@@ -80,6 +80,16 @@ func TestDiffPassesFindsStumble(t *testing.T) {
 	}
 }
 
+func TestSearchMatchesFillerWhenQuoted(t *testing.T) {
+	ws := []Word{{Text: "The"}, {Text: "first"}, {Text: "is,"}, {Text: "UM,"}, {Text: "the"}, {Text: "first"}, {Text: "is"}, {Text: "an"}}
+	if m := Search(ws, "first is, um"); len(m) != 1 || m[0].First != 1 || m[0].Last != 3 {
+		t.Fatalf("quoted filler must disambiguate: %+v", m)
+	}
+	if m := Search(ws, "first is"); len(m) != 2 {
+		t.Fatalf("unquoted: both takes: %+v", m)
+	}
+}
+
 func TestSearchIgnoresCaseFillersPunctuation(t *testing.T) {
 	ws := []Word{{Text: "The"}, {Text: "first"}, {Text: "um,"}, {Text: "thing,"}, {Text: "you"}}
 	m := Search(ws, "first thing you")
