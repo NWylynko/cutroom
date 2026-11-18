@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/cutroom/cutroom/internal/media"
 	"github.com/cutroom/cutroom/internal/project"
 	"github.com/cutroom/cutroom/internal/speech"
 	"github.com/cutroom/cutroom/internal/timecode"
@@ -48,7 +49,8 @@ Examples:
   cutroom transcript
   cutroom transcript --search "first thing you need"
   cutroom transcript --suspects
-  cutroom transcript --words --from 0:06 --to 0:12`,
+  cutroom transcript --words --from 0:06 --to 0:12
+  cutroom transcript --file out/final.mp4     read the render's own words (to confirm sentences are whole)`,
 		Flags: []Flag{
 			{Name: "words", Kind: "bool", Help: "One line per word with start/end"},
 			{Name: "search", Kind: "string", Help: "Find a phrase (case/punctuation/fillers ignored); prints every occurrence"},
@@ -57,6 +59,7 @@ Examples:
 			{Name: "to", Kind: "string", Help: "End of range (time)"},
 			{Name: "gap", Kind: "float", Default: "0.5", Help: "Pause length (s) that splits phrases"},
 			{Name: "all", Kind: "bool", Help: "Don't truncate long output"},
+			{Name: "file", Kind: "string", Help: "Transcribe and read any file, e.g. your render (cached); times are file times"},
 		},
 		Run: runTranscript,
 	})
@@ -136,6 +139,31 @@ func runTranscribe(c *Ctx) (*Result, error) {
 	return &Result{Text: strings.Join(lines, "\n"), Data: sums, Next: []string{"cutroom transcript " + ids[0], "cutroom transcript " + ids[0] + " --suspects"}}, nil
 }
 
+// transcribeFile transcribes any media file (1 pass), cached by path, size and mtime.
+func transcribeFile(p *project.Project, path string) (*speech.Transcript, error) {
+	st, err := os.Stat(path)
+	if err != nil {
+		return nil, Errf(ExitUsage, "file-not-found", "check the path", "%s not found", path)
+	}
+	f, err := media.Probe(path, media.Options{})
+	if err != nil || f.Audio == nil {
+		return nil, Errf(ExitUsage, "no-audio", "pick a file with sound", "%s has no audio", path)
+	}
+	model, _ := deps.FindModel()
+	if model == "" {
+		return nil, Errf(ExitDep, "no-model", deps.Model().Fix, "no whisper model found")
+	}
+	abs, _ := filepath.Abs(path)
+	id := "file-" + speech.Key(st.Size(), st.ModTime(), abs, 1)
+	t, _, err := speech.Transcribe(id, path, f.Audio.Start, f.Duration, speech.Key(st.Size(), st.ModTime(), model, 1),
+		speech.Options{Model: model, Passes: 1, CacheDir: cacheDir(p)})
+	if err != nil {
+		return nil, Errf(ExitExternal, "transcribe-failed", "run `cutroom doctor`", "%v", err)
+	}
+	t.Source = relToCwd(path)
+	return t, nil
+}
+
 func cacheDir(p *project.Project) string { return filepath.Join(p.Dir, ".cutroom") }
 
 func sourceByID(p *project.Project, id string) (*project.Source, error) {
@@ -192,8 +220,12 @@ func runTranscript(c *Ctx) (*Result, error) {
 	if len(c.Args) == 1 {
 		id = c.Args[0]
 	}
-	t, err := loadTranscript(p, id)
-	if err != nil {
+	var t *speech.Transcript
+	if c.Has("file") {
+		if t, err = transcribeFile(p, c.Str("file")); err != nil {
+			return nil, err
+		}
+	} else if t, err = loadTranscript(p, id); err != nil {
 		return nil, err
 	}
 	lo, hi := 0.0, 1e18
@@ -262,7 +294,19 @@ func runTranscript(c *Ctx) (*Result, error) {
 		for _, s := range t.Suspects {
 			if inRange(s.Start, s.End) {
 				sel = append(sel, s)
-				lines = append(lines, fmt.Sprintf("%s–%s  %-14s %s%s", clock(s.Start), clock(s.End), s.Kind, s.Detail, cutNote(s.Start, s.End)))
+				note := cutNote(s.Start, s.End)
+				if s.Kind == "repeat" && tl != nil {
+					kept := 0
+					for _, at := range s.Related {
+						if tl.Kept(t.Source, at+0.05) {
+							kept++
+						}
+					}
+					if kept <= 1 {
+						note = "  (resolved: only one take is kept)"
+					}
+				}
+				lines = append(lines, fmt.Sprintf("%s–%s  %-14s %s%s", clock(s.Start), clock(s.End), s.Kind, s.Detail, note))
 			}
 		}
 		if len(sel) == 0 {
@@ -326,9 +370,13 @@ func runTranscript(c *Ctx) (*Result, error) {
 		out = append(out, phraseOut{x.Start, x.End, text, x.PauseAfter, marks})
 	}
 	trunc("narrow with --from/--to")
-	foot := fmt.Sprintf("%d suspect(s): `cutroom transcript %s --suspects`", len(t.Suspects), t.Source)
+	ref := t.Source
+	if c.Has("file") {
+		ref = "--file " + c.Str("file")
+	}
+	foot := fmt.Sprintf("%d suspect(s): `cutroom transcript %s --suspects`", len(t.Suspects), ref)
 	return &Result{Text: head + "\n" + strings.Join(lines, "\n") + "\n" + foot, Data: map[string]any{"source": t.Source, "phrases": out, "suspects": len(t.Suspects)},
-		Next: []string{"cutroom transcript " + t.Source + " --suspects"}}, nil
+		Next: []string{"cutroom transcript " + ref + " --suspects"}}, nil
 }
 
 func nzs(s []speech.Suspect) []speech.Suspect {

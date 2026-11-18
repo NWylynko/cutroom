@@ -241,6 +241,45 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 			}
 		}
 	}
+	// cuts that break a sentence: words removed from the middle of a sentence, not a retake
+	for i := 0; i+1 < len(t.Segments); i++ {
+		l, r := t.Segments[i], t.Segments[i+1]
+		tx := tr[l.Source]
+		if tx == nil || l.Source != r.Source || r.In <= l.Out {
+			continue
+		}
+		var lw, fw *speech.Word
+		var removed []string
+		for k := range tx.Words {
+			w := &tx.Words[k]
+			m := (w.Start + w.End) / 2
+			switch {
+			case m >= l.In && m < l.Out:
+				lw = w
+			case m >= l.Out && m < r.In:
+				removed = append(removed, w.Text)
+			case m >= r.In && m < r.Out && fw == nil:
+				fw = w
+			}
+		}
+		if lw == nil || fw == nil || len(removed) == 0 {
+			continue
+		}
+		retake := false
+		for _, s := range tx.Suspects {
+			if s.Kind == "repeat" && s.Start < r.In && s.End > l.Out {
+				retake = true
+			}
+		}
+		midLeft := !endsSentence(lw.Text)
+		midRight := startsLower(fw.Text)
+		if retake || (!midLeft && !midRight) {
+			continue
+		}
+		add("warn", "broken-sentence", &t.Segments[i+1], r.OutStart,
+			fmt.Sprintf("if unintended: `cutroom edit undo`, or cut whole sentences with --from/--to (check with `cutroom transcript --file` after rendering)"),
+			"the cut at %.3f removes %q from inside a sentence: …%s | %s…", r.OutStart, strings.Join(removed, " "), lw.Text, fw.Text)
+	}
 	// suspects still in the cut
 	for src, tx := range tr {
 		for _, s := range tx.Suspects {
@@ -316,6 +355,18 @@ func (t *Timeline) Joins(tr Transcripts) []Join {
 		js = append(js, j)
 	}
 	return js
+}
+
+func endsSentence(w string) bool {
+	w = strings.TrimRight(w, "\"')”’")
+	return strings.HasSuffix(w, ".") || strings.HasSuffix(w, "?") || strings.HasSuffix(w, "!")
+}
+
+func startsLower(w string) bool {
+	for _, r := range w {
+		return r >= 'a' && r <= 'z'
+	}
+	return false
 }
 
 func tail(ws []string, n int) string {

@@ -87,9 +87,11 @@ M=out/final.mp4.cutroom.json
 ffmpeg -v error -y -i out/final.mp4 -itsoffset 0.1 -i out/final.mp4 -map 0:v -map 1:a -c copy -t 13.767 out/late.mp4; cp $M out/late.mp4.cutroom.json
 expect "check: audio 100 ms late"   'FAIL sync .*worst \+(9[0-9]|10[0-9]) ms'  cutroom check out/late.mp4
 ffmpeg -v error -y -i out/final.mp4 -vf "trim=start_frame=3,setpts=PTS-STARTPTS,tpad=stop=3:stop_mode=clone" -c:v libx264 -crf 18 -c:a copy out/shift.mp4; cp $M out/shift.mp4.cutroom.json
-expect "check: picture 3 frames off" 'FAIL picture .*offset \+3 frames' cutroom check out/shift.mp4
+expect "check: picture 3 frames off" 'FAIL picture .*about \+3 frames' cutroom check out/shift.mp4
 cutroom edit cut 1.9-2.9 >/dev/null; cutroom render out/clip.mp4 >/dev/null 2>&1
 expect "check: clipped word"        'WARN clipped-word .*inside the word' cutroom check out/clip.mp4
+expect "timeline: broken sentence"  'broken-sentence'                 cutroom timeline
+expect "transcript --file render"   'out/clip\.mp4 — [0-9]+ words'     cutroom transcript --file out/clip.mp4
 cutroom edit undo >/dev/null
 expect "check: stale timeline"      'WARN stale'                      cutroom check out/clip.mp4
 expect "check exit code 4 on fail"  '^4$'                             sh -c 'cutroom check out/late.mp4 >/dev/null; echo $?'
@@ -104,7 +106,7 @@ expect "edit audio refuses unsynced"  'cutroom sync mic --to talk'      cutroom 
 python3 -c "import json;t=json.load(open('timeline.json'));t['audio']='mic';json.dump(t,open('timeline.json','w'))"
 expect "render refuses hand-set unsynced audio" 'audio-not-synced|have not been aligned' cutroom render
 cutroom edit undo >/dev/null; cutroom edit tighten >/dev/null
-expect "sync measures offset"         'offset \+1\.70[01] s'             cutroom sync mic
+expect "sync measures offset"         'mic started recording 1\.70[01] s before talk' cutroom sync mic
 expect "edit audio after sync"        'takes its sound from mic'        cutroom edit audio mic
 expect "timeline shows audio source"  'sound from mic'                  cutroom timeline
 expect "render with recorder audio"   'wrote out/final.mp4'             cutroom render
@@ -116,6 +118,17 @@ pushd "$S" >/dev/null
 expect "dry run says would"           '^would cut .*DRY RUN|would cut'  cutroom edit cut --text "Then install Linux on it." --dry-run
 expect "transcript range past end"    'not word numbers'                cutroom transcript talk --words --from 38 --to 63
 expect "init --remove in use refused" 'used by the timeline'            cutroom init --remove mic
+popd >/dev/null
+# round-2 regressions
+V="$W/vfrcheck"; mkdir -p "$V"; cp $FIX/talk-vfr.mp4 "$V/"; pushd "$V" >/dev/null
+cutroom init talk-vfr.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null
+expect "dry run would create"        'would create timeline'           cutroom edit tighten --dry-run
+cutroom edit tighten >/dev/null; cutroom edit cut --from "The first thing you need is, um" --to "the first thing." >/dev/null; cutroom render >/dev/null 2>&1
+expect "check passes VFR render (no false FAIL)" '^PASS'               cutroom check
+expect "picture measured on VFR"     'ok   picture     1[0-9] sampled'   cutroom check
+expect "short flag hint"             'positional arguments need no flag' cutroom render -o x.mp4
+expect "short flag maps to long"     'did you mean --preview'          cutroom render -p
+expect "resolved repeat marked"      'resolved: only one take'         cutroom transcript --suspects
 popd >/dev/null
 expect "no project → fix"      'run `cutroom init'                   cutroom inspect --project "$W/nothing-here"
 

@@ -39,7 +39,7 @@ func init() {
 				res.Exit = ExitDep
 			} else {
 				b.WriteString("all dependencies ok")
-				res.Next = []string{"cutroom init --source cam=<video file>"}
+				res.Next = []string{"cutroom init <video file>"}
 			}
 			res.Text = b.String()
 			return res, nil

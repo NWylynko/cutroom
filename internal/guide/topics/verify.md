@@ -20,4 +20,4 @@ file). It measures the file itself:
 fine. Word differences are often the recogniser mishearing (especially with small models); settle
 each with `cutroom listen` around the source time before changing the edit.
 
-Exit code 4 means a check failed. Fix, re-render (unchanged chunks are cached), check again.
+Exit code 4 means a check failed (so `cutroom render && cutroom check` stops at check, not at render). Fix, re-render (unchanged chunks are cached), check again.

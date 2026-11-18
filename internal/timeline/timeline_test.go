@@ -109,3 +109,34 @@ func TestValidateFlagsEdgeInWordAndKeptRetake(t *testing.T) {
 		t.Fatalf("got %v", codes)
 	}
 }
+
+func TestBrokenSentenceWarned(t *testing.T) {
+	mk := func(spec []string) []speech.Word {
+		var ws []speech.Word
+		for i, x := range spec {
+			ws = append(ws, speech.Word{I: i, Text: x, Start: float64(i), End: float64(i) + 0.8})
+		}
+		return ws
+	}
+	ws := mk([]string{"Hi,", "today", "I'm", "going", "to", "show", "you."})
+	tl := New("30", 1280, 720, "cam", "cam", 0, 8)
+	tl.Cut("cam", 2.9, 4.9, "x", true) // removes "going to"
+	found := false
+	for _, is := range tl.Validate(map[string]float64{"cam": 8}, Transcripts{"cam": {Words: ws}}) {
+		if is.Code == "broken-sentence" {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatal("cut inside a sentence not flagged")
+	}
+	// cutting a whole sentence is fine
+	ws2 := mk([]string{"One.", "Two", "three.", "Four."})
+	tl2 := New("30", 1280, 720, "cam", "cam", 0, 5)
+	tl2.Cut("cam", 0.9, 2.9, "x", true)
+	for _, is := range tl2.Validate(map[string]float64{"cam": 5}, Transcripts{"cam": {Words: ws2}}) {
+		if is.Code == "broken-sentence" {
+			t.Fatalf("whole-sentence cut flagged: %+v", is)
+		}
+	}
+}

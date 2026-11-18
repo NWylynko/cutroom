@@ -102,8 +102,13 @@ func runSync(c *Ctx) (*Result, error) {
 	}
 	dur := ref.Facts.Duration
 	driftMS := math.Abs(s.Drift) * dur * 1000
+	first := fmt.Sprintf("%s started recording %.3f s before %s", other.ID, s.Offset, ref.ID)
+	if s.Offset < 0 {
+		first = fmt.Sprintf("%s started recording %.3f s after %s", other.ID, -s.Offset, ref.ID)
+	}
 	lines := []string{
-		fmt.Sprintf("synced %s to %s: %s time = %+.3f s + %s time × (1 %+.1f ppm)", other.ID, ref.ID, other.ID, s.Offset, ref.ID, s.PPM),
+		fmt.Sprintf("synced %s to %s: %s", other.ID, ref.ID, first),
+		fmt.Sprintf("  mapping: %s time = %+.3f s + %s time × (1 %+.1f ppm)", other.ID, s.Offset, ref.ID, s.PPM),
 		fmt.Sprintf("  offset %+.3f s; clock drift %+.1f ppm (%.1f ms over the %s of %s)", s.Offset, s.PPM, driftMS, clock(dur), ref.ID),
 		fmt.Sprintf("  fit: %d windows, %d rejected, residual %.2f ms", s.Windows, s.Rejected, s.Residual),
 	}

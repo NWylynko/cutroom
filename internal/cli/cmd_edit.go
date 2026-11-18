@@ -165,7 +165,11 @@ func runEdit(c *Ctx) (*Result, error) {
 	var data map[string]any
 	label := "edit " + op
 	if e.made {
-		lines = append(lines, fmt.Sprintf("created timeline from %s (whole source, %s)", e.tl.Video, secs(e.tl.Duration())))
+		verb := "created"
+		if c.Bool("dry-run") {
+			verb = "would create"
+		}
+		lines = append(lines, fmt.Sprintf("%s timeline from %s (whole source, %s)", verb, e.tl.Video, secs(e.tl.Duration())))
 	}
 	before := e.tl.Duration()
 

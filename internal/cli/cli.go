@@ -297,8 +297,18 @@ func parseArgs(ctx *Ctx, args []string) error {
 		}
 		if !strings.HasPrefix(a, "--") || len(a) == 2 {
 			if strings.HasPrefix(a, "-") && len(a) > 1 && !isNumberish(a) {
-				return Errf(ExitUsage, "bad-flag", fmt.Sprintf("use the long form, e.g. --%s", strings.TrimLeft(a, "-")),
-					"short flags are not supported: %s", a)
+				short := strings.TrimLeft(a, "-")
+				var cands []string
+				for n := range flags {
+					if strings.HasPrefix(n, short) && n != "help" && n != "project" && n != "json" {
+						cands = append(cands, n)
+					}
+				}
+				fix := "usage: " + usageLine(ctx.Cmd) + " (positional arguments need no flag; `cutroom " + ctx.Cmd.Name + " --help` lists flags)"
+				if len(cands) == 1 {
+					fix = fmt.Sprintf("did you mean --%s?", cands[0])
+				}
+				return Errf(ExitUsage, "bad-flag", fix, "%s has no flag %s (cutroom uses long flags only)", ctx.Cmd.Name, a)
 			}
 			ctx.Args = append(ctx.Args, a)
 			continue

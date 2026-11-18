@@ -5,10 +5,13 @@
 package verify
 
 import (
+	"bytes"
 	"fmt"
 	"math"
 	"os"
+	"os/exec"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -171,6 +174,7 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 		err     float64
 		ambig   bool
 		skipped bool
+		distMS  float64
 	}
 	var ss []sample
 	for _, g := range m.Segments {
@@ -204,29 +208,44 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			path := m.Sources[s.seg.Source].Path
-			seek := s.srcT - 3/fps
-			lead := 3
-			if seek < 0 {
-				lead = int(math.Round(s.srcT * fps))
-				seek = 0
-			}
-			burst := grey(path, "", seek, 7)
-			best, bi := math.Inf(1), 0
-			errs := make([]float64, len(burst))
-			for j, b := range burst {
-				errs[j] = mse(frames[s.f], b)
-				if errs[j] < best {
-					best, bi = errs[j], j
-				}
-			}
+			burst, pts := greyBurst(path, s.srcT-4/fps, 9)
 			if len(burst) == 0 {
 				s.skipped = true
 				return
 			}
-			s.offset, s.err = bi-lead, best
-			if lead < len(errs) && errs[lead]-best < 1.0 {
-				s.offset, s.ambig = 0, true // neighbouring frames look alike (static shot)
+			errs := make([]float64, len(burst))
+			best := math.Inf(1)
+			for j, b := range burst {
+				errs[j] = mse(frames[s.f], b)
+				best = math.Min(best, errs[j])
 			}
+			// the frame that should be on screen: the one whose display interval [pts_j, pts_j+1)
+			// contains the expected time (real timestamps, so VFR held frames are handled)
+			exp, bj := -1, 0
+			for j := range burst {
+				hi := pts[j] + 1/fps
+				if j+1 < len(pts) {
+					hi = pts[j+1]
+				}
+				if s.srcT >= pts[j]-0.5/fps && s.srcT < hi-0.5/fps+1e-6 {
+					exp = j
+					break
+				}
+			}
+			for j := range errs {
+				if errs[j] < errs[bj] {
+					bj = j
+				}
+			}
+			s.err = best
+			bestDist := math.Abs(pts[bj]-s.srcT) * 1000
+			if exp >= 0 && errs[exp]-best < 1.0 {
+				s.offset, bestDist = 0, 0 // the expected frame (or an identical one) is shown
+			} else {
+				s.offset = int(math.Round((pts[bj] - s.srcT) * fps))
+			}
+			s.ambig = exp >= 0 && bj != exp
+			s.distMS = bestDist
 		}(&ss[i])
 	}
 	wg.Wait()
@@ -249,15 +268,58 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 	st := "pass"
 	d := fmt.Sprintf("%d sampled frames match their source frames (worst difference %.1f)", n, worst)
 	it := Item{Check: "picture"}
+	if n == 0 && len(ss) > 0 {
+		zoomed := true
+		for _, s := range ss {
+			if s.seg.Zoom <= 1.001 {
+				zoomed = false
+			}
+		}
+		if !zoomed {
+			r.add(Item{Check: "picture", Status: "fail", Detail: "no frame could be measured (source frames could not be decoded); the picture is unverified",
+				Fix: "make sure the sources are still readable; if they are, this is a cutroom bug"})
+			return
+		}
+	}
 	if bad > 0 {
 		st = "fail"
-		d = fmt.Sprintf("%d of %d sampled frames don't match their source frame; first at output %.3f (segment %s): offset %+d frames, difference %.1f",
-			bad, n, float64(first.f)/fps, first.seg.ID, first.offset, first.err)
+		d = fmt.Sprintf("%d of %d sampled frames show the wrong moment; first at output %.3f (segment %s): about %+d frames (%.0f ms) off, difference %.1f",
+			bad, n, float64(first.f)/fps, first.seg.ID, first.offset, first.distMS, first.err)
 		it.At, it.Segment = float64(first.f)/fps, first.seg.ID
 		it.Fix = "look at it: `cutroom look " + strconv.FormatFloat(first.srcT, 'f', 2, 64) + " --source " + first.seg.Source + "` vs the render frame"
 	}
 	it.Status, it.Detail = st, d
 	r.add(it)
+}
+
+var ptsRe = regexp.MustCompile(`pts_time:(-?[0-9.]+)`)
+
+// greyBurst decodes n frames from seek with their real presentation times (source clock, -copyts),
+// so held/dropped frames on VFR sources are judged by time, not by frame count.
+func greyBurst(p string, seek float64, n int) ([][]byte, []float64) {
+	cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "info", "-ss", strconv.FormatFloat(math.Max(0, seek), 'f', 4, 64), "-copyts", "-i", p,
+		"-vf", fmt.Sprintf("scale=%d:%d,format=yuv420p,extractplanes=y,showinfo", gw, gh),
+		"-frames:v", strconv.Itoa(n), "-fps_mode", "passthrough", "-f", "rawvideo", "-")
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	b, err := cmd.Output()
+	if err != nil {
+		return nil, nil
+	}
+	var fr [][]byte
+	for i := 0; (i+1)*gw*gh <= len(b); i++ {
+		fr = append(fr, b[i*gw*gh:(i+1)*gw*gh])
+	}
+	var pts []float64
+	for _, m := range ptsRe.FindAllStringSubmatch(stderr.String(), -1) {
+		f, _ := strconv.ParseFloat(m[1], 64)
+		pts = append(pts, f)
+	}
+	// showinfo logs frames that -frames:v then discards; frames come out in order, so trim
+	if len(pts) < len(fr) {
+		return nil, nil
+	}
+	return fr, pts[:len(fr)]
 }
 
 func grey(p, extra string, seek float64, n int) [][]byte {
@@ -352,7 +414,11 @@ func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, floa
 		it.Fix = "audio and picture disagree; if the audio comes from another device, align it first (see `cutroom guide`)"
 	}
 	it.Status = st
-	it.Detail = fmt.Sprintf("%d of %d segments measured: audio vs source median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), lags[len(lags)/2], worst)
+	ref := m.Audio
+	if s, ok := m.Sources[m.Audio]; ok && s.Sync != nil {
+		ref += " (aligned to " + s.Sync.To + " by sync)"
+	}
+	it.Detail = fmt.Sprintf("%d of %d segments measured: render audio vs %s at the same moment: median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), ref, lags[len(lags)/2], worst)
 	r.add(it)
 }
 

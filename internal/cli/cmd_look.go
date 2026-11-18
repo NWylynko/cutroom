@@ -192,6 +192,9 @@ func runLook(c *Ctx) (*Result, error) {
 		}
 		text := fmt.Sprintf("wrote %s\n  contact sheet of %s: %d frames %s–%s (every %.3f s), %dx%d px\n  each frame is labelled with time, frame number and the word being spoken\n  view the image to see it",
 			relToCwd(out), s.ID, n, clock(a), clock(b), step, img.Bounds().Dx(), img.Bounds().Dy())
+		if s.Facts.Video.VFR {
+			text += "\n  note: variable frame rate source — frame numbers are nominal (time × fps), the picture is the frame actually shown at that time"
+		}
 		return &Result{Text: text, Data: map[string]any{"image": out, "source": s.ID, "frames": meta}}, nil
 	}
 	tm, err := timecode.Parse(arg, rate)

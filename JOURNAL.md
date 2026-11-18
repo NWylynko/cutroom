@@ -2,6 +2,23 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 13 · 2026-11-18 · round-2 friction: VFR picture false FAIL, transcript --file, 8 small fixes
+Did: `check` picture now judged by real timestamps: source bursts decoded with `-copyts` + `showinfo`;
+the expected frame is the one whose display interval contains the target time; pass if it matches as
+well as the best match (held VFR frames, static shots), else report the best match's offset in frames
+and ms. Guard: a picture check that measured nothing now FAILS instead of passing. `transcript --file`
+(any file, cached; all views). Short flags: `-o` → "positional arguments need no flag"; `-p` → "did you
+mean --preview". Dry run says "would create timeline". New validator `broken-sentence` (words removed
+from inside a sentence, retakes exempt). Resolved repeats marked in `--suspects`. doctor's next: line
+matches the guide; `sync` says "mic started recording 1.700 s before talk"; `check` names the audio
+reference; `look` notes nominal frame numbers on VFR; guide notes check's exit 4 in chains. e2e 78/78.
+Surprises: (1) the first rewrite PASSED the VFR render by measuring nothing — showinfo logs one frame
+more than `-frames:v` emits, so the length check discarded every burst and "0 sampled frames match"
+read as success. Never let a check pass on zero measurements. (2) Picking "the nearest of the
+equally-good frames" turned a planted 3-frame shift into "+2": on test patterns neighbouring frames
+differ by < 1.0 MSE. Judge the *expected* frame against the best one instead.
+Next: eval round 3.
+
 ### 12 · 2026-11-18 · eval round 2
 Did: new task `fix-edit` (scripted `setup` field: a pre-broken project; grader fails its start state 3
 ways). Ran 5 tasks × haiku/sonnet. **10/10 tool-only passes** (round 1: 6/8). Results:
