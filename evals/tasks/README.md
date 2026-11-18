@@ -10,7 +10,8 @@ Preamble given to every agent:
 > Work only inside <dir>. Don't look for cutroom's source code. When you finish, write a friction
 > report to <dir>/FRICTION.md using the template that follows.
 
-Grading spec fields: `fixtures` (files to copy), `output` (path the result must be at),
+Grading spec fields: `fixtures` (files to copy), `setup` (shell commands the runner executes in the
+run directory before the agent starts, with cutroom on PATH), `output` (path the result must be at),
 `must_contain` / `must_not_contain` (phrases, matched loosely against an independent whisper pass
 of the output), `duration` ([min, max] seconds), `checks` (named checks: `upright`, `no_rotation_meta`,
 `av_sync`, `size=WxH`, `loudness=-16±1`, `srt`).

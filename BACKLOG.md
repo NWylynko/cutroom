@@ -6,7 +6,16 @@ Move done items to the journal, not here.
 ## Needs human
 - Final name (working name: cutroom) and license (proposed: Apache-2.0).
 
-## NOW — friction from eval round 1 (ranks above features)
+## NOW — friction from eval round 2
+- [friction][medium] **check picture false FAIL on VFR** (both vfr runs: "offset −2 frames, difference 0.0"). Measure offsets by frame timestamps, not decoded-frame index; equal frames are a pass.
+- [friction] `transcript --file <render>`: transcribe any file and print its phrases (3 runs).
+- [friction] short flag `-o` → fix suggested `--o`; map to real long flags / positional args.
+- [friction] dry run of the first edit says "created timeline" → "would create".
+- [friction] validator `broken-sentence`: a cut that removes mid-sentence words (not a repeat/aside) and joins mid-sentence.
+- [friction] `--suspects`: mark repeats already resolved as "(already cut)" too.
+- [friction] doctor's next: line → `cutroom init <video>`; `sync` wording ("mic is 1.700 s ahead of talk"); check names the audio reference.
+- [friction] `look` labels on VFR: say frame numbers are nominal (or show pts).
+- [friction] guide: `check` exits 4 on failure — don't chain `render && check` and read the exit as a render error.
 
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
@@ -18,7 +27,7 @@ Move done items to the journal, not here.
 - `status`.
 
 ## NEXT
-- **Eval round 2 — next iteration**: rerun all 4 tasks × 2 models; target tool-only 8/8. Add a 5th task that needs `look --cuts`/`check` judgement (e.g. a planted bad cut to find and fix).
+- Eval round 3 after the round-2 friction is fixed: golden needs two consecutive rounds ≥90% haiku / 100% sonnet with no medium friction.
 
 ## M2 — decide/act
 - `edit zoom` (punch-ins with anchor; warn > 1.2× on 1080p) once render exists. [L40]

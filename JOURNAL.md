@@ -2,6 +2,16 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 12 · 2026-11-18 · eval round 2
+Did: new task `fix-edit` (scripted `setup` field: a pre-broken project; grader fails its start state 3
+ways). Ran 5 tasks × haiku/sonnet. **10/10 tool-only passes** (round 1: 6/8). Results:
+evals/results/2026-11-18-2.md, reports in evals/results/r2/. Both models solved fix-edit with `edit
+history`/`undo` and the validator's warnings. One medium friction: `check` reported a false picture
+FAIL on the VFR source in both vfr runs (offset counted in decoded frames across a dropped-frame gap);
+the haiku agent spent ~34 calls investigating. Plus 9 small items. Not golden: needs that fixed, then
+two clean rounds.
+Next: fix the round-2 list (VFR picture check first, `transcript --file`), then round 3.
+
 ### 11 · 2026-11-18 · perceive the edit and the render (friction #3 from round 1)
 Did: contact sheets generalised to labelled cells (any file/time, cut markers). `look --cuts`
 (pairs: last frame before | first after each cut, words either side, measured pause; 12 cuts/page),

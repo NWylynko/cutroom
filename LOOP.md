@@ -43,7 +43,7 @@ Run every 5th iteration and at each milestone. Three tiers:
 
 ### Running a T2 task (exact protocol)
 1. `make build fixtures`; `d=evals/work/runs/<round>-<task>-<model>`; `mkdir -p $d`; copy the task's
-   `fixtures` into `$d`.
+   `fixtures` into `$d`, then run the task's `setup` (if any) in `$d` with `bin/` on PATH.
 2. Spawn the subagent (Agent tool, `general-purpose`, `model` = haiku or sonnet). Prompt = the preamble
    in `evals/tasks/README.md` with `<dir>` = the absolute `$d`, then the task brief verbatim, then the
    contents of `evals/FRICTION_TEMPLATE.md`, then: "Put `<repo>/bin` first on PATH in every shell command
