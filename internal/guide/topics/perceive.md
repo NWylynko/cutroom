@@ -17,6 +17,17 @@
   - `low-confidence`: the recogniser was unsure of the word.
 - `cutroom transcript --words --from 6 --to 12` — word-by-word timing for a stretch.
 
+## See and hear
+- `cutroom look 12.5` — one frame as a viewer sees it (rotation applied), labelled. `--crop x,y,w,h`
+  gives a full-resolution crop: judge faces, text and colour on crops, not thumbnails.
+- `cutroom look 6-12 --count 12` — a contact sheet; each frame shows its time, frame number and the
+  word being spoken. Good for choosing where a cut lands visually.
+- `cutroom listen 16.5-17.8` — a spectrogram with loudness and word timing drawn under it, plus what an
+  isolated re-transcription of just that stretch hears. Use it to settle every doubt about a suspect:
+  whether a sound is words, where a word really ends, whether a pause is clean. Red = sound with no words.
+Both write a PNG and print its path. **Open the PNG** with your image/file viewing tool; the text alone
+is a summary, not the picture.
+
 ## How far to trust times
 Word starts come from the recogniser; the start of each phrase and the end of every word before a
 pause are measured from the audio's loudness, so **pause boundaries are accurate to ~30–50 ms**.

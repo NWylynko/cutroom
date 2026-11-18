@@ -40,6 +40,17 @@ expect "retake suspect"        'repeat .*first thing you need'       cutroom tra
 expect "sound suspect"         'sound .*no words'                    cutroom transcript talk --suspects
 expect "search"                '2 match\(es\)'                       cutroom transcript --search "first thing you need"
 expect "untranscribed → fix"   'cutroom transcribe mic'              cutroom transcript mic
+expect "look sheet"            'contact sheet of talk: 8 frames'     cutroom look 6-12 --count 8
+expect "look frame rotated"    'frame 375 of talk-rot'               cutroom look 12.5 --source talk-rot
+expect "look crop"             '_crop100-50-200-100.png'             cutroom look 3 --crop 100,50,200,100
+expect "look past end → fix"   'is 30\.[0-9]+ s long'                cutroom look 400
+expect "listen finds burst"    'sound with no transcript words 0:16\.9' cutroom listen 15.3-18.9
+expect "listen heard"          'heard \(isolated clip\): .*by the way' cutroom listen 15.3-18.9
+expect "listen too long → fix" 'at most 30 s'                        cutroom listen 0-29.9 --pad 1
+# rotated source must come out upright: compare a frame with the clean source's frame
+cutroom look 12.5 --source talk --json >/dev/null; cutroom look 12.5 --source talk-rot --json >/dev/null
+d=$(ffmpeg -v error -i .cutroom/look/talk_12_500.png -i .cutroom/look/talk-rot_12_500.png -lavfi "[0][1]psnr" -f null - 2>&1; ffmpeg -i .cutroom/look/talk_12_500.png -i .cutroom/look/talk-rot_12_500.png -lavfi "[0:v]crop=iw:ih-40:0:0[a];[1:v]crop=iw:ih-40:0:0[b];[a][b]psnr" -f null - 2>&1 | grep -o 'average:[0-9.inf]*')
+case "$d" in *average:inf*|*average:[3-9][0-9]*) ok "look shows rotated source upright";; *) bad "look shows rotated source upright" "$d";; esac
 popd >/dev/null
 expect "no project → fix"      'run `cutroom init'                   cutroom inspect --project "$W/nothing-here"
 

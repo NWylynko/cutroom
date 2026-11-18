@@ -13,10 +13,11 @@ Move done items to the journal, not here.
 - T3 sanity: run `transcribe` on a 2-min excerpt of real footage (local only) and compare phrase edges / suspects with what the published edit cut; tune envelope threshold for breaths and room tone (synthetic audio is too clean).
 - HDR fixture (HEVC 10-bit HLG tags via libx265) so `inspect` hdr warning has a test. [L23]
 - `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
-- `look` (frame, range sheet) and `listen` (spectrogram + RMS + isolated transcript). [L30 L31 L34]
 - `status`.
 
 ## M2 — decide/act
+- **First T2 eval round right after `render` works** (moved from iteration 5: no task is completable before rendering).
+- `look --cuts` / `look --output` once a timeline exists (frames either side of every cut).
 - `timeline.json` schema + `validate`; `edit cut|keep|tighten|zoom|pin|undo|history` with text anchors. [L32 L38 L39 L40]
 - `render`: chunked, cached, CFR-anchored, frame/sample exact, preview, range, dry-run. [L01 L02 L07–L17 L27]
 - Audio: default voice chain, measured loudness. [L43 L44 L46]

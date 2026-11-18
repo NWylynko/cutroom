@@ -2,6 +2,24 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 5 · 2026-11-18 · M1 look + listen (eval round deferred)
+Eval round due (5th iteration) deferred to right after `render` exists: every T2 task needs an output
+video, so a round now would only measure "can't do it". Logged in BACKLOG.
+Did: `internal/raster` (Go fonts via golang.org/x/image, text/labels/fills — L47, also the base for
+captions later); `look` (one frame as displayed, rotation applied, labelled; `--crop` at full
+resolution; ranges → contact sheet with time, frame number and the word being spoken per frame);
+`listen` (≤ 30 s: ffmpeg spectrogram + our loudness trace with room-tone/threshold lines, sound
+regions green / no-words red, word blocks with start times, time axis; text: transcript words, what an
+isolated re-transcription hears (L30), peak/room tone, sound regions, unworded sounds). Guide
+`perceive` updated ("open the PNG"). e2e 30/30 incl. a PSNR check that the rotated source looks
+identical to the clean one in `look`.
+Measured: listen 0.9 s for 3.6 s; 8-frame sheet ~1 s.
+Surprises: `listen` hung forever: label truncation cut 2 bytes and appended "…" (3 bytes), so the
+string grew. Now rune-based with a termination test. Viewing the first listen PNG found 3 readability
+bugs (no-words region drawn teal instead of red, overlapping time labels, labels on the trace) — the
+"look at your output" rule earned its place again.
+Next: M2 timeline schema + edit commands.
+
 ### 4 · 2026-11-18 · M1 transcribe + transcript
 Did: `internal/speech`: 16 kHz extraction (source time = wav time + audio stream start); 10 ms RMS
 envelope after an 80 Hz high-pass (L46); sound regions (threshold = room tone + max(10 dB, 35% of

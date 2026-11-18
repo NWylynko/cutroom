@@ -9,7 +9,7 @@
    offset and loudness. Warnings marked `handled` need nothing from you. `ACTION` ones say what to do.
 3. **Perceive the content.** `cutroom transcribe`, then `cutroom transcript` to read it phrase by
    phrase, `--suspects` for retakes and stray sounds, `--search` to find exact words. See
-   `cutroom guide perceive`. *(Looking at frames and listening closely: not available yet.)*
+   `cutroom guide perceive`. `cutroom look` shows frames; `cutroom listen` settles doubts about audio.
 4. **Edit the timeline.** *(not available in this version yet)*
 5. **Render** a preview, then the final. *(not available in this version yet)*
 6. **Verify** with `cutroom check` before calling anything done. *(not available in this version yet)*
