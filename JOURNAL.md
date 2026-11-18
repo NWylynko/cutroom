@@ -2,6 +2,34 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 15 · 2026-11-18 · round-3 friction: runnable retake fix, tighten/cut say what they removed
+Did: `retake-kept` now prints a ready `cutroom edit cut --from "<take>" --near <t> --to "<last words>"`
+that removes the earlier take(s) and keeps the last; the --to phrase is grown until the CLI's own
+resolution (first kept match after --from) lands on the last word before the next take. Tighten prints
+its rule (pads + --min-cut) and each pause as `0:04.180 2.13→0.32 s`; JSON has `shortened`. Any edit
+that drops a "sound" suspect says so ("this also removes the sound with no words at …"). Unknown flags
+on commands with positional args show the usage line (`render --output` → `cutroom render
+[output.mp4]`). `look`/`listen` take a file path first (`look out/final.mp4 3.9`). `render --range`
+says which output span its chunks cover, and "= the whole timeline" when it fits in one chunk.
+`check` sync line/help say what it proves: the render's sound vs the source's sound at the moment the
+picture shows, so with picture ok lip sync is as the source plays. Guide: retake warning after tighten
+is expected and carries the fix. e2e 86/86 (+8), incl. running the warning's command and asserting it
+removes exactly the false start.
+Surprises: the first draft of the --to phrase ("first thing.") would have been the wrong match if the
+false start had contained the phrase twice; checking against the same Search the CLI uses keeps the
+suggestion honest instead of plausible.
+Next: eval round 4 (second clean round needed for golden criterion 3).
+
+### 14 · 2026-11-18 · eval round 3
+Did: 5 tasks × haiku/sonnet at f7f96a1. **10/10 grader passes, all tool-only**, no medium friction:
+the round-2 VFR false FAIL is gone (both vfr runs: check PASS, 0 warnings). Median 12.5 tool calls
+(round 2: 16); 4 cutroom errors in total, all guessed syntax (`render --output` ×2, `look <file>`, cut
+of an already-removed sound), each unstuck by its fix line. Results: evals/results/2026-11-18-3.md.
+Six low friction items, top one from 5 runs: the retake warning should carry a runnable cut.
+Surprises: agents now lean entirely on `check`; none listened to a join. The vfr-haiku agent doubted
+that a passing sync check meant lip sync — wording, not measurement.
+Next: fix the six items, then round 4.
+
 ### 13 · 2026-11-18 · round-2 friction: VFR picture false FAIL, transcript --file, 8 small fixes
 Did: `check` picture now judged by real timestamps: source bursts decoded with `-copyts` + `showinfo`;
 the expected frame is the one whose display interval contains the target time; pass if it matches as

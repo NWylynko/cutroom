@@ -317,6 +317,9 @@ func parseArgs(ctx *Ctx, args []string) error {
 		f, ok := flags[name]
 		if !ok {
 			fix := fmt.Sprintf("run `cutroom %s --help` to list flags", ctx.Cmd.Name)
+			if ctx.Cmd.Args != "" {
+				fix = "usage: " + usageLine(ctx.Cmd) + " (positional arguments need no flag; `cutroom " + ctx.Cmd.Name + " --help` lists flags)"
+			}
 			if s := suggest(name, names()); s != "" {
 				fix = fmt.Sprintf("did you mean --%s? (`cutroom %s --help` lists all flags)", s, ctx.Cmd.Name)
 			}

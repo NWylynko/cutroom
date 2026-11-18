@@ -418,7 +418,10 @@ func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, floa
 	if s, ok := m.Sources[m.Audio]; ok && s.Sync != nil {
 		ref += " (aligned to " + s.Sync.To + " by sync)"
 	}
-	it.Detail = fmt.Sprintf("%d of %d segments measured: render audio vs %s at the same moment: median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), ref, lags[len(lags)/2], worst)
+	it.Detail = fmt.Sprintf("%d of %d segments measured: the render's sound vs %s's sound at the source moment its picture shows: median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), ref, lags[len(lags)/2], worst)
+	if st == "pass" {
+		it.Detail += "; with picture ok, lip sync is as the source plays (its audio start offset included)"
+	}
 	r.add(it)
 }
 

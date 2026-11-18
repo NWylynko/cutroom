@@ -21,7 +21,10 @@ func init() {
 		Help: `Measures the rendered file itself (it does not trust the renderer):
   frames      frame count equals what the timeline rendered; audio length = video length
   picture     sampled frames match their source frames (catches shifted or frozen video)
-  sync        per segment, the render's audio vs the source audio at the same moment (limit 45 ms)
+  sync        per segment, the render's sound vs the source's sound at the moment its picture shows
+              (limit 45 ms). picture + sync together prove lip sync is as the source plays in a
+              player, timestamps and audio start offsets included. They can't repair a source
+              recorded out of sync; to judge that, look at a face with ` + "`cutroom look --output`" + `.
   words       re-transcribes the render and compares with the timeline's words, in order
               (missing words = a clipped cut; extra words = a fragment of something you cut)
   stray-sound sound with no words kept in the video (breaths, bumps, pieces of cut takes)

@@ -7,7 +7,8 @@ Move done items to the journal, not here.
 - Final name (working name: cutroom) and license (proposed: Apache-2.0).
 
 ## NOW
-- **Eval round 3** (all 5 tasks × haiku/sonnet). Golden needs it and round 4 both clean (≥90% haiku, 100% sonnet, no medium friction).
+- **Eval round 4** (all 5 tasks × haiku/sonnet). Round 3 was clean (10/10, no medium friction); golden
+  criterion 3 needs round 4 clean too. Then T3 real footage and the other golden criteria.
 
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
@@ -19,6 +20,8 @@ Move done items to the journal, not here.
 - `status`.
 
 ## NEXT
+- Retake suggestion for 3+ takes: the fix removes only the first kept take; re-warns for the next. Fine,
+  but could cut all but the last in one command once `edit cut` accepts several spans.
 
 ## M2 — decide/act
 - `edit zoom` (punch-ins with anchor; warn > 1.2× on 1080p) once render exists. [L40]

@@ -172,6 +172,7 @@ func runEdit(c *Ctx) (*Result, error) {
 		lines = append(lines, fmt.Sprintf("%s timeline from %s (whole source, %s)", verb, e.tl.Video, secs(e.tl.Duration())))
 	}
 	before := e.tl.Duration()
+	soundsBefore := e.keptSounds()
 
 	switch op {
 	case "reset":
@@ -189,8 +190,18 @@ func runEdit(c *Ctx) (*Result, error) {
 		}
 		r := e.tl.Tighten(e.tr, minCut)
 		label = fmt.Sprintf("edit tighten --min-cut %g", minCut)
-		lines = append(lines, fmt.Sprintf("tightened: %d pauses shortened, %d segment edges trimmed, %s removed (pads %.2f s after / %.2f s before words)",
-			r.Pauses, r.Edges, secs(r.Removed), e.tl.PadAfter, e.tl.PadBefore))
+		lines = append(lines, fmt.Sprintf("tightened: %d pauses shortened, %d segment edges trimmed, %s removed (pauses longer than pads %.2f+%.2f s + --min-cut %g s)",
+			r.Pauses, r.Edges, secs(r.Removed), e.tl.PadAfter, e.tl.PadBefore, minCut))
+		var ps []string
+		for _, pc := range r.Shortened {
+			ps = append(ps, fmt.Sprintf("%s %.2f→%.2f s", clock(pc.At), pc.Before, pc.After))
+		}
+		if len(ps) > 0 {
+			if len(ps) > 8 {
+				ps = append(ps[:8], fmt.Sprintf("… %d more (--json)", len(ps)-8))
+			}
+			lines = append(lines, "  pauses (source time): "+strings.Join(ps, ", "))
+		}
 		if r.Skipped > 0 {
 			lines = append(lines, fmt.Sprintf("kept %d pinned edge(s) from your explicit cuts", r.Skipped))
 		}
@@ -227,11 +238,18 @@ func runEdit(c *Ctx) (*Result, error) {
 		lines = append(lines, res...)
 	}
 	e.tl.Recompute()
+	for _, sd := range soundsBefore {
+		if !e.tl.Kept(sd.src, sd.mid) {
+			lines = append(lines, fmt.Sprintf("  this also removes the sound with no words at source %s–%s", clock(sd.a), clock(sd.b)))
+		}
+	}
 	issues := e.validate()
 	lines = append(lines, fmt.Sprintf("timeline: %d segments, %s (was %s)", len(e.tl.Segments), secs(e.tl.Duration()), secs(before)))
 	lines = append(lines, issueLines(issues, 6)...)
 	if c.Bool("dry-run") {
 		for i, l := range lines {
+			lines[i] = strings.Replace(l, "this also removes", "this would also remove", 1)
+			l = lines[i]
 			for _, v := range [][2]string{{"cut ", "would cut "}, {"kept only ", "would keep only "}, {"tightened: ", "would tighten: "}, {"timeline: ", "timeline would be: "}} {
 				if strings.HasPrefix(l, v[0]) {
 					lines[i] = v[1] + strings.TrimPrefix(l, v[0])
@@ -551,4 +569,26 @@ func truncLines(lines []string, all bool) []string {
 	}
 	n := len(lines) - maxLines
 	return append(lines[:maxLines], fmt.Sprintf("… %d more (--all, or --json)", n))
+}
+
+type keptSound struct {
+	src       string
+	a, b, mid float64
+}
+
+// keptSounds lists the transcript's "sound" suspects the timeline currently keeps.
+func (e *editEnv) keptSounds() []keptSound {
+	var out []keptSound
+	for _, id := range e.p.IDs() {
+		tx := e.tr[id]
+		if tx == nil {
+			continue
+		}
+		for _, s := range tx.Suspects {
+			if m := (s.Start + s.End) / 2; s.Kind == "sound" && e.tl.Kept(id, m) {
+				out = append(out, keptSound{id, s.Start, s.End, m})
+			}
+		}
+	}
+	return out
 }

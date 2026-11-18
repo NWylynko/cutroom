@@ -21,9 +21,9 @@ import (
 func init() {
 	Register(&Command{
 		Name:     "look",
-		Args:     "[time | start-end]",
+		Args:     "[file] [time | start-end]",
 		MinArgs:  0,
-		MaxArgs:  1,
+		MaxArgs:  2,
 		Category: "perceive",
 		Summary:  "See video: a frame, a labelled contact sheet, every cut (--cuts), the edit (--output) or a render (--file)",
 		Help: `A time gives one frame (as a viewer would see it: rotation applied). A range gives a contact
@@ -36,7 +36,7 @@ Examples:
   cutroom look 3 --source cam --crop 400,100,600,600     (full-resolution crop, e.g. to judge a face)
   cutroom look --cuts                    every cut: last frame before | first frame after, with the words
   cutroom look --output 0:03-0:06        OUTPUT times: frames of the edit, cuts marked in red
-  cutroom look 3.9 --file out/final.mp4  a frame of a rendered file (file time)
+  cutroom look out/final.mp4 3.9        a frame of a rendered file (file time; same as --file)
 Times are source times unless you pass --output (edit time) or --file (that file's time).`,
 		Flags: []Flag{
 			{Name: "source", Kind: "string", Help: "Source id (default: the first video source)"},
@@ -52,9 +52,9 @@ Times are source times unless you pass --output (edit time) or --file (that file
 	})
 	Register(&Command{
 		Name:     "listen",
-		Args:     "<start-end>",
+		Args:     "[file] <start-end>",
 		MinArgs:  1,
-		MaxArgs:  1,
+		MaxArgs:  2,
 		Category: "perceive",
 		Summary:  "Hear a stretch of audio (a source, the edit with --output, or a file): spectrogram + loudness + words as a PNG, and what an isolated re-transcription hears",
 		Help: `Use it to settle doubts before cutting: a suspect sound, a word the transcript may have missed,
@@ -65,7 +65,7 @@ Examples:
   cutroom listen 16.5-17.8
   cutroom listen 0:06-0:11 --source mic
   cutroom listen --output 3-5        the RENDERED edit around output 3–5 s, cuts marked (needs a current render)
-  cutroom listen 3-5 --file out/final.mp4`,
+  cutroom listen out/final.mp4 3-5   (same as --file)`,
 		Flags: []Flag{
 			{Name: "output", Kind: "bool", Help: "Range is in output time; listens to the current render (out/final.mp4 or preview)"},
 			{Name: "file", Kind: "string", Help: "Listen to this file (e.g. a render); range in file time"},
@@ -143,6 +143,9 @@ func relToCwd(path string) string {
 func stamp(t float64) string { return strings.ReplaceAll(strconv.FormatFloat(t, 'f', 3, 64), ".", "_") }
 
 func runLook(c *Ctx) (*Result, error) {
+	if err := fileArg(c); err != nil {
+		return nil, err
+	}
 	if c.Bool("cuts") || c.Bool("output") || c.Has("file") {
 		return lookEdit(c)
 	}
@@ -243,6 +246,9 @@ func runLook(c *Ctx) (*Result, error) {
 }
 
 func runListen(c *Ctx) (*Result, error) {
+	if err := fileArg(c); err != nil {
+		return nil, err
+	}
 	if c.Bool("output") || c.Has("file") {
 		return listenFile(c)
 	}
@@ -347,4 +353,30 @@ func sameWords(a, b string) bool {
 		return strings.Join(o, " ")
 	}
 	return norm(a) == norm(b)
+}
+
+// fileArg lets `look out/final.mp4 3.9` mean `look 3.9 --file out/final.mp4`: a positional argument
+// that names an existing file (and isn't a time) becomes --file.
+func fileArg(c *Ctx) error {
+	if !c.Has("file") {
+		takeFileArg(c)
+	}
+	if len(c.Args) > 1 {
+		return Errf(ExitUsage, "bad-args", fmt.Sprintf("one time or range, optionally after a file: `cutroom %s out/final.mp4 3-5`", c.Cmd.Name),
+			"%q is not a file and %s takes one time or range", c.Args[0], c.Cmd.Name)
+	}
+	return nil
+}
+
+func takeFileArg(c *Ctx) {
+	for i, a := range c.Args {
+		if isNumberish(a) || !strings.ContainsAny(a, "./\\") {
+			continue
+		}
+		if st, err := os.Stat(a); err == nil && !st.IsDir() {
+			c.vals["file"] = []string{a}
+			c.Args = append(append([]string{}, c.Args[:i]...), c.Args[i+1:]...)
+			return
+		}
+	}
 }

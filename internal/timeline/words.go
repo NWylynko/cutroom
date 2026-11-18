@@ -121,6 +121,16 @@ type TightenResult struct {
 	Edges   int     `json:"edges_trimmed"`
 	Removed float64 `json:"removed_s"`
 	Skipped int     `json:"pinned_edges_kept"`
+	// Shortened lists each pause that was cut, by source time, with its length before and after.
+	Shortened []PauseChange `json:"shortened"`
+}
+
+// PauseChange is one pause shortened by tighten.
+type PauseChange struct {
+	Source string  `json:"source"`
+	At     float64 `json:"source_time"` // end of the word before the pause
+	Before float64 `json:"before_s"`
+	After  float64 `json:"after_s"`
 }
 
 // Tighten shortens every pause between kept words whose removable part (pause − pads) is at least
@@ -129,8 +139,9 @@ func (t *Timeline) Tighten(tr Transcripts, minCut float64) TightenResult {
 	var res TightenResult
 	before := t.Duration()
 	type cut struct {
-		src  string
-		a, b float64
+		src       string
+		a, b, at  float64
+		gap, left float64
 	}
 	var cuts []cut
 	for _, g := range append([]Segment(nil), t.Segments...) {
@@ -151,7 +162,8 @@ func (t *Timeline) Tighten(tr Transcripts, minCut float64) TightenResult {
 		for k := 0; k+1 < len(ws); k++ {
 			gap := ws[k+1].Start - ws[k].End
 			if gap-t.PadAfter-t.PadBefore >= minCut {
-				cuts = append(cuts, cut{g.Source, ws[k].End + t.PadAfter, ws[k+1].Start - t.PadBefore})
+				a, b := ws[k].End+t.PadAfter, ws[k+1].Start-t.PadBefore
+				cuts = append(cuts, cut{g.Source, a, b, ws[k].End, gap, gap - (b - a)})
 			}
 		}
 		// segment edges
@@ -173,6 +185,7 @@ func (t *Timeline) Tighten(tr Transcripts, minCut float64) TightenResult {
 	for _, c := range cuts {
 		if t.Cut(c.src, c.a, c.b, "", false) > 0 {
 			res.Pauses++
+			res.Shortened = append(res.Shortened, PauseChange{c.src, round6(c.at), round6(c.gap), round6(c.left)})
 		}
 	}
 	res.Removed = round6(before - t.Duration())
@@ -293,8 +306,14 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 				}
 				if kept >= 2 {
 					o, _ := t.ToOutput(src, s.Related[0]+0.05)
-					add("warn", "retake-kept", nil, o, "cut all but one take: `cutroom transcript --search \""+s.Text+"\"`",
-						"%q is still said %d× in the timeline (a retake?)", s.Text, kept)
+					fix := "cut all but one take: `cutroom transcript --search \"" + s.Text + "\"`"
+					if cmd := t.retakeCut(tx, src, s); cmd != "" {
+						if len(tr) > 1 {
+							cmd += " --source " + src
+						}
+						fix = "keep the last take: `" + cmd + "` (add --dry-run to check the join first)"
+					}
+					add("warn", "retake-kept", nil, o, fix, "%q is still said %d× in the timeline (a retake?)", s.Text, kept)
 				}
 			case "sound":
 				if o, ok := t.ToOutput(src, (s.Start+s.End)/2); ok {
@@ -374,4 +393,67 @@ func tail(ws []string, n int) string {
 		ws = ws[len(ws)-n:]
 	}
 	return strings.Join(ws, " ")
+}
+
+// retakeCut builds a ready-to-run `edit cut` that removes the first kept take of a repeat, from its
+// first words up to the last word before the next kept take, in the --from/--near/--to form the CLI
+// resolves. The --to phrase is checked to resolve to exactly that word; "" if none does.
+func (t *Timeline) retakeCut(tx *speech.Transcript, src string, s speech.Suspect) string {
+	var takes []float64
+	for _, at := range s.Related {
+		if t.Kept(src, at+0.05) {
+			takes = append(takes, at)
+		}
+	}
+	if len(takes) < 2 {
+		return ""
+	}
+	ws := tx.Words
+	kept := func(k int) bool { return t.Kept(src, (ws[k].Start+ws[k].End)/2) }
+	// the --from match nearest the first kept take, among kept occurrences (as the CLI picks it)
+	fi, fl, bd := -1, -1, math.Inf(1)
+	for _, m := range speech.Search(ws, s.Text) {
+		ok := true
+		for k := m.First; k <= m.Last; k++ {
+			ok = ok && kept(k)
+		}
+		if d := math.Abs(m.Start - takes[0]); ok && d < bd {
+			fi, fl, bd = m.First, m.Last, d
+		}
+	}
+	if fi < 0 || bd > 0.5 {
+		return ""
+	}
+	j := -1
+	for k := fl + 1; k < len(ws); k++ {
+		if ws[k].Start >= takes[1]-0.05 {
+			break
+		}
+		if kept(k) {
+			j = k
+		}
+	}
+	if j < 0 {
+		return ""
+	}
+	for n := 1; n <= 6 && j-n+1 > fi; n++ {
+		phrase := speech.Text(ws, j-n+1, j)
+		for _, m := range speech.Search(ws, phrase) {
+			if m.First < fi+1 || m.Last < fl {
+				continue
+			}
+			all := true
+			for k := m.First; k <= m.Last; k++ {
+				all = all && kept(k)
+			}
+			if !all {
+				continue
+			}
+			if m.Last == j && len(strings.Fields(phrase)) >= 2 || m.Last == j && n == j-fi {
+				return fmt.Sprintf("cutroom edit cut --from %q --near %.2f --to %q", s.Text, takes[0], phrase)
+			}
+			break // first match after --from is the wrong one: use more words
+		}
+	}
+	return ""
 }

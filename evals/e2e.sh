@@ -57,9 +57,15 @@ popd >/dev/null
 E="$W/edit"; mkdir -p "$E"; cp $FIX/talk.mp4 "$E/"; pushd "$E" >/dev/null
 cutroom init talk.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null
 expect "timeline before edit → fix" 'make the first edit'             cutroom timeline
+expect "tighten lists pauses"       'pauses \(source time\): 0:04\.[0-9]+ 2\.[0-9]+→0\.32 s' cutroom edit tighten --dry-run
+expect "tighten names lost sound"   'would also remove the sound with no words at source 0:16\.9' cutroom edit tighten --dry-run
 expect "tighten creates timeline"   'created timeline from talk'      cutroom edit tighten
 expect "tighten flags retake"       'retake-kept'                     cutroom timeline
 expect "ambiguous --from lists"     'occurs 2 times'                  cutroom edit cut --from "The first thing you need is" --to "thing."
+fixcmd=$(cutroom timeline | grep -o 'keep the last take: `[^`]*`' | sed 's/^keep the last take: `//; s/`$//')
+expect "retake warning has a cut command" '^cutroom edit cut --from' echo "$fixcmd"
+expect "its cut removes the false start"  'removed\): "The first thing you need is, UM, the first thing\."' sh -c "$fixcmd"
+cutroom edit undo >/dev/null
 expect "cut retake by words"        'removed\): "The first thing you need is, UM, the first thing\."' cutroom edit cut --from "The first thing you need is, um" --to "the first thing."
 expect "join pause is real"         'join: .*\(pause 0\.[23][0-9] s\)'  cutroom edit cut --from "By the way" --to "keyboard." --dry-run
 expect "dry run not saved"          'my cat'                          cutroom timeline
@@ -81,6 +87,10 @@ expect "look --cuts"                'cuts 1–4 of 4'                   cutroom 
 expect "look --output marks cut"    'red bar = a cut'                 cutroom look --output 3-5 --count 8
 expect "listen --output (render)"   'cuts in range: 0:03\.933'         cutroom listen --output 3-5
 expect "look --file"                'of out/final.mp4 at 0:03\.900 \(file time\)' cutroom look 3.9 --file out/final.mp4
+expect "look <file> <time>"         'of out/final.mp4 at 0:03\.900 \(file time\)' cutroom look out/final.mp4 3.9
+expect "listen <file> needs range"  'cutroom listen out/final.mp4 3-5' cutroom listen out/final.mp4
+expect "render --output → usage"    'usage: cutroom render \[output.mp4\]' cutroom render --output out/x.mp4
+expect "range says whole chunk"     'whole timeline \(it fits in one chunk\)' cutroom render --dry-run --range 0:02-0:04
 expect "check passes a good render" '^PASS out/final.mp4'              cutroom check
 # planted faults: each must be caught by the right check
 M=out/final.mp4.cutroom.json

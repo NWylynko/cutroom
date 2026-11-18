@@ -244,6 +244,9 @@ func listenFile(c *Ctx) (*Result, error) {
 	} else if f, m, err = e.currentRender(); err != nil {
 		return nil, err
 	}
+	if len(c.Args) == 0 {
+		return nil, Errf(ExitUsage, "bad-args", "give a range in the file, e.g. `cutroom listen "+relToCwd(f)+" 3-5`", "listen needs a range")
+	}
 	a, b, err := parseRange(c.Args[0], timecode.Rate{Num: 30, Den: 1})
 	if err != nil {
 		return nil, Errf(ExitUsage, "bad-range", "write a range as start-end, e.g. 3-5", "%v", err)
