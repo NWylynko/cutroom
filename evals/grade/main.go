@@ -212,7 +212,8 @@ func worst[T any](xs []T, f func(T) float64) float64 {
 }
 
 func greyFrames(p, extra string) [][]byte {
-	vf := fmt.Sprintf("scale=%d:%d,format=gray", gw, gh)
+	// raw luma plane: independent of colour tags (untagged sources vs bt709-tagged renders)
+	vf := fmt.Sprintf("scale=%d:%d,format=yuv420p,extractplanes=y", gw, gh)
 	if extra != "" {
 		vf = extra + "," + vf
 	}

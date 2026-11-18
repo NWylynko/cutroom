@@ -20,8 +20,9 @@ Move done items to the journal, not here.
 - `look --cuts` / `look --output` once a timeline exists (frames either side of every cut).
 - `edit zoom` (punch-ins with anchor; warn > 1.2× on 1080p) once render exists. [L40]
 - `edit move` / reorder and multi-source (takes) segments. 
-- `render`: chunked, cached, CFR-anchored, frame/sample exact, preview, range, dry-run. [L01 L02 L07–L17 L27]
-- Audio: default voice chain, measured loudness. [L43 L44 L46]
+- `look`: untagged HD sources are converted with bt601 by ffmpeg but shown as bt709 by players; assume bt709 for untagged ≥720p (in_color_matrix) so `look` matches renders.
+- Render: segments from a source other than the audio source (multi-take); per-source audio mapping.
+- Render: zoom/punch-in filters. Overlay inputs (M4).
 
 ## M3 — verify
 - `check`: duration, re-transcribe vs timeline text, per-segment A/V drift, frame match, tail pads, loudness. [L06 L20 L33 L37]

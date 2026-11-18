@@ -2,6 +2,30 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 7 · 2026-11-18 · M2 render
+Did: `internal/render`: audio decoded once to a cached 48 kHz float WAV and assembled in Go by
+sample index (pieces = frames × SR/fps, so audio length = video length exactly), 20 ms raised-cosine
+fades (L22), voice chain, loudness measured on the whole timeline then exact gain + alimiter, AAC
+stereo 48 kHz (L17/L27/L43); video planned into ~45 s chunks at cuts, each segment its own seek
+0.25 s early + `fps=…:start_time=<lead>` on the audio-anchored grid + `trim=end_frame` + 3 spare
+frames (L02/L09), concat + restamp (L08), bt709 tags, x264, frame count checked (L14), cached by
+content key, parallel, joined by stream copy (L12) and muxed. `render` CLI: --preview (540p),
+--range (output time), --dry-run with estimates from per-project timing history (L56 defaults),
+--loudness, --true-peak, --audio-chain. Guide `render`. Tests: TestL07_L08_ChunkCommandInvariants,
+TestL01_AssembleSampleExactWithFades, chunk planning/caching. e2e 49/49, including the independent
+grader passing the e2e render.
+Measured: talk edit (13.767 s): 1.2 s final render, 0.08 s cached; -16.0 LUFS exactly. Grader on
+renders of all three video fixtures: frames 69–70/70 exact; sync worst 0 ms (CFR, rotated) and 30 ms
+(VFR: nearest-frame rounding around dropped frames). Rotated source: upright pixels, no rotation
+metadata. The grader's own float-trim reference cut drifts 34–40 ms — L01 visible side by side.
+Surprises: (1) the grader failed every frame (err 216) though luma PSNR was 47.7 dB: `format=gray`
+treats untagged source and bt709-tagged output differently. Grader now compares raw Y planes; the
+real issue (ffmpeg assumes bt601 for untagged HD, players assume bt709) → backlog for `look`.
+(2) The VFR fixture itself was out of sync: `-itsoffset` shifted audio timestamps without dropping
+content, so the file played 85 ms late. Real cameras that start audio late keep timestamps honest.
+Fixture fixed (trim then offset); the renderer, which honours timestamps, then passed.
+Next: **first T2 eval round** (agents with only `cutroom guide`), then `check`.
+
 ### 6 · 2026-11-18 · M2 timeline + edit
 Did: `internal/timeline`: segments of kept source ranges, edges snapped to the frame grid anchored at
 the audio start (L01/L02), output duration from whole frames, source↔output mapping, Cut (pins

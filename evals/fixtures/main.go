@@ -94,12 +94,15 @@ func main() {
 		n := 40 + i*53
 		drops = append(drops, fmt.Sprintf("eq(n,%d)+eq(n,%d)", n, n+1))
 	}
-	ff("-i", path("talk.mp4"), "-itsoffset", "0.085", "-i", path("talk.mp4"), "-map", "0:v", "-map", "1:a",
+	// Audio starts 0.085 s after the first frame but stays in sync by timestamps (as on a real
+	// camera): drop its first 0.085 s of content, then stamp it to start at 0.085.
+	ff("-i", path("talk.mp4"), "-vn", "-af", "atrim=start=0.085,asetpts=PTS-STARTPTS", "-c:a", "aac", "-ar", "48000", path("tmp/late.m4a"))
+	ff("-i", path("talk.mp4"), "-itsoffset", "0.085", "-i", path("tmp/late.m4a"), "-map", "0:v", "-map", "1:a",
 		"-vf", "select='not("+strings.Join(drops, "+")+")'", "-fps_mode", "vfr",
 		"-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-c:a", "copy",
 		"-video_track_timescale", "90000", path("talk-vfr.mp4"))
 	m.Facts["audio_start_stream"] = probeStart(path("talk-vfr.mp4"), "a:0")
-	m.Facts["note"] = "audio was shifted 0.085 s; the stream start_time reads lower by the AAC priming delay (1024 samples)"
+	m.Facts["note"] = "audio starts 0.085 s after video, in sync by timestamps; the stream start_time reads lower by the AAC priming delay (1024 samples)"
 	writeManifest(m)
 
 	// 3. talk-rot.mov — display matrix says rotate 180 (phone mounted upside down). [L25]

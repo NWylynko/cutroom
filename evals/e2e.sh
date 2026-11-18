@@ -35,7 +35,7 @@ expect "inspect a loose file"  'no problems found'                   cutroom ins
 expect "transcribe"            'talk +[0-9]+ words, 7 phrases'        cutroom transcribe talk talk-vfr
 expect "transcribe cached"     'cached'                              cutroom transcribe talk
 expect "phrases"               '0:10\.[0-9]+–0:12\.[0-9]+  The first thing you need is an old laptop' cutroom transcript talk
-expect "vfr times shifted"     '^0:06\.(39|40)[0-9]–'                cutroom transcript talk-vfr
+expect "vfr times on source clock" '^0:06\.3[0-2][0-9]–'             cutroom transcript talk-vfr
 expect "retake suspect"        'repeat .*first thing you need'       cutroom transcript talk --suspects
 expect "sound suspect"         'sound .*no words'                    cutroom transcript talk --suspects
 expect "search"                '2 match\(es\)'                       cutroom transcript --search "first thing you need"
@@ -69,6 +69,14 @@ out=$(cutroom timeline --json)
 dur=$(python3 -c 'import json,sys;print(json.load(sys.stdin)["result"]["duration"])' <<<"$out")
 python3 -c "import sys;d=float('$dur');sys.exit(0 if 13.0<=d<=18.5 else 1)" && ok "edited duration $dur in ground-truth bounds" || bad "edited duration" "$dur"
 if grep -qiE '"text": "[^"]*(UM|cat)' <<<"$out"; then bad "no retake/aside words left" "$out"; else ok "no retake/aside words left"; fi
+expect "render dry run"             'estimate: ~'                     cutroom render --dry-run
+expect "render"                     'wrote out/final.mp4'             cutroom render
+expect "render cached"              '1 of 1 chunk\(s\) cached'         cutroom render
+expect "render preview 540p"        '\(preview, 960x540\)'             cutroom render --preview
+popd >/dev/null
+g=$(go run ./evals/grade -fixtures $FIX tighten "$E" 2>&1)
+grep -q 'GRADE tighten: PASS' <<<"$g" && ok "independent grader passes the render" || bad "independent grader passes the render" "$(grep -E 'FAIL' <<<"$g")"
+pushd "$E" >/dev/null
 expect "undo"                       'undid: edit cut'                 cutroom edit undo
 expect "history"                    'edit tighten'                    cutroom edit history
 expect "unknown op suggests"        'did you mean `cutroom edit cut`' cutroom edit cutt
