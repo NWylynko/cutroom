@@ -2,6 +2,27 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 9 · 2026-11-18 · `check` (friction #1 from round 1)
+Did: render writes `<out>.cutroom.json` (segments with file-relative output times, sources, settings,
+timeline hash). `internal/verify` measures the file: frames vs manifest, audio vs video length, size /
+rotation / colour tags, picture (render frames vs a 7-frame source burst, offset in frames, static-shot
+ambiguity tolerated), per-segment sync (audio xcorr vs the source at the mapped time), words (re-
+transcribe, LCS vs the timeline's kept words; ≥3 missing in a row = FAIL), clipped words at edges,
+stray sound without words (L33), loudness, stale timeline. `check` CLI (exit 4 on fail, each finding
+with output time, segment and a command to look). Guide `verify`; guide rule 1 restored; render's
+next: is now `cutroom check <file>`. Also: CLI no longer panics on an undeclared flag, and any panic
+becomes `error[internal]` with a fix line. e2e 55/55 incl. five planted faults.
+Measured: good render: PASS in 1.7 s (413/413 frames, 15 picture samples err 0.0, sync 0 ms on 5/5
+segments, 44/44 words, -16.0 LUFS). Planted: audio +100 ms → FAIL sync +100; picture +3 frames → FAIL
+picture offset +3; cut through a sentence → WARN clipped-word "I'm"; burst kept → WARN stray-sound
+at 16.97; edited after render → WARN stale.
+Surprises: (1) the first sync measurement of the late file read −21 ms — extracting audio to WAV
+drops the stream's start offset (third time this trap has bitten; now padded back from start_time).
+(2) The sign of the lag was inverted; a unit test now pins "late = +". (3) Planting the burst by
+undoing a cut didn't keep the burst (tighten had removed it) — the first fault test was wrong, not
+the checker; verify the fault is really planted before trusting a "missed" result.
+Next: audio from another source (correctness) + `sync`.
+
 ### 8 · 2026-11-18 · eval round 1
 Did: first T2 round: 4 tasks × haiku/sonnet, fresh subagents with only the brief + `cutroom guide`.
 Results in evals/results/2026-11-18-1.md (friction reports in evals/results/r1/). Grader passes 8/8 after

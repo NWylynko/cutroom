@@ -140,7 +140,7 @@ func runRender(c *Ctx) (*Result, error) {
 	if c.Has("range") {
 		lines = append(lines, fmt.Sprintf("  range render: starts at output %s", clock(res.RangeStart)))
 	}
-	next := []string{"cutroom timeline --joins   (re-read every join), then view frames of " + relToCwd(res.Output)}
+	next := []string{"cutroom check " + relToCwd(res.Output)}
 	return &Result{Text: strings.Join(lines, "\n"), Data: res, Next: next}, nil
 }
 

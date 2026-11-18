@@ -77,6 +77,18 @@ popd >/dev/null
 g=$(go run ./evals/grade -fixtures $FIX tighten "$E" 2>&1)
 grep -q 'GRADE tighten: PASS' <<<"$g" && ok "independent grader passes the render" || bad "independent grader passes the render" "$(grep -E 'FAIL' <<<"$g")"
 pushd "$E" >/dev/null
+expect "check passes a good render" '^PASS out/final.mp4'              cutroom check
+# planted faults: each must be caught by the right check
+M=out/final.mp4.cutroom.json
+ffmpeg -v error -y -i out/final.mp4 -itsoffset 0.1 -i out/final.mp4 -map 0:v -map 1:a -c copy -t 13.767 out/late.mp4; cp $M out/late.mp4.cutroom.json
+expect "check: audio 100 ms late"   'FAIL sync .*worst \+(9[0-9]|10[0-9]) ms'  cutroom check out/late.mp4
+ffmpeg -v error -y -i out/final.mp4 -vf "trim=start_frame=3,setpts=PTS-STARTPTS,tpad=stop=3:stop_mode=clone" -c:v libx264 -crf 18 -c:a copy out/shift.mp4; cp $M out/shift.mp4.cutroom.json
+expect "check: picture 3 frames off" 'FAIL picture .*offset \+3 frames' cutroom check out/shift.mp4
+cutroom edit cut 1.9-2.9 >/dev/null; cutroom render out/clip.mp4 >/dev/null 2>&1
+expect "check: clipped word"        'WARN clipped-word .*inside the word' cutroom check out/clip.mp4
+cutroom edit undo >/dev/null
+expect "check: stale timeline"      'WARN stale'                      cutroom check out/clip.mp4
+expect "check exit code 4 on fail"  '^4$'                             sh -c 'cutroom check out/late.mp4 >/dev/null; echo $?'
 expect "undo"                       'undid: edit cut'                 cutroom edit undo
 expect "history"                    'edit tighten'                    cutroom edit history
 expect "unknown op suggests"        'did you mean `cutroom edit cut`' cutroom edit cutt

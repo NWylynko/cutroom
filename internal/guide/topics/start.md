@@ -26,9 +26,7 @@ Source files are never modified. Cuts snap to whole frames and audio samples. Vi
 from the sources. You don't need to manage any of that.
 
 ## Rules you must follow
-1. Never call an edit done without verifying the render. `cutroom render` prints its duration next to
-   the timeline's; read `cutroom timeline --joins`; look at frames. (A one-command `cutroom check` is
-   planned but not in this version — don't call it.)
+1. Never call an edit done without running `cutroom check` on the render and reading every line.
 2. Look at images cutroom gives you (frames, contact sheets, spectrograms) before judging visuals.
 3. Test small first: `render --preview --range` before a full render.
 

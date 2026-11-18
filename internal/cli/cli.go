@@ -107,7 +107,7 @@ func (c *Ctx) flag(name string) Flag {
 			return f
 		}
 	}
-	panic("cli: undeclared flag " + name)
+	return Flag{Name: name} // undeclared: behaves as unset (TestEveryCommandRunsWithoutPanic guards this)
 }
 
 var globalFlags = []Flag{
@@ -207,7 +207,13 @@ func writeJSON(w io.Writer, v any) {
 	_ = enc.Encode(v)
 }
 
-func dispatch(argv []string, stdout, stderr io.Writer, stdin io.Reader, jsonMode bool) (*Result, error) {
+func dispatch(argv []string, stdout, stderr io.Writer, stdin io.Reader, jsonMode bool) (res *Result, err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			res, err = nil, &Error{Code: "internal", Exit: ExitExternal, Message: fmt.Sprintf("cutroom crashed: %v", r),
+				Fix: "this is a cutroom bug; try a different approach to the same step, and report the command"}
+		}
+	}()
 	if len(argv) == 0 || argv[0] == "--help" || argv[0] == "-h" || argv[0] == "help" {
 		if len(argv) > 1 && argv[0] == "help" {
 			if c, ok := registry[argv[1]]; ok {
@@ -240,7 +246,7 @@ func dispatch(argv []string, stdout, stderr io.Writer, stdin io.Reader, jsonMode
 		return nil, Errf(ExitUsage, "bad-args", "usage: "+usageLine(cmd),
 			"%s expects %s, got %d argument(s)", cmd.Name, argCount(cmd), len(ctx.Args))
 	}
-	res, err := cmd.Run(ctx)
+	res, err = cmd.Run(ctx)
 	if err != nil {
 		return nil, err
 	}

@@ -7,7 +7,6 @@ Move done items to the journal, not here.
 - Final name (working name: cutroom) and license (proposed: Apache-2.0).
 
 ## NOW — friction from eval round 1 (ranks above features)
-- [friction] **`check`** — all 8 agents: "Never call an edit done without running `cutroom check`" but it didn't exist. One command: render vs timeline duration/frames, re-transcribe the render and diff against the timeline's words, per-segment A/V offset (audio xcorr of the render vs source at mapped times), frames vs source, tail/head pads loud (L33), loudness. Exit 4 on failure. Then restore guide rule 1.
 - [friction][correctness] **Separate audio source silently misaligned**: recorder-sonnet: "render silently uses the unaligned audio when you point the timeline at the recorder". Add `sync <audio-src> --to <video-src>` (offset + drift, robust fit, L05) stored in cutroom.json; render maps audio through it; `edit audio <source>` sets the timeline's audio; validate/render ERROR if audio source ≠ video source and no sync exists. `timeline` shows the audio source.
 - [friction] **Perceive the render**: 5/8 wanted `look`/`listen`/`transcript` on out/final.mp4. `look --output <t>` and `listen --output <range>` (output time through the timeline, or a rendered file).
 - [friction] `transcript --words --from/--to` outside the source prints only a header → say "no words in range; source is N s".
@@ -34,8 +33,8 @@ Move done items to the journal, not here.
 - Render: zoom/punch-in filters. Overlay inputs (M4).
 
 ## M3 — verify
-- `check`: duration, re-transcribe vs timeline text, per-segment A/V drift, frame match, tail pads, loudness. [L06 L20 L33 L37]
-- First T2 eval round.
+- `check` picture check skips zoomed segments; compare through the zoom once punch-ins exist.
+- `check --frames` full frame-by-frame PSNR vs an overlay-free render once overlays exist (L20, L21).
 
 ## M4 — overlays & text
 - Built-in text rasteriser (embedded font), text/image/clip overlays anchored to text; caption clip. [L47 L48 L16 L19]

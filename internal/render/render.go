@@ -309,6 +309,9 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 	res.Frames = n
 	res.Duration = round6(float64(n) / tl.Rate())
 	res.Seconds = round3(time.Since(t0).Seconds())
+	if err := writeManifest(tl, srcs, chunks, res, o); err != nil {
+		return nil, err
+	}
 	return res, nil
 }
 

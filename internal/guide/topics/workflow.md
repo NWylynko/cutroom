@@ -13,6 +13,7 @@
 4. **Edit the timeline.** `cutroom edit tighten`, then `cutroom edit cut --from "…" --to "…"` for
    retakes and asides; check `cutroom timeline` and `cutroom timeline --joins`. See `cutroom guide edit`.
 5. **Render.** `cutroom render --preview`, check it, then `cutroom render`. See `cutroom guide render`.
-6. **Verify** with `cutroom check` before calling anything done. *(not available in this version yet)*
+6. **Verify.** `cutroom check` measures the render: frames, sync, every word, stray sounds,
+   loudness. Fix what fails, re-render, check again. See `cutroom guide verify`.
 
 Separate audio recorder? Add it as a source too (`cutroom init --source mic=recorder.wav`).
