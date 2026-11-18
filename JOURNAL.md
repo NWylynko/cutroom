@@ -2,6 +2,25 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 4 · 2026-11-18 · M1 transcribe + transcript
+Did: `internal/speech`: 16 kHz extraction (source time = wav time + audio stream start); 10 ms RMS
+envelope after an 80 Hz high-pass (L46); sound regions (threshold = room tone + max(10 dB, 35% of
+range), 80 ms gap closing, 30 ms hangover); whisper.cpp passes with **DTW word onsets** (`-nfa -dtw
+<model>`: flash attention silently disables DTW, t_dtw = -1); tokens merged into words, punctuation
+never extends timing; refinement: first word of a region starts at the region start, last word ends
+at the region end; suspects: repeat (3–8-gram within 30 s → retake, "keep the last"), sound (region
+with no words), long-word, low-confidence, pass-diff (LCS per 60 s window). Commands `transcribe`
+(cached by size/mtime/model/passes/algorithm) and `transcript` (phrases with pauses + suspect markers,
+`--words`, `--search` with context, `--suspects`, `--from/--to`, truncation at 40 lines). Guide topic
+`perceive`. Tests incl. TestL28_FixturePhrasesMatchGroundTruth. e2e 22/22.
+Measured: whisper base.en 0.8 s/pass on 30 s (1.5 s with DTW). Raw whisper word mode stretched
+"server." 3.69→6.38 over a 2 s pause and placed "Then install Linux on it" ~1.5 s late (overlapping
+the noise burst). After refinement every phrase start is within 50 ms of truth; burst found at
+16.97–17.30 (truth 17.008–17.258); VFR fixture times = clean + 0.084 s (truth 0.085).
+Surprises: the disfluency prompt changed nothing on TTS speech (no real stumbles), so pass-diff is
+only unit-tested. Synthetic audio is cleaner than real rooms: threshold tuning needs T3 footage.
+Next: `look` + `listen`.
+
 ### 3 · 2026-11-18 · M1 init + inspect
 Did: `internal/media` (ffprobe facts; VFR from packet timestamps — no decode; rotation from the
 display matrix; HDR from transfer; AV offset; EBU R128 loudness + true peak), warnings tagged

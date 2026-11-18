@@ -10,9 +10,9 @@ Move done items to the journal, not here.
 - Fixtures on Linux: espeak-ng path untested.
 
 ## M1 — perceive
+- T3 sanity: run `transcribe` on a 2-min excerpt of real footage (local only) and compare phrase edges / suspects with what the published edit cut; tune envelope threshold for breaths and room tone (synthetic audio is too clean).
 - HDR fixture (HEVC 10-bit HLG tags via libx265) so `inspect` hdr warning has a test. [L23]
 - `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
-- `transcribe` via whisper.cpp; suspects (long words, loud gaps, repeated n-grams); `transcript` views (`--phrases`, `--search`, `--suspects`, `--retakes`). [L28 L29 L36]
 - `look` (frame, range sheet) and `listen` (spectrogram + RMS + isolated transcript). [L30 L31 L34]
 - `status`.
 

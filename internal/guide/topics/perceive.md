@@ -1,0 +1,26 @@
+<!-- summary: reading transcripts, suspects, and how far to trust word times -->
+# Perceive: what was said, and where
+
+`cutroom transcribe` makes a word-level transcript of every source with audio (cached). Then:
+
+- `cutroom transcript` — one line per phrase with its time range and the pause after it. Read this
+  first; it is the fastest way to understand a recording. Retakes stand out as repeated openings.
+- `cutroom transcript --search "exact words"` — every occurrence with times and context. Use it to
+  find edit points; quote words as the recogniser wrote them (case, punctuation and um/uh ignored).
+- `cutroom transcript --suspects` — things to check before cutting near them:
+  - `repeat`: the same 3–8 words said more than once within 30 s. Almost always a retake; the last
+    take is usually the good one, but read both.
+  - `sound`: sound with no words in a pause: a cough, a bump, a breath, or words the recogniser
+    skipped. Don't keep it in a pause you leave in; if it might be words, check it.
+  - `long-word`: a word lasting > 0.75 s; it may hide a restart.
+  - `pass-diff`: the second, stumble-sensitive pass heard something different. Look there.
+  - `low-confidence`: the recogniser was unsure of the word.
+- `cutroom transcript --words --from 6 --to 12` — word-by-word timing for a stretch.
+
+## How far to trust times
+Word starts come from the recogniser; the start of each phrase and the end of every word before a
+pause are measured from the audio's loudness, so **pause boundaries are accurate to ~30–50 ms**.
+Inside continuous speech, word boundaries are approximate (±100 ms). Cut in pauses when you can.
+
+Times are source times in seconds (`12.5`) or `m:ss.mmm`. Any time printed by cutroom can be
+passed back to any command.

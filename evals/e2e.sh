@@ -32,6 +32,14 @@ expect "inspect rotation"      'rotated 180° by metadata'            cutroom in
 expect "inspect audio-only"    'audio  pcm_s16le 48000 Hz mono'      cutroom inspect mic
 expect "unknown id suggests"   'did you mean source "talk"'          cutroom inspect tlk
 expect "inspect a loose file"  'no problems found'                   cutroom inspect --fast talk.mp4
+expect "transcribe"            'talk +[0-9]+ words, 7 phrases'        cutroom transcribe talk talk-vfr
+expect "transcribe cached"     'cached'                              cutroom transcribe talk
+expect "phrases"               '0:10\.[0-9]+–0:12\.[0-9]+  The first thing you need is an old laptop' cutroom transcript talk
+expect "vfr times shifted"     '^0:06\.(39|40)[0-9]–'                cutroom transcript talk-vfr
+expect "retake suspect"        'repeat .*first thing you need'       cutroom transcript talk --suspects
+expect "sound suspect"         'sound .*no words'                    cutroom transcript talk --suspects
+expect "search"                '2 match\(es\)'                       cutroom transcript --search "first thing you need"
+expect "untranscribed → fix"   'cutroom transcribe mic'              cutroom transcript mic
 popd >/dev/null
 expect "no project → fix"      'run `cutroom init'                   cutroom inspect --project "$W/nothing-here"
 
