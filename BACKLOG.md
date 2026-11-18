@@ -6,6 +6,16 @@ Move done items to the journal, not here.
 ## Needs human
 - Final name (working name: cutroom) and license (proposed: Apache-2.0).
 
+## NOW — friction from eval round 1 (ranks above features)
+- [friction] **`check`** — all 8 agents: "Never call an edit done without running `cutroom check`" but it didn't exist. One command: render vs timeline duration/frames, re-transcribe the render and diff against the timeline's words, per-segment A/V offset (audio xcorr of the render vs source at mapped times), frames vs source, tail/head pads loud (L33), loudness. Exit 4 on failure. Then restore guide rule 1.
+- [friction][correctness] **Separate audio source silently misaligned**: recorder-sonnet: "render silently uses the unaligned audio when you point the timeline at the recorder". Add `sync <audio-src> --to <video-src>` (offset + drift, robust fit, L05) stored in cutroom.json; render maps audio through it; `edit audio <source>` sets the timeline's audio; validate/render ERROR if audio source ≠ video source and no sync exists. `timeline` shows the audio source.
+- [friction] **Perceive the render**: 5/8 wanted `look`/`listen`/`transcript` on out/final.mp4. `look --output <t>` and `listen --output <range>` (output time through the timeline, or a rendered file).
+- [friction] `transcript --words --from/--to` outside the source prints only a header → say "no words in range; source is N s".
+- [friction] `--dry-run` reads as done ("cut talk …") → "would cut …".
+- [friction] suspects already inside cut spans: mark "(cut)" in `transcript --suspects` when a timeline exists.
+- [friction] `listen` shows "BLANK_AUDIO]": strip whisper annotations (`[…]`, `(…)`) from heard text and transcripts.
+- [friction] `init` should name the files it wrote; add `init --remove <id>`.
+
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
 
@@ -16,7 +26,6 @@ Move done items to the journal, not here.
 - `status`.
 
 ## M2 — decide/act
-- **First T2 eval round right after `render` works** (moved from iteration 5: no task is completable before rendering).
 - `look --cuts` / `look --output` once a timeline exists (frames either side of every cut).
 - `edit zoom` (punch-ins with anchor; warn > 1.2× on 1080p) once render exists. [L40]
 - `edit move` / reorder and multi-source (takes) segments. 

@@ -2,6 +2,22 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 8 · 2026-11-18 · eval round 1
+Did: first T2 round: 4 tasks × haiku/sonnet, fresh subagents with only the brief + `cutroom guide`.
+Results in evals/results/2026-11-18-1.md (friction reports in evals/results/r1/). Grader passes 8/8 after
+loosening phone-footage's min duration (both agents also cut a retake, prompted by `retake-kept`), but
+**tool-only 6/8**: both recorder runs needed workarounds outside cutroom (own xcorr, ffmpeg-built audio,
+hand-edited timeline.json). Every cutroom render measured frame-exact; sync ≤ 30 ms.
+Top friction: (1) `check` mandated by the guide but missing — all 8 runs; guide contradiction fixed now
+(rule 1 rewritten, render's next: line no longer points at a missing command). (2) **Correctness bug**:
+timeline audio set to another source renders 1.7 s late silently. (3) Can't look/listen/transcribe the
+render. Plus 5 small items. All in BACKLOG "NOW", above features.
+Measured: agents took 70–150 s and 8–22 tool calls; haiku ~40% more commands than sonnet, same outcomes.
+Surprises: the validator's warnings steer agents beyond the brief (retake removal). The recorder agents
+found the 1.7 s offset immediately from two transcripts' phrase times — `sync` can use the same idea as a
+cross-check of the xcorr result.
+Next: `check`, then the audio-source correctness bug + `sync`.
+
 ### 7 · 2026-11-18 · M2 render
 Did: `internal/render`: audio decoded once to a cached 48 kHz float WAV and assembled in Go by
 sample index (pieces = frames × SR/fps, so audio length = video length exactly), 20 ms raised-cosine

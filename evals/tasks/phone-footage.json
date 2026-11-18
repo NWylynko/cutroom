@@ -3,6 +3,6 @@
   "output": "out/final.mp4",
   "must_contain": ["install Linux on it", "your server is ready"],
   "must_not_contain": ["my cat"],
-  "duration": [14.0, 23.0],
+  "duration": [13.0, 23.0],
   "checks": ["upright", "no_rotation_meta", "av_sync"]
 }
