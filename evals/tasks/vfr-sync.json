@@ -1,0 +1,8 @@
+{
+  "fixtures": ["talk-vfr.mp4"],
+  "output": "out/final.mp4",
+  "must_contain": ["first thing you need is an old laptop", "your server is ready"],
+  "must_not_contain": ["um"],
+  "duration": [15.0, 23.0],
+  "checks": ["av_sync", "frames_from_source"]
+}
