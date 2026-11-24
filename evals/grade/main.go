@@ -41,6 +41,9 @@ type spec struct {
 	// SyncLimit (ms, default 45). The HDR fixture is HEVC-encoded test pattern whose neighbouring
 	// frames differ less than its encoding noise, so the grader can place a frame only to ±1 (33 ms).
 	SyncLimit float64 `json:"sync_limit_ms,omitempty"`
+	// AltRef is a second source the output may also draw from (a pickup take). Frames and sync are
+	// judged against whichever reference a frame matches; `alt_used` requires it to appear.
+	AltRef string `json:"alt_ref,omitempty"`
 }
 
 type result struct {
@@ -108,7 +111,7 @@ func main() {
 		case c == "no_rotation_meta":
 			r := rotation(out)
 			add(c, r == 0, "display rotation %d", r)
-		case c == "upright", c == "frames_from_source", c == "av_sync":
+		case c == "upright", c == "frames_from_source", c == "av_sync", c == "alt_used":
 			// computed together below
 		case c == "sdr_bt709":
 			tr, pr := colourTags(out)
@@ -134,7 +137,7 @@ func main() {
 			add(c, false, "unknown check")
 		}
 	}
-	if has(sp.Checks, "upright") || has(sp.Checks, "frames_from_source") || has(sp.Checks, "av_sync") {
+	if has(sp.Checks, "upright") || has(sp.Checks, "frames_from_source") || has(sp.Checks, "av_sync") || has(sp.Checks, "alt_used") {
 		frameAndSync(out, sp, add)
 	}
 	res = append(res, result{"transcript", true, truncate(text, 400)})
@@ -178,6 +181,12 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 	} else {
 		refFrames = greyFrames(ref, "")
 	}
+	refSets := [][][]byte{refFrames}
+	refPaths := []string{ref}
+	if sp.AltRef != "" {
+		refSets = append(refSets, greyFrames(filepath.Join(fixtures, sp.AltRef), ""))
+		refPaths = append(refPaths, filepath.Join(fixtures, sp.AltRef))
+	}
 	outFrames := greyFrames(out, "fps=30") // resample to a 30 fps grid in output time
 	if len(outFrames) == 0 || len(refFrames) == 0 {
 		add("frames", false, "could not decode frames")
@@ -185,38 +194,48 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 	}
 	type match struct {
 		outT, refT, err, flippedErr float64
+		ref                         int // which reference the frame came from
 	}
 	var ms []match
 	for i := 0; i < len(outFrames); i += 6 { // every 0.2 s
 		// match a short run of frames, not one: neighbouring frames of a near-static picture differ
 		// less than encoding noise, and a ±1 frame error is a ±33 ms sync error. The run is taken on
 		// whichever side of frame i fits better, so a cut next to i doesn't spoil it.
-		run := func(j, d0, d1 int) float64 {
-			t, n := 0.0, 0
-			for d := d0; d <= d1; d++ {
-				if i+d < 0 || i+d >= len(outFrames) || j+d < 0 || j+d >= len(refFrames) {
-					continue
+		bestRun, bi, br := math.Inf(1), 0, 0
+		for r, refFrames := range refSets {
+			run := func(j, d0, d1 int) float64 {
+				t, n := 0.0, 0
+				for d := d0; d <= d1; d++ {
+					if i+d < 0 || i+d >= len(outFrames) || j+d < 0 || j+d >= len(refFrames) {
+						continue
+					}
+					t += mse(outFrames[i+d], refFrames[j+d])
+					n++
 				}
-				t += mse(outFrames[i+d], refFrames[j+d])
-				n++
+				if n == 0 {
+					return math.Inf(1)
+				}
+				return t / float64(n)
 			}
-			if n == 0 {
-				return math.Inf(1)
-			}
-			return t / float64(n)
-		}
-		bestRun, bi := math.Inf(1), 0
-		for j, rf := range refFrames {
-			if mse(outFrames[i], rf) > 4*maxErr+1000 {
-				continue // cheap reject before scoring the run
-			}
-			if e := math.Min(run(j, -2, 0), run(j, 0, 2)); e < bestRun {
-				bestRun, bi = e, j
+			for j, rf := range refFrames {
+				if mse(outFrames[i], rf) > 4*maxErr+1000 {
+					continue // cheap reject before scoring the run
+				}
+				if e := math.Min(run(j, -2, 0), run(j, 0, 2)); e < bestRun {
+					bestRun, bi, br = e, j, r
+				}
 			}
 		}
-		best := mse(outFrames[i], refFrames[bi])
-		fl := mse(flip(outFrames[i]), refFrames[bi])
-		ms = append(ms, match{float64(i) / refFPS, float64(bi) / refFPS, best, fl})
+		if math.IsInf(bestRun, 1) { // nothing close: fall back to the main reference's nearest frame
+			for j, rf := range refSets[0] {
+				if e := mse(outFrames[i], rf); e < bestRun {
+					bestRun, bi, br = e, j, 0
+				}
+			}
+		}
+		best := mse(outFrames[i], refSets[br][bi])
+		fl := mse(flip(outFrames[i]), refSets[br][bi])
+		ms = append(ms, match{float64(i) / refFPS, float64(bi) / refFPS, best, fl, br})
 	}
 	// upright: best match error small and much smaller than the flipped comparison
 	bad := 0
@@ -234,14 +253,27 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 		sort.Float64s(fs)
 		add("frames_from_source/upright", bad == 0, "%d/%d sampled frames match an upright source frame (err median %.1f, worst %.1f; flipped median %.1f)", len(ms)-bad, len(ms), es[len(es)/2], es[len(es)-1], fs[len(fs)/2])
 	}
+	if has(checks, "alt_used") {
+		n := 0
+		for _, m := range ms {
+			if m.ref == 1 && m.err < maxErr {
+				n++
+			}
+		}
+		add("alt_used", n >= 5, "%d sampled frames (≈%.1f s) come from %s", n, float64(n)*0.2, sp.AltRef)
+	}
 	if !has(checks, "av_sync") {
 		return
 	}
 	outA := pcm(out)
-	refA := pcm(ref)
+	refAs := make([][]float64, len(refPaths))
+	for i, p := range refPaths {
+		refAs[i] = pcm(p)
+	}
 	var lags []float64
 	win, maxLag := int(0.5*sr), int(0.25*sr)
 	for _, m := range ms {
+		refA := refAs[m.ref]
 		o := int(m.outT * sr)
 		r := int(m.refT * sr)
 		if o-win/2 < 0 || o+win/2 > len(outA) || r-win/2-maxLag < 0 || r+win/2+maxLag > len(refA) {

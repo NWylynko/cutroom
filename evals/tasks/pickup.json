@@ -1,0 +1,10 @@
+{
+  "fixtures": ["talk.mp4", "pickup.mp4"],
+  "output": "out/final.mp4",
+  "must_contain": ["show you how to set up a home server", "first thing you need is an old laptop", "install Linux on it", "open the terminal and run the update command", "your server is ready"],
+  "must_not_contain": ["um", "my cat"],
+  "exactly_once": ["install Linux on it", "first thing you need"],
+  "duration": [12.0, 19.0],
+  "alt_ref": "pickup.mp4",
+  "checks": ["frames_from_source", "av_sync", "alt_used"]
+}

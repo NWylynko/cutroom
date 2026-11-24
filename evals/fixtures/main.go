@@ -126,6 +126,22 @@ func main() {
 		"-ar", "48000", "-c:a", "pcm_s16le", path("recorder.wav"))
 	writeManifest(m)
 
+	// 6. pickup.mp4 — one line re-recorded after the talk ("Then install Linux on it."), with 0.5 s
+	// either side; picture negated so a grader can tell which take a frame came from.
+	m = base
+	m.Name, m.File = "pickup", "pickup.mp4"
+	m.Description = "A re-recorded line (pickup) of talk.mp4's 'Then install Linux on it.', picture negated."
+	var pl line
+	for _, l := range lines {
+		if strings.HasPrefix(l.Say, "Then install Linux") {
+			pl = l
+		}
+	}
+	m.Facts = map[string]any{"fps": "30", "line": pl.Say, "talk_start": pl.Start - 0.5}
+	ff("-ss", fmt.Sprintf("%.3f", pl.Start-0.5), "-t", fmt.Sprintf("%.3f", pl.End-pl.Start+1.0), "-i", path("talk.mp4"),
+		"-vf", "negate", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-c:a", "aac", "-b:a", "128k", path("pickup.mp4"))
+	writeManifest(m)
+
 	// 5. talk-hdr.mov — iPhone-style HDR: HEVC 10-bit tagged HLG/bt2020, stored upside down with a
 	// 180° display rotation (real iPhone footage in T3 is exactly this). [L23 L25]
 	m = base

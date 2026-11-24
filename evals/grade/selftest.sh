@@ -76,5 +76,25 @@ want FAIL hdr-phone "$W/hdrnaive" "tone_mapped"
 cut "$W/hdr-sdr.mp4" "$W/hdrlate/out/final.mp4" null "$W/hdr-sdr.mp4" 100
 want FAIL hdr-phone "$W/hdrlate" "av_sync"
 
+# pickup: the good cut with the pickup's line in place of the original passes; ignoring the pickup fails
+fc=$(python3 - <<'PY'
+import json
+m=json.load(open("evals/work/fixtures/talk.json")); pk=json.load(open("evals/work/fixtures/pickup.json"))
+parts=[];cat="";i=0
+for l in m["lines"]:
+    if l.get("tag") not in ("keep","retake-good"): continue
+    if l["say"].startswith("Then install Linux"):
+        a=l["start"]-0.10-pk["facts"]["talk_start"]; b=l["end"]+0.22-pk["facts"]["talk_start"]; src=1
+    else:
+        a=l["start"]-0.10; b=l["end"]+0.22; src=0
+    parts.append(f"[{src}:v]trim=start={a:.3f}:end={b:.3f},setpts=PTS-STARTPTS[v{i}];[{src}:a]atrim=start={a:.3f}:end={b:.3f},asetpts=PTS-STARTPTS[a{i}];")
+    cat+=f"[v{i}][a{i}]"; i+=1
+print("".join(parts)+cat+f"concat=n={i}:v=1:a=1[v][a]")
+PY
+)
+mkdir -p "$W/pick/out" && ffmpeg -v error -y -i $FIX/talk.mp4 -i $FIX/pickup.mp4 -filter_complex "$fc" -map "[v]" -map "[a]" -c:v libx264 -preset veryfast -c:a aac -ar 48000 "$W/pick/out/final.mp4"
+want PASS pickup "$W/pick"
+want FAIL pickup "$W/good" "alt_used"
+
 echo "selftest: $pass passed, $fail failed"
 [ $fail -eq 0 ]
