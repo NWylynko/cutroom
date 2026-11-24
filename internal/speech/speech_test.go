@@ -193,3 +193,23 @@ func TestL28_FixturePhrasesMatchGroundTruth(t *testing.T) {
 		t.Errorf("suspects missing (sound=%v repeat=%v): %+v", sound, repeat, tr.Suspects)
 	}
 }
+
+// L28: breaths (short, well below speech) are not suspects; coughs, bumps and skipped words are.
+// Levels from real footage (T3 deploy excerpt, speech −24 dB) and the fixture (speech −16 dB).
+func TestL28_BreathIsNotASoundSuspect(t *testing.T) {
+	for _, c := range []struct {
+		peak, speech, dur float64
+		breath            bool
+	}{
+		{-42, -24, 0.11, true},  // real breath, 18 dB below speech
+		{-39, -24, 0.14, true},  // real breath, 15 dB below
+		{-31, -24, 0.33, false}, // real: loud, right after a word — keep as a suspect
+		{-35, -16, 0.33, true},  // fixture breath
+		{-21, -16, 0.32, false}, // fixture bump
+		{-42, -24, 1.2, false},  // long: not a breath, worth a listen
+	} {
+		if got := IsBreath(c.peak, c.speech, c.dur); got != c.breath {
+			t.Errorf("IsBreath(%v, %v, %v) = %v, want %v", c.peak, c.speech, c.dur, got, c.breath)
+		}
+	}
+}

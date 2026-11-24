@@ -38,6 +38,8 @@ expect "phrases"               '0:10\.[0-9]+–0:12\.[0-9]+  The first thing you
 expect "vfr times on source clock" '^0:06\.3[0-2][0-9]–'             cutroom transcript talk-vfr
 expect "retake suspect"        'repeat .*first thing you need'       cutroom transcript talk --suspects
 expect "sound suspect"         'sound .*no words'                    cutroom transcript talk --suspects
+expect "breath not a suspect"  'breath\(s\) not listed'              cutroom transcript talk --suspects
+expect "breath shown with --all" 'breath +breath or mouth noise'      cutroom transcript talk --suspects --all
 expect "search"                '2 match\(es\)'                       cutroom transcript --search "first thing you need"
 expect "untranscribed → fix"   'cutroom transcribe mic'              cutroom transcript mic
 expect "look sheet"            'contact sheet of talk: 8 frames'     cutroom look 6-12 --count 8

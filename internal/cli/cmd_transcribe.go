@@ -305,7 +305,14 @@ func runTranscript(c *Ctx) (*Result, error) {
 
 	case c.Bool("suspects"):
 		var sel []speech.Suspect
+		breaths := 0
 		for _, s := range t.Suspects {
+			if s.Kind == "breath" && !c.Bool("all") {
+				if inRange(s.Start, s.End) {
+					breaths++
+				}
+				continue
+			}
 			if inRange(s.Start, s.End) {
 				sel = append(sel, s)
 				note := cutNote(s.Start, s.End)
@@ -325,6 +332,9 @@ func runTranscript(c *Ctx) (*Result, error) {
 		}
 		if len(sel) == 0 {
 			lines = append(lines, "no suspects")
+		}
+		if breaths > 0 {
+			lines = append(lines, fmt.Sprintf("(%d breath(s) not listed: quiet, normal; --all shows them)", breaths))
 		}
 		trunc("narrow with --from/--to")
 		return &Result{Text: head + "\n" + strings.Join(lines, "\n"), Data: map[string]any{"suspects": nzs(sel)},

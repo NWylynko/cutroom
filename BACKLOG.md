@@ -8,9 +8,6 @@ Move done items to the journal, not here.
 
 ## NOW
 - Golden criterion 3 met in rounds 3+4; the remaining gap is spec coverage (M2–M6), T3, doctor/README.
-- Breaths: on real footage (deploy excerpt) 6 "sound" suspects are breaths (peaks −39…−43 dB over a
-  −55 dB floor). Classify short low sounds next to speech as `breath` (not a suspect by default). [L28]
-
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
 

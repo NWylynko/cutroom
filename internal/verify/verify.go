@@ -613,7 +613,7 @@ func edgeCheck(sx []float64, audioStart float64, tr *speech.Transcript, m *rende
 	env.Floor, env.Peak = tr.RoomTone, tr.SpeechDB
 	env.Thr = env.Floor + math.Max(10, 0.35*(env.Peak-env.Floor))
 	regions := env.Regions()
-	found := 0
+	found, breaths := 0, 0
 	for _, g := range m.Segments {
 		if g.Source != m.Audio {
 			continue
@@ -634,6 +634,10 @@ func edgeCheck(sx []float64, audioStart float64, tr *speech.Transcript, m *rende
 			if worded {
 				continue
 			}
+			if speech.IsBreath(rg.PeakDB, tr.SpeechDB, rg.End-rg.Start) {
+				breaths++
+				continue
+			}
 			found++
 			at := g.OutStart + math.Max(a, g.In) - g.In
 			r.add(Item{Check: "stray-sound", Status: "warn", At: round3(at), Segment: g.ID,
@@ -642,7 +646,11 @@ func edgeCheck(sx []float64, audioStart float64, tr *speech.Transcript, m *rende
 		}
 	}
 	if found == 0 {
-		r.add(Item{Check: "stray-sound", Status: "pass", Detail: "no sound without words kept at any cut or inside segments"})
+		d := "no sound without words kept at any cut or inside segments"
+		if breaths > 0 {
+			d += fmt.Sprintf(" (%d breath(s) kept: quiet, normal)", breaths)
+		}
+		r.add(Item{Check: "stray-sound", Status: "pass", Detail: d})
 	}
 }
 

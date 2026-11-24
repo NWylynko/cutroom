@@ -20,8 +20,9 @@ import (
 type line struct {
 	Say    string  `json:"say,omitempty"`
 	Pause  float64 `json:"pause,omitempty"`
-	Burst  bool    `json:"burst,omitempty"` // a loud 0.25 s noise burst in the middle of the pause
-	Tag    string  `json:"tag,omitempty"`   // ground-truth label: retake-bad, retake-good, keep, aside
+	Burst  bool    `json:"burst,omitempty"`  // a loud 0.25 s noise burst in the middle of the pause
+	Breath bool    `json:"breath,omitempty"` // a soft 0.3 s inhale ending 0.25 s before the next line
+	Tag    string  `json:"tag,omitempty"`    // ground-truth label: retake-bad, retake-good, keep, aside
 	Start  float64 `json:"start"`
 	End    float64 `json:"end"`
 	Detail string  `json:"detail,omitempty"`
@@ -45,7 +46,7 @@ var talk = []line{
 	{Say: "The first thing you need is, um, the first thing", Tag: "retake-bad", Detail: "abandoned start"},
 	{Pause: 0.9},
 	{Say: "The first thing you need is an old laptop.", Tag: "retake-good"},
-	{Pause: 1.4},
+	{Pause: 1.4, Breath: true, Detail: "pause with a quiet breath before the next line (normal, not a suspect)"},
 	{Say: "Then install Linux on it.", Tag: "keep"},
 	{Pause: 3.0, Burst: true, Detail: "loud noise burst in a pause (e.g. a cough or a bump)"},
 	{Say: "By the way, my cat just walked across the keyboard.", Tag: "aside"},
@@ -159,6 +160,14 @@ func speech(tmp string, script []line) ([]line, string) {
 			ff("-f", "lavfi", "-i", fmt.Sprintf("anullsrc=r=48000:cl=mono:d=%.3f", half),
 				"-f", "lavfi", "-i", "anoisesrc=color=brown:amplitude=0.6:duration=0.25:sample_rate=48000",
 				"-filter_complex", "[0:a][1:a][0:a]concat=n=3:v=0:a=1", "-ac", "1", "-c:a", "pcm_s16le", p)
+		} else if l.Breath {
+			// breath: band-limited soft noise ~20 dB below the speech peaks, with a quick fade in/out
+			pre := l.Pause - 0.3 - 0.25
+			ff("-f", "lavfi", "-i", fmt.Sprintf("anullsrc=r=48000:cl=mono:d=%.3f", pre),
+				"-f", "lavfi", "-i", "anoisesrc=color=pink:amplitude=0.25:duration=0.3:sample_rate=48000",
+				"-f", "lavfi", "-i", "anullsrc=r=48000:cl=mono:d=0.25",
+				"-filter_complex", "[1:a]highpass=f=500,lowpass=f=5000,afade=t=in:d=0.1,afade=t=out:st=0.2:d=0.1[b];[0:a][b][2:a]concat=n=3:v=0:a=1",
+				"-ac", "1", "-c:a", "pcm_s16le", p)
 		} else {
 			ff("-f", "lavfi", "-i", fmt.Sprintf("anullsrc=r=48000:cl=mono:d=%.3f", l.Pause), "-c:a", "pcm_s16le", p)
 		}

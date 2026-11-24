@@ -2,6 +2,20 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 23 · 2026-11-24 · breaths aren't suspects
+Did: `speech.IsBreath` — a wordless sound shorter than 0.8 s and more than 12 dB below speech level is
+a breath or mouth noise. Transcripts label it `breath` (Algorithm 3), so retake/kept-sound warnings,
+tighten's "also removes the sound" notes and `transcript --suspects` skip it ("N breath(s) not listed;
+--all shows them"); `check` stray-sound counts kept breaths as normal instead of warning. Fixture talk
+gains a soft inhale before "Then install Linux on it." (−35 dB, 19 dB under speech; timings
+unchanged). Tests: TestL28_BreathIsNotASoundSuspect (real + fixture levels); e2e 116/116 (+2);
+selftest 12/12 on the regenerated fixtures.
+Measured: deploy excerpt (speech −24 dB): 7 "sound" suspects → 1 sound (−31 dB, right after a word)
++ 6 breaths (−39…−43 dB). Fixture: breath −35 dB → breath; planted bump −21 dB → sound.
+Surprises: the threshold falls in a wide gap on both real and synthetic audio (breaths 15–19 dB under
+speech, bumps/coughs 5–7 dB under), so 12 dB isn't a fragile choice.
+Next: M2 — `edit zoom` (punch-ins).
+
 ### 22 · 2026-11-24 · round-5 friction: HDR measured in check, one-line open warnings, clocks labelled
 Did: `check` has a **tone** item for HDR sources: the render's saturation and brightness range vs the
 source read through the tone map at the same moments (±15%); `render` says "is HDR (HLG): tone-mapped

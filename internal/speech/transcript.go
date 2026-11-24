@@ -44,7 +44,7 @@ type Transcript struct {
 }
 
 // Algorithm bumps invalidate cached transcripts.
-const Algorithm = 2 // 2: overlapping repeat windows merged (T3, 2026-11-24)
+const Algorithm = 3 // 2: overlapping repeat windows merged; 3: breaths told apart from sounds (T3, 2026-11-24)
 
 // Build turns whisper words (wav seconds) plus the envelope into a refined transcript.
 func Build(raw []RawWord, env *Envelope, offset, duration float64) ([]Word, []Suspect) {
@@ -74,7 +74,10 @@ func Build(raw []RawWord, env *Envelope, offset, duration float64) ([]Word, []Su
 				break
 			}
 		}
-		if !has && r.End-r.Start >= 0.1 {
+		if !has && r.End-r.Start >= 0.1 && IsBreath(r.PeakDB, env.Peak, r.End-r.Start) {
+			sus = append(sus, Suspect{Kind: "breath", Start: r.Start, End: r.End, Lesson: "L28",
+				Detail: fmt.Sprintf("breath or mouth noise, %.2f s, peak %.0f dB (%.0f dB below speech): normal, not a problem", r.End-r.Start, r.PeakDB, env.Peak-r.PeakDB)})
+		} else if !has && r.End-r.Start >= 0.1 {
 			sus = append(sus, Suspect{Kind: "sound", Start: r.Start, End: r.End, Lesson: "L28",
 				Detail: fmt.Sprintf("sound with no words, %.2f s, peak %.0f dB (room tone %.0f dB): a cough, bump, breath, or words the recogniser skipped — `cutroom listen` it", r.End-r.Start, r.PeakDB, env.Floor)})
 		}
@@ -470,3 +473,10 @@ func normRaw(s string) string {
 }
 
 func round3(f float64) float64 { return math.Round(f*1000) / 1000 }
+
+// IsBreath tells a breath or mouth noise from a sound worth checking (cough, bump, skipped words):
+// short and well below speech level. Measured on real footage (T3): breaths sit 15–19 dB below speech
+// peaks; coughs, bumps and missed words within ~7 dB.
+func IsBreath(peakDB, speechDB, dur float64) bool {
+	return dur < 0.8 && peakDB < speechDB-12
+}
