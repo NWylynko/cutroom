@@ -36,6 +36,9 @@ const sr = speech.SampleRate
 
 var ErrNoMatch = errors.New("not enough shared sound to align")
 
+// minWindowCorr is the correlation a 2 s window needs to count in the fine fit (see Measure).
+var minWindowCorr = 0.35
+
 // Measure aligns other (x) to ref (y). Both are 16 kHz mono samples whose sample 0 is at
 // refStart / otherStart seconds on their own source clocks.
 func Measure(ref []float64, refStart float64, other []float64, otherStart float64) (Sync, error) {
@@ -59,7 +62,7 @@ func Measure(ref []float64, refStart float64, other []float64, otherStart float6
 	var pts []pt
 	rejected := 0
 	refDur := float64(len(ref)) / sr
-	n := 40
+	n := 60
 	for k := 0; k < n; k++ {
 		t := (float64(k) + 0.5) / float64(n) * refDur // ref wav time (window centre)
 		ri := int(t*sr) - win/2
@@ -72,7 +75,10 @@ func Measure(ref []float64, refStart float64, other []float64, otherStart float6
 			continue // silence: nothing to correlate (L05: silent windows pulled a plain fit off)
 		}
 		lag, c := xcorr(seg, other[oi-maxLag:oi+win+maxLag], maxLag)
-		if c < 0.5 {
+		// 0.35, not 0.5: a camera across a reverberant room correlates 0.35–0.55 with a close mic even
+		// at the right lag (T3, securing-personal-software); wrong windows are removed by the robust
+		// fit and the consensus check below.
+		if c < minWindowCorr {
 			rejected++
 			continue
 		}
@@ -100,6 +106,7 @@ func Measure(ref []float64, refStart float64, other []float64, otherStart float6
 		return
 	}
 	a, b := fit(pts)
+	dropped := 0
 	for iter := 0; iter < 3; iter++ {
 		res := make([]float64, len(pts))
 		for i, p := range pts {
@@ -113,6 +120,7 @@ func Measure(ref []float64, refStart float64, other []float64, otherStart float6
 				keep = append(keep, p)
 			} else {
 				rejected++
+				dropped++
 			}
 		}
 		if len(keep) == len(pts) || len(keep) < 4 {
@@ -124,6 +132,10 @@ func Measure(ref []float64, refStart float64, other []float64, otherStart float6
 	res := make([]float64, len(pts))
 	for i, p := range pts {
 		res[i] = math.Abs(p.off - (a + b*p.t))
+	}
+	// consensus: most windows that correlated must agree on one line, or the "fit" is noise
+	if len(pts) < 4 || float64(len(pts)) < 0.6*float64(len(pts)+dropped) {
+		return Sync{}, fmt.Errorf("%w: windows disagree (%d of %d agree on one offset)", ErrNoMatch, len(pts), len(pts)+dropped)
 	}
 	// convert wav clocks to source clocks:
 	// other_src = otherStart + other_wav = otherStart + ref_wav + a + b·ref_wav,  ref_wav = t − refStart

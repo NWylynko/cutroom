@@ -2,6 +2,25 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 26 · 2026-11-24 · T3 multi-take on real footage: two HEVC HDR takes, two recorders
+Did: excerpts (local) of securing-personal-software take-1/take-2 (4K HLG, 180° rotation) and their
+recorders. `sync` failed on both ("only 2 confident windows"): the camera across the room correlates
+0.35–0.55 with the lapel recorder even at the right lag, under the 0.5 window threshold. Lowered to
+0.35, 60 windows instead of 40, and a consensus guard (≥ 60% of correlating windows must sit on the
+fitted line, else no-match). TestL05_ReverberantCamera: the fixture camera with echoes, band limits
+and room noise must fail at 0.5 and land within 2.5 ms at 0.35. Then the full flow: tighten take 1,
+`edit audio mic1`, `edit audio mic2 --for sec-take2`, `edit add` a line from take 2, render --preview,
+check.
+Measured: mic1 +9.203 s (truth +9.205), mic2 +5.409 s (truth +5.410); drift on a 60 s span is loose
+(mic2 −68 ppm vs −28: ≤ 2.4 ms over the excerpt). Preview of 39.9 s from two 4K HEVC HDR takes in
+11.6 s. check PASS: picture worst 3.2, tone 16 vs 17, sync 0 ms against mic1/mic2 per segment,
+sync-camera worst 15 ms (independent of both offsets), 116/123 words with 5 recogniser variants.
+Contact sheet across the take join: upright, natural colour, take 2's slightly different framing.
+Surprises: the retake suggestion on real speech cuts from mid-sentence ("does the right
+authentication…") to the same words in the next take — a valid splice, but an editor would cut the
+whole first attempt at sentence boundaries. Backlog.
+Next: retake cuts at sentence boundaries; then M3/M4 (captions, overlays).
+
 ### 25 · 2026-11-24 · multi-take: `edit add`, `edit move`, each take's own sound
 Did: `edit add` puts a span of any source into the edit (by words with --text/--from/--to across all
 transcripts, or a range with --source; --after/--before id, --after start; default end; edges pinned;

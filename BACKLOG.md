@@ -7,8 +7,11 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- T3 multi-take: securing-personal-software take-1/take-2 (HEVC 4K HLG) + audio-1/audio-2 excerpts:
-  sync each recorder to its take, add a line from take 2, render, check. [L24 L05]
+- Retake cuts at sentence boundaries: on real speech the retake-kept fix cuts from the first
+  repeated phrase (mid-sentence) to the same phrase in the next take. Prefer: start of the sentence
+  holding the first take's repeat → start of the next take's sentence (T3 sec excerpt, take 1 2.3–23 s:
+  "Instead of making sure…security." then "My solution is to bare-hug…"). Several repeat suspects in one
+  retake should merge into one suggestion. [L36]
 - Golden criterion 3 met in rounds 3+4; the remaining gap is spec coverage (M2–M6), T3, doctor/README.
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
