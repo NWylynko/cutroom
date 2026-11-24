@@ -2,6 +2,26 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 20 · 2026-11-24 · HDR → SDR: iPhone HLG/PQ tone-mapped in render, look and check
+Did: `media.ReadSDR` — the one way render, look and check's picture burst read a source. HDR (HLG/PQ)
+goes through VideoToolbox (`-hwaccel videotoolbox`, `scale_vt` to bt709 — scaled on the GPU to the
+output size — `hwdownload`, `setparams` retag), the recipe the real productions used; zscale+tonemap
+(hable) where VideoToolbox is missing; SDR sources untouched. Rotation on the hardware path is applied
+by hand after download. `inspect`'s hdr warning is now "handled" when a tone mapper exists, else says
+what ffmpeg is needed. New fixture talk-hdr.mov (HEVC 10-bit, HLG/bt2020 tags, 180° display
+rotation, like iPhone files). Render Version 2 (cache keys). Tests: TestL23_HardwareToneMapOverrides
+Rotation, TestL24_OutputAlwaysTaggedBT709 (L24 had no guard). e2e 109/109 (+5), selftest 9/9.
+Measured: fixture: render 29.7 s in 2.9 s; check PASS, picture worst 0.3, rotation 0°, bt709; look
+upright (PSNR 24.2 vs 1.2 against the flipped frame). Real iPhone 4K HLG excerpt: `look` frame shows
+natural skin, saturated neon, proper contrast; a naive ffmpeg conversion of the same frame is visibly
+washed out and flat (both viewed).
+Surprises: (1) `-noautorotate` with hardware frames copied the input's −180° display matrix into the
+output — players would have flipped it back upside down. `-display_rotation 0` on the input overrides
+it. Only caught because frame counting choked on the extra side-data CSV field. (2) facts stored at
+inspect time keep an old "ACTION hdr" line until the file changes — warning text that depends on the
+machine shouldn't be frozen into cutroom.json (backlog).
+Next: breaths (real footage), then M2 (`edit zoom`, multi-take).
+
 ### 19 · 2026-11-24 · T3 prep on real footage: one retake = one suspect; changed sources can't be used stale
 Did: 60 s stream-copy excerpts (local only) from three published productions: ProRes 1080p single take,
 h264 1080p with two video streams, iPhone 4K HLG + separate 24-bit recorder. `init`/`transcribe`/

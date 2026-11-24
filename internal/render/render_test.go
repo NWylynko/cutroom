@@ -101,3 +101,18 @@ func TestL01_AssembleSampleExactWithFades(t *testing.T) {
 		t.Fatalf("fades wrong: %v %v %v %v", sample(0), sample(2400), sample(4799), sample(4800))
 	}
 }
+
+// L24: frames downloaded from the hardware tone mapper keep their bt2020 tags; every chunk is retagged
+// bt709 in the graph and on the encoder, whatever the source.
+func TestL24_OutputAlwaysTaggedBT709(t *testing.T) {
+	tl := timeline.New("30", 1280, 720, "cam", "cam", 0, 30)
+	tl.Cut("cam", 6, 9, "x", true)
+	c := Plan(tl, srcs(), Options{Target: 45, CacheDir: t.TempDir()})[0]
+	args := strings.Join(chunkCmd(tl, srcs(), c, false, "out.mp4"), " ")
+	for _, want := range []string{"setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv[out]",
+		"-colorspace bt709", "-color_primaries bt709", "-color_trc bt709", "-color_range tv"} {
+		if !strings.Contains(args, want) {
+			t.Fatalf("missing %q in %s", want, args)
+		}
+	}
+}

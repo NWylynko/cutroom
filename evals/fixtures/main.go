@@ -125,6 +125,19 @@ func main() {
 		"-ar", "48000", "-c:a", "pcm_s16le", path("recorder.wav"))
 	writeManifest(m)
 
+	// 5. talk-hdr.mov — iPhone-style HDR: HEVC 10-bit tagged HLG/bt2020, stored upside down with a
+	// 180° display rotation (real iPhone footage in T3 is exactly this). [L23 L25]
+	m = base
+	m.Name, m.File = "talk-hdr", "talk-hdr.mov"
+	m.Description = "Same talk as HEVC 10-bit HLG (bt2020) with a 180° display rotation, like iPhone HDR video."
+	m.Facts = map[string]any{"fps": "30", "vfr": false, "rotation": 180, "hdr": "hlg", "audio_start": 0.0}
+	ff("-i", path("talk.mp4"), "-vf", "hflip,vflip,format=yuv420p10le", "-c:v", "libx265", "-preset", "ultrafast", "-crf", "24",
+		"-x265-params", "log-level=error:colorprim=bt2020:transfer=arib-std-b67:colormatrix=bt2020nc",
+		"-color_primaries", "bt2020", "-color_trc", "arib-std-b67", "-colorspace", "bt2020nc", "-tag:v", "hvc1",
+		"-c:a", "copy", path("tmp/hdr.mov"))
+	ff("-display_rotation", "180", "-i", path("tmp/hdr.mov"), "-c", "copy", path("talk-hdr.mov"))
+	writeManifest(m)
+
 	os.RemoveAll(tmp)
 	fmt.Println("fixtures in", out)
 }

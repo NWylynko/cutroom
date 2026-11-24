@@ -19,6 +19,7 @@ import (
 	"sync"
 
 	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/cutroom/cutroom/internal/media"
 	"github.com/cutroom/cutroom/internal/render"
 	"github.com/cutroom/cutroom/internal/speech"
 )
@@ -301,9 +302,12 @@ var ptsRe = regexp.MustCompile(`pts_time:(-?[0-9.]+)`)
 // greyBurst decodes n frames from seek with their real presentation times (source clock, -copyts),
 // so held/dropped frames on VFR sources are judged by time, not by frame count.
 func greyBurst(p string, seek float64, n int) ([][]byte, []float64) {
-	cmd := exec.Command("ffmpeg", "-hide_banner", "-loglevel", "info", "-ss", strconv.FormatFloat(math.Max(0, seek), 'f', 4, 64), "-copyts", "-i", p,
-		"-vf", fmt.Sprintf("scale=%d:%d,format=yuv420p,extractplanes=y,showinfo", gw, gh),
+	sdr := media.ReadSDR(p, 0, 0) // compare with the source as the render read it (L23)
+	args := []string{"-hide_banner", "-loglevel", "info", "-ss", strconv.FormatFloat(math.Max(0, seek), 'f', 4, 64), "-copyts"}
+	args = append(args, sdr.Pre...)
+	args = append(args, "-i", p, "-vf", sdr.Chain(fmt.Sprintf("scale=%d:%d,format=yuv420p,extractplanes=y,showinfo", gw, gh)),
 		"-frames:v", strconv.Itoa(n), "-fps_mode", "passthrough", "-f", "rawvideo", "-")
+	cmd := exec.Command("ffmpeg", args...)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	b, err := cmd.Output()

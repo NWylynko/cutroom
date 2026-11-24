@@ -19,11 +19,12 @@ import (
 
 	"github.com/cutroom/cutroom/internal/align"
 	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/cutroom/cutroom/internal/media"
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
 // Version is part of every cache key; bump when output would change.
-const Version = 1
+const Version = 2 // 2: HDR sources tone-mapped to SDR bt709 (L23)
 
 type Source struct {
 	Path       string
@@ -158,8 +159,11 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 		lead := g.In - seek
 		nf := tl.Frames(g)
 		dur := lead + float64(nf+3)/tl.Rate() // 3 spare frames (L09)
-		args = append(args, "-ss", f6(seek), "-t", f6(dur), "-i", s.Path)
-		chain := fmt.Sprintf("[%d:v]fps=fps=%s:start_time=%s:round=near,trim=end_frame=%d,setpts=PTS-STARTPTS", n, fps, f6(lead), nf)
+		sdr := media.ReadSDR(s.Path, w, h)    // HDR → SDR bt709 on the way in (L23)
+		args = append(args, "-ss", f6(seek), "-t", f6(dur))
+		args = append(args, sdr.Pre...)
+		args = append(args, "-i", s.Path)
+		chain := fmt.Sprintf("[%d:v]", n) + sdr.Chain(fmt.Sprintf("fps=fps=%s:start_time=%s:round=near,trim=end_frame=%d,setpts=PTS-STARTPTS", fps, f6(lead), nf))
 		chain += fmt.Sprintf(",scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1", w, h, w, h)
 		chain += ",format=yuv420p" + fmt.Sprintf("[v%d]", n)
 		fc = append(fc, chain)
@@ -201,7 +205,9 @@ func countFrames(p string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return strconv.ParseInt(strings.TrimSpace(strings.Split(string(out), "\n")[0]), 10, 64)
+	first := strings.TrimSpace(strings.Split(string(out), "\n")[0])
+	first, _, _ = strings.Cut(first, ",") // side data adds empty csv fields
+	return strconv.ParseInt(first, 10, 64)
 }
 
 // Render renders the timeline (or a range) to out.

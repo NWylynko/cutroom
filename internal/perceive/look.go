@@ -14,6 +14,7 @@ import (
 	"sync"
 
 	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/cutroom/cutroom/internal/media"
 	"github.com/cutroom/cutroom/internal/raster"
 	"github.com/cutroom/cutroom/internal/speech"
 	"github.com/cutroom/cutroom/internal/timecode"
@@ -34,8 +35,11 @@ func Frame(src string, t float64, maxW int, crop *image.Rectangle) (image.Image,
 		vf += fmt.Sprintf("scale='min(%d,iw)':-2:flags=lanczos,", maxW)
 	}
 	vf += "format=rgb24"
-	out, err := deps.Run("ffmpeg", "-hide_banner", "-loglevel", "error", "-ss", strconv.FormatFloat(t, 'f', 4, 64), "-i", src,
-		"-frames:v", "1", "-vf", vf, "-f", "image2pipe", "-c:v", "png", "-")
+	sdr := media.ReadSDR(src, 0, 0) // HDR sources shown as they render (L23)
+	args := []string{"-hide_banner", "-loglevel", "error", "-ss", strconv.FormatFloat(t, 'f', 4, 64)}
+	args = append(args, sdr.Pre...)
+	args = append(args, "-i", src, "-frames:v", "1", "-vf", sdr.Chain(vf), "-f", "image2pipe", "-c:v", "png", "-")
+	out, err := deps.Run("ffmpeg", args...)
 	if err != nil {
 		return nil, err
 	}

@@ -285,9 +285,14 @@ func warnings(f *Facts) []Warning {
 				Fix:     "nothing to do: renders apply the rotation to the pixels and write no rotation metadata. Judge orientation from `cutroom look`, which shows frames as rendered"})
 		}
 		if v.HDR != "" {
-			w = append(w, Warning{Code: "hdr", Lesson: "L23", Handled: false,
-				Message: fmt.Sprintf("HDR source (%s, %s, %d-bit); a plain SDR conversion looks washed out", strings.ToUpper(v.HDR), v.Primaries, v.BitDepth),
-				Fix:     "tone mapping to SDR is not implemented yet; output will look washed out"})
+			msg := fmt.Sprintf("HDR source (%s, %s, %d-bit); a plain SDR conversion looks washed out", strings.ToUpper(v.HDR), v.Primaries, v.BitDepth)
+			if tm := ToneMapper(); tm != "" {
+				w = append(w, Warning{Code: "hdr", Lesson: "L23", Handled: true, Message: msg,
+					Fix: "nothing to do: render, look and check tone-map it to SDR bt709 (" + tm + "); `cutroom look` shows frames as they will render"})
+			} else {
+				w = append(w, Warning{Code: "hdr", Lesson: "L23", Handled: false, Message: msg,
+					Fix: "this ffmpeg can't tone-map (needs VideoToolbox on macOS, or the zscale filter: an ffmpeg built with libzimg); without it the output looks washed out. `cutroom doctor` shows how to install one"})
+			}
 		}
 		if v.Width*v.Height > 1920*1080 {
 			w = append(w, Warning{Code: "large", Handled: true,

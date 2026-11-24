@@ -8,9 +8,6 @@ Move done items to the journal, not here.
 
 ## NOW
 - Golden criterion 3 met in rounds 3+4; the remaining gap is spec coverage (M2–M6), T3, doctor/README.
-- HDR → SDR tone mapping for HLG/PQ sources (render, look, check picture). 2 of 4 real productions
-  are iPhone HLG; today `inspect` says "output will look washed out". VideoToolbox on macOS, zscale
-  tonemap fallback. Needs an HDR fixture (libx265 10-bit HLG tags). [L23 L24]
 - Breaths: on real footage (deploy excerpt) 6 "sound" suspects are breaths (peaks −39…−43 dB over a
   −55 dB floor). Classify short low sounds next to speech as `breath` (not a suspect by default). [L28]
 
@@ -21,6 +18,10 @@ Move done items to the journal, not here.
 - `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
 
 ## NEXT
+- Warnings whose text depends on this machine (hdr: tone mapper available?) are frozen into
+  cutroom.json at inspect time; recompute `handled`/fix at display time.
+- Tone-map timing on 4K: measure render speed of a 60 s 4K HLG excerpt (VideoToolbox) for the
+  estimator; zscale path is untested (no zscale in this ffmpeg).
 - [friction r4] `edit history` could flag the edit that a timeline warning comes from (fix-edit-sonnet:
   "have `edit history` flag edits that trigger a timeline warning").
 - Retake suggestion for 3+ takes: the fix removes only the first kept take; re-warns for the next. Fine,

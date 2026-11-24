@@ -172,5 +172,19 @@ expect "render reports baked rotation" 'rotation is baked into the pixels' cutro
 expect "status: preview not checked" 'out/preview\.mp4 +preview +current, not checked' cutroom status
 popd >/dev/null
 
+# iPhone-style HDR (HLG 10-bit, 180° rotation): tone-mapped to SDR everywhere, upright, no metadata [L23 L25]
+mkdir -p "$W/hdr" && cp $FIX/talk-hdr.mov $FIX/talk.mp4 "$W/hdr/" && pushd "$W/hdr" >/dev/null
+expect "inspect: hdr handled"      'handled hdr: HDR source \(HLG'     cutroom init talk-hdr.mov talk.mp4
+cutroom look 12.5 --source talk-hdr >/dev/null; cutroom look 12.5 --source talk >/dev/null
+ffmpeg -v error -y -i .cutroom/look/talk_12_500.png -vf hflip,vflip flipped.png
+up=$(ffmpeg -i .cutroom/look/talk-hdr_12_500.png -i .cutroom/look/talk_12_500.png -lavfi "[0:v]crop=iw:ih-40:0:0[a];[1:v]crop=iw:ih-40:0:0[b];[a][b]psnr" -f null - 2>&1 | grep -o 'average:[0-9.]*' | cut -d: -f2)
+dn=$(ffmpeg -i .cutroom/look/talk-hdr_12_500.png -i flipped.png -lavfi "[0:v]crop=iw:ih-40:0:0[a];[1:v]crop=iw:ih-40:0:0[b];[a][b]psnr" -f null - 2>&1 | grep -o 'average:[0-9.]*' | cut -d: -f2)
+awk -v u="$up" -v d="$dn" 'BEGIN{exit !(u > d + 3)}' && ok "look: HDR source upright (psnr $up vs flipped $dn)" || bad "look: HDR source upright" "psnr upright $up, flipped $dn"
+cutroom edit cut 0-0.5 --source talk-hdr >/dev/null 2>&1 || true
+expect "render HDR: rotation baked"  'rotation is baked into the pixels' cutroom render
+expect "check HDR render: SDR, no rotation" 'format +1280x720, display rotation 0°, colour bt709' cutroom check
+expect "check HDR render: picture"   'ok   picture'                      cutroom check
+popd >/dev/null
+
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]
