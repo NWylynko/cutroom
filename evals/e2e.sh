@@ -124,6 +124,8 @@ expect "edit audio after sync"        'takes its sound from mic'        cutroom 
 expect "timeline shows audio source"  'sound from mic'                  cutroom timeline
 expect "render with recorder audio"   'wrote out/final.mp4'             cutroom render
 expect "check passes synced render"   '^PASS'                           cutroom check
+expect "status: done after check"     'done: out/final\.mp4 is current and passed check' cutroom status
+expect "status: shows recorder sync"  'synced to talk \(\+1\.70[01] s'  cutroom status
 expect "check: camera cross-check"    'ok   sync-camera .*worst [+-]?[0-9] ms' cutroom check
 cp cutroom.json cutroom.json.bak
 python3 -c "import json;p=json.load(open('cutroom.json'));p['sources']['mic']['sync']['offset']+=0.1;json.dump(p,open('cutroom.json','w'))"
@@ -153,8 +155,13 @@ expect "no project → fix"      'run `cutroom init'                   cutroom i
 
 # rotated phone footage: render says the rotation is baked in
 mkdir -p "$W/rot" && cp $FIX/talk-rot.mov "$W/rot/" && pushd "$W/rot" >/dev/null
-cutroom init talk-rot.mov >/dev/null; cutroom edit cut 0-0.5 >/dev/null
+cutroom init talk-rot.mov >/dev/null
+expect "status: untranscribed → transcribe" 'next: cutroom transcribe talk-rot' cutroom status
+expect "status: no timeline yet"   'timeline: none yet'              cutroom status
+cutroom edit cut 0-0.5 >/dev/null
+expect "status: no render → preview" 'renders: none'                 cutroom status
 expect "render reports baked rotation" 'rotation is baked into the pixels' cutroom render --preview
+expect "status: preview not checked" 'out/preview\.mp4 +preview +current, not checked' cutroom status
 popd >/dev/null
 
 echo "e2e: $pass passed, $fail failed"

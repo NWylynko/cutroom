@@ -25,6 +25,8 @@ func init() {
               (limit 45 ms). picture + sync together prove lip sync is as the source plays in a
               player, timestamps and audio start offsets included. They can't repair a source
               recorded out of sync; to judge that, look at a face with ` + "`cutroom look --output`" + `.
+  sync-camera with a separate recorder only: the render's sound vs the camera's own sound, so a
+              wrong ` + "`cutroom sync`" + ` offset can't pass (sync above trusts that offset)
   words       re-transcribes the render and compares with the timeline's words, in order
               (missing words = a clipped cut; extra words = a fragment of something you cut)
   stray-sound sound with no words kept in the video (breaths, bumps, pieces of cut takes)
@@ -76,6 +78,7 @@ func runCheck(c *Ctx) (*Result, error) {
 	if err != nil {
 		return nil, Errf(ExitExternal, "check-failed", "make sure the file plays; re-render if it was interrupted", "%v", err)
 	}
+	saveCheck(e.p.Dir, file, rep)
 	var lines []string
 	verdict := "PASS"
 	if !rep.Pass {

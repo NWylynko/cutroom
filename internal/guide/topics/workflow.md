@@ -1,6 +1,9 @@
 <!-- summary: the steps from raw footage to a verified video, and which commands do each -->
 # Workflow
 
+Coming back to a project, or not sure where it stands? `cutroom status` shows sources, the timeline,
+every render (current or stale, checked or not) and the next step.
+
 1. **Set up.** `cutroom doctor` once. Then, in your working directory:
    `cutroom init <video> [<more files>]` creates `cutroom.json` and inspects every source.
    Each source gets an id (file name by default); other commands take ids or paths.

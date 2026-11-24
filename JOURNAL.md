@@ -2,6 +2,17 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 18 · 2026-11-24 · `status`
+Did: `cutroom status` (SPEC rule 6): sources (kind, size, length, transcribed, changed on disk, recorder
+sync), timeline (segments, length vs sources, sound source, edits and the last one, error/warning
+codes), every render in out/ with a manifest (full/preview/partial, current vs STALE by timeline hash,
+last check verdict while the file is unchanged), and one next step: transcribe → first edit →
+render --preview → check → render → check → "done: out/final.mp4 is current and passed check".
+`check` now records its verdict in .cutroom/checks.json (pass, counts, first problem, file size+mtime).
+Guide workflow points to it. e2e 98/98 (+6: each next-step state, recorder sync shown).
+Surprises: with two current full renders the newest won; out/final.mp4 is the deliverable, so it wins.
+Next: T3 prep on real footage (excerpts, inspect/transcribe vs the published cut).
+
 ### 17 · 2026-11-24 · round-4 friction: render paths, honest fix lines, independent recorder sync check
 Did: `transcript out/final.mp4` reads the file (as `--file`); any command given a render path where a
 source is expected says "is a render, not a source; read it as a file" instead of suggesting `init`.

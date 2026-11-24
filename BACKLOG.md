@@ -7,8 +7,7 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- `status` (SPEC rule 6: an agent with no memory runs it and knows everything). Golden criterion 3 met
-  in rounds 3+4; the remaining gap to golden is spec coverage (M2–M6) plus T3 and doctor/README.
+- Golden criterion 3 met in rounds 3+4; the remaining gap is spec coverage (M2–M6), T3, doctor/README.
 - T3 prep: cut 60–120 s excerpts from evals/local/README.md's productions (read-only sources) and run
   `inspect`/`transcribe` on them; compare suspects with what the published edit cut.
 
@@ -19,7 +18,6 @@ Move done items to the journal, not here.
 - T3 sanity: run `transcribe` on a 2-min excerpt of real footage (local only) and compare phrase edges / suspects with what the published edit cut; tune envelope threshold for breaths and room tone (synthetic audio is too clean).
 - HDR fixture (HEVC 10-bit HLG tags via libx265) so `inspect` hdr warning has a test. [L23]
 - `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
-- `status`.
 
 ## NEXT
 - [friction r4] `edit history` could flag the edit that a timeline warning comes from (fix-edit-sonnet:
