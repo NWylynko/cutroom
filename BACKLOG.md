@@ -4,7 +4,7 @@ Top = next. Tags: `[friction]` from an eval (quote the agent), `[lesson Lxx]`, `
 Move done items to the journal, not here.
 
 ## Needs human
-- Final name (working name: cutroom) and license (proposed: Apache-2.0).
+- (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
 - **Eval round 4** (all 5 tasks × haiku/sonnet). Round 3 was clean (10/10, no medium friction); golden

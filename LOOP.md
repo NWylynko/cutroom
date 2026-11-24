@@ -33,7 +33,8 @@ Run every 5th iteration and at each milestone. Three tiers:
 - **T2 agent evals** — for each task in `evals/tasks/*.md`, spawn a **fresh** subagent (no access to
   this conversation or cutroom's source) with only: the task brief, a working directory with the
   fixture, and `cutroom` on PATH. It must say "Start with `cutroom guide`" and nothing else about
-  usage. Run each task with a weaker model (haiku) and a stronger one (sonnet). The subagent ends with
+  usage. Run each task with sonnet (the gate: real users are expected to drive cutroom with
+  Sonnet/Opus-class models) and haiku (cheap early-warning signal for friction). The subagent ends with
   a **friction report** (`evals/FRICTION_TEMPLATE.md`). Then grade with `evals/grade.sh <task> <dir>`,
   which checks the output independently of cutroom's own `check` (ffprobe, an independent whisper
   pass, expected/forbidden phrases, duration bounds, sync).
@@ -70,8 +71,9 @@ command that didn't exist; used seconds where text anchors would have been safer
 All of these, verified in the same round:
 1. Every SPEC v1 command implemented, in `guide`, with e2e coverage.
 2. Every INVARIANT in LESSONS.md has a passing guard test; every DETECT has a fixture that triggers it.
-3. T2: ≥ 90% task pass rate with haiku and 100% with sonnet, two consecutive rounds, with no friction
-   item rated medium or higher.
+3. T2: 100% task pass rate with sonnet, two consecutive rounds, with no friction item rated medium or
+   higher. Haiku runs are informational (their friction still goes to the backlog), not a gate.
+   (Decided by the user 2026-11-24.)
 4. T3: the reviewer accepts the edits on all local real-footage excerpts; `check` passes on them.
 5. `go install` + `cutroom doctor` works on a clean PATH; README quick start verified by a fresh agent.
 
