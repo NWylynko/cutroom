@@ -8,15 +8,16 @@ Move done items to the journal, not here.
 
 ## NOW
 - Golden criterion 3 met in rounds 3+4; the remaining gap is spec coverage (M2–M6), T3, doctor/README.
-- T3 prep: cut 60–120 s excerpts from evals/local/README.md's productions (read-only sources) and run
-  `inspect`/`transcribe` on them; compare suspects with what the published edit cut.
+- HDR → SDR tone mapping for HLG/PQ sources (render, look, check picture). 2 of 4 real productions
+  are iPhone HLG; today `inspect` says "output will look washed out". VideoToolbox on macOS, zscale
+  tonemap fallback. Needs an HDR fixture (libx265 10-bit HLG tags). [L23 L24]
+- Breaths: on real footage (deploy excerpt) 6 "sound" suspects are breaths (peaks −39…−43 dB over a
+  −55 dB floor). Classify short low sounds next to speech as `breath` (not a suspect by default). [L28]
 
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
 
 ## M1 — perceive
-- T3 sanity: run `transcribe` on a 2-min excerpt of real footage (local only) and compare phrase edges / suspects with what the published edit cut; tune envelope threshold for breaths and room tone (synthetic audio is too clean).
-- HDR fixture (HEVC 10-bit HLG tags via libx265) so `inspect` hdr warning has a test. [L23]
 - `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
 
 ## NEXT

@@ -44,7 +44,7 @@ type Transcript struct {
 }
 
 // Algorithm bumps invalidate cached transcripts.
-const Algorithm = 1
+const Algorithm = 2 // 2: overlapping repeat windows merged (T3, 2026-11-24)
 
 // Build turns whisper words (wav seconds) plus the envelope into a refined transcript.
 func Build(raw []RawWord, env *Envelope, offset, duration float64) ([]Word, []Suspect) {
@@ -174,6 +174,30 @@ func Norm(s string) string {
 	return n
 }
 
+// cand is one repeated phrase: token index ranges [first, last] of each take, in time order.
+type cand struct{ occ [][2]int }
+
+// merge joins two repeats whose takes overlap pairwise (the same retake seen through two windows).
+func (c cand) merge(d cand) (cand, bool) {
+	if len(c.occ) != len(d.occ) {
+		return c, false
+	}
+	m := cand{}
+	for i := range c.occ {
+		a, b := c.occ[i], d.occ[i]
+		if a[0] > b[1]+1 || b[0] > a[1]+1 { // disjoint (adjacent counts as overlapping)
+			return c, false
+		}
+		m.occ = append(m.occ, [2]int{min(a[0], b[0]), max(a[1], b[1])})
+	}
+	for i := 1; i < len(m.occ); i++ { // merged takes must not run into each other
+		if m.occ[i][0] <= m.occ[i-1][1] {
+			return c, false
+		}
+	}
+	return m, true
+}
+
 // repeats finds n-grams (3–8 words) said more than once within 30 s: retakes (L36).
 func repeats(words []Word) []Suspect {
 	type tok struct {
@@ -188,6 +212,7 @@ func repeats(words []Word) []Suspect {
 	}
 	covered := map[int]bool{}
 	var out []Suspect
+	var cands []cand
 	for n := 8; n >= 3; n-- {
 		pos := map[string][]int{}
 		for k := 0; k+n <= len(toks); k++ {
@@ -219,18 +244,47 @@ func repeats(words []Word) []Suspect {
 			if len(group) < 2 || covered[toks[group[0]].i] {
 				continue
 			}
-			var times []float64
 			for _, k := range group {
-				times = append(times, words[toks[k].i].Start)
 				for j := k; j < k+n; j++ {
 					covered[toks[j].i] = true
 				}
 			}
-			first, last := words[toks[group[0]].i], words[toks[group[len(group)-1]+n-1].i]
-			out = append(out, Suspect{Kind: "repeat", Start: first.Start, End: last.End, Text: key, Lesson: "L36",
-				Related: times,
-				Detail:  fmt.Sprintf("%q is said %d× within %.0f s — likely a retake; the last take is usually the keeper", key, len(group), times[len(times)-1]-times[0])})
+			c := cand{}
+			for _, k := range group {
+				c.occ = append(c.occ, [2]int{k, k + n - 1})
+			}
+			cands = append(cands, c)
 		}
+	}
+	// sliding windows of one retake ("no point replacing a $5 a month…", "a $5 a month subscription
+	// with…") overlap in every take: merge them so one retake is reported once.
+	for merged := true; merged; {
+		merged = false
+		for a := 0; a < len(cands) && !merged; a++ {
+			for b := a + 1; b < len(cands) && !merged; b++ {
+				if m, ok := cands[a].merge(cands[b]); ok {
+					cands[a] = m
+					cands = append(cands[:b], cands[b+1:]...)
+					merged = true
+				}
+			}
+		}
+	}
+	sort.Slice(cands, func(i, j int) bool { return cands[i].occ[0][0] < cands[j].occ[0][0] })
+	for _, c := range cands {
+		var times []float64
+		for _, o := range c.occ {
+			times = append(times, words[toks[o[0]].i].Start)
+		}
+		var parts []string
+		for _, t := range toks[c.occ[0][0] : c.occ[0][1]+1] {
+			parts = append(parts, t.w)
+		}
+		key := strings.Join(parts, " ")
+		first, last := words[toks[c.occ[0][0]].i], words[toks[c.occ[len(c.occ)-1][1]].i]
+		out = append(out, Suspect{Kind: "repeat", Start: first.Start, End: last.End, Text: key, Lesson: "L36",
+			Related: times,
+			Detail:  fmt.Sprintf("%q is said %d× within %.0f s — likely a retake; the last take is usually the keeper", key, len(c.occ), times[len(times)-1]-times[0])})
 	}
 	return out
 }

@@ -38,7 +38,9 @@ Examples:
 
 func srcWav(p *project.Project, s *project.Source) ([]float64, error) {
 	w := speech.WavPath(cacheDir(p), s.ID)
-	if st, err := os.Stat(w); err != nil || st.ModTime().Before(s.ModTime) {
+	// compare with the file as it is on disk now, not as recorded at inspect time
+	src, _ := os.Stat(p.Abs(s))
+	if st, err := os.Stat(w); err != nil || src == nil || st.ModTime().Before(src.ModTime()) {
 		os.MkdirAll(filepath.Dir(w), 0o755)
 		if err := speech.ExtractWav(p.Abs(s), w); err != nil {
 			return nil, err
@@ -78,6 +80,11 @@ func runSync(c *Ctx) (*Result, error) {
 	for _, s := range []*project.Source{ref, other} {
 		if s.Facts.Audio == nil {
 			return nil, Errf(ExitUsage, "no-audio", "both sources need sound to be matched (the camera's own mic is enough)", "source %q has no audio", s.ID)
+		}
+	}
+	for _, src := range []*project.Source{ref, other} {
+		if err := notChanged(p, src); err != nil {
+			return nil, err
 		}
 	}
 	rx, err := srcWav(p, ref)

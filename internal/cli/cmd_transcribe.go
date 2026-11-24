@@ -117,6 +117,9 @@ func runTranscribe(c *Ctx) (*Result, error) {
 		if s.Facts.Audio == nil {
 			return nil, Errf(ExitUsage, "no-audio", "pick a source with audio (`cutroom inspect`)", "source %q has no audio", id)
 		}
+		if err := notChanged(p, s); err != nil {
+			return nil, err
+		}
 		t0 := time.Now()
 		key := speech.Key(s.Size, s.ModTime, model, passes)
 		t, cached, err := speech.Transcribe(id, p.Abs(s), s.Facts.Audio.Start, s.Facts.Duration, key,
@@ -400,4 +403,16 @@ func nzs(s []speech.Suspect) []speech.Suspect {
 // clock formats seconds as m:ss.mmm.
 func clock(s float64) string {
 	return timecode.FromFloat(s).Clock()
+}
+
+// notChanged refuses a source whose file changed since `init` inspected it: its facts, cached audio
+// and transcript would describe the old file.
+func notChanged(p *project.Project, s *project.Source) error {
+	if stale, err := p.Stale(s); stale {
+		if err != nil {
+			return Errf(ExitInvalid, "source-missing", "put the file back, or `cutroom init --remove "+s.ID+"`", "source %q (%s) is missing", s.ID, s.Path)
+		}
+		return Errf(ExitInvalid, "stale-source", "run `cutroom init` to re-inspect it", "source %q changed on disk since it was inspected", s.ID)
+	}
+	return nil
 }

@@ -139,6 +139,14 @@ pushd "$S" >/dev/null
 expect "dry run says would"           '^would cut .*DRY RUN|would cut'  cutroom edit cut --text "Then install Linux on it." --dry-run
 expect "transcript range past end"    'not word numbers'                cutroom transcript talk --words --from 38 --to 63
 expect "init --remove in use refused" 'used by the timeline'            cutroom init --remove mic
+# the recorder file is replaced (0.5 s later start): found on real footage (T3), sync used the old file
+expect "bare init: nothing changed"    'nothing changed on disk'         cutroom init
+ffmpeg -v error -y -i recorder.wav -af adelay=500 -c:a pcm_s16le rec2.wav && mv rec2.wav recorder.wav
+expect "status: changed on disk"       'mic .*CHANGED on disk'           cutroom status
+expect "sync refuses changed source"   'run .cutroom init. to re-inspect'  cutroom sync mic
+expect "transcribe refuses changed"    'stale-source'                    cutroom transcribe mic
+expect "bare init resets sync"         'mic changed, so its alignment was reset' cutroom init
+expect "sync re-measures new file"     'mic started recording 2\.(19[0-9]|20[0-9]) s before talk' cutroom sync mic
 popd >/dev/null
 # round-2 regressions
 V="$W/vfrcheck"; mkdir -p "$V"; cp $FIX/talk-vfr.mp4 "$V/"; pushd "$V" >/dev/null

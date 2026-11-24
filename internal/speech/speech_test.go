@@ -85,6 +85,25 @@ func TestRepeatsFindRetake(t *testing.T) {
 	}
 }
 
+// A long retake (> 8 words repeated) is seen through several overlapping n-gram windows; it must be
+// reported once, spanning the whole repeated phrase (found on real footage, T3).
+func TestL36_LongRetakeReportedOnce(t *testing.T) {
+	var ws []Word
+	t0 := 0.0
+	take := "there is no point replacing a five a month subscription with a ten a month server"
+	for _, s := range strings.Fields(take + " so " + take + " instead") {
+		ws = append(ws, Word{Text: s, Start: t0, End: t0 + 0.3})
+		t0 += 0.35
+	}
+	sus := repeats(ws)
+	if len(sus) != 1 {
+		t.Fatalf("want 1 repeat, got %d: %+v", len(sus), sus)
+	}
+	if sus[0].Text != take || len(sus[0].Related) != 2 {
+		t.Fatalf("want the whole take %q ×2, got %q ×%d", take, sus[0].Text, len(sus[0].Related))
+	}
+}
+
 func TestDiffPassesFindsStumble(t *testing.T) {
 	mk := func(s string) []Word {
 		var ws []Word

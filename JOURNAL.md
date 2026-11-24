@@ -2,6 +2,28 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 19 · 2026-11-24 · T3 prep on real footage: one retake = one suspect; changed sources can't be used stale
+Did: 60 s stream-copy excerpts (local only) from three published productions: ProRes 1080p single take,
+h264 1080p with two video streams, iPhone 4K HLG + separate 24-bit recorder. `init`/`transcribe`/
+`sync` on each. Fixes from what they exposed: (1) a retake longer than 8 words was reported once per
+overlapping n-gram window (4 suspects for one retake) — windows whose takes overlap pairwise are now
+merged (TestL36_LongRetakeReportedOnce; transcript Algorithm 2 invalidates old caches). (2) Bare
+`cutroom init` didn't re-inspect a file that changed on disk although the guide and every
+stale-source fix line promise it; now it does, says "nothing changed" otherwise, and warns that a
+changed recorder's alignment was reset. (3) `sync` and `transcribe` used caches keyed on the facts
+recorded at inspect time, so a replaced file was silently aligned/transcribed as the old one; both
+now refuse a changed source with "run `cutroom init`", and sync's wav cache compares with the file on
+disk. e2e 104/104 (+6).
+Measured (real footage): deploy excerpt suspects 7 → 5 repeats; both retake spans match what the
+published edit removed (excerpt 0.12–8.61 s and 14.86–41.52 s). iPhone+recorder: `sync` +15.167 s,
+−23.8 ppm, 21 windows, residual 0.04 ms, 0.4 s — the production's own tool measured +15.17 s (from
+−104.8265 s at cam 0) and −24.36 ppm. Transcribe ~4 s per minute of speech (base.en, 2 passes).
+Surprises: `status` caught the stale recorder before I did. The no-match error on my first (wrong)
+audio window was correct and its fix line pointed the right way.
+Next: HDR→SDR tone mapping moves up — 2 of 4 real productions are iPhone HLG and render "washed out"
+today [L23]. Then breath/room-tone thresholds (deploy: 6 "sound" suspects at −39…−43 dB peaks over
+a −55 dB floor are breaths).
+
 ### 18 · 2026-11-24 · `status`
 Did: `cutroom status` (SPEC rule 6): sources (kind, size, length, transcribed, changed on disk, recorder
 sync), timeline (segments, length vs sources, sound source, edits and the last one, error/warning

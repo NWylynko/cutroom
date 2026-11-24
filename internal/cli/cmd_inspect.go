@@ -116,6 +116,14 @@ func runInit(c *Ctx) (*Result, error) {
 	if len(todo) == 0 && created {
 		return nil, Errf(ExitUsage, "no-sources", "name at least one file: `cutroom init talk.mp4`", "init needs source files")
 	}
+	if len(todo) == 0 { // bare `cutroom init`: re-inspect every source that changed on disk
+		for _, id := range p.IDs() {
+			if stale, _ := p.Stale(p.Sources[id]); stale {
+				todo = append(todo, pending{id, p.Abs(p.Sources[id])})
+			}
+		}
+	}
+	var resyncs []string
 
 	var lines []string
 	var added, refreshed, unchanged []string
@@ -151,6 +159,9 @@ func runInit(c *Ctx) (*Result, error) {
 			return nil, Errf(ExitExternal, "probe-failed", "make sure it is a video or audio file ffmpeg can read", "%s: %v", t.path, err)
 		}
 		st, _ := os.Stat(path)
+		if existing != nil && existing.Sync != nil {
+			resyncs = append(resyncs, id) // the old alignment was measured on the old file
+		}
 		p.Sources[id] = &project.Source{ID: id, Path: p.RelPath(path), Size: st.Size(), ModTime: st.ModTime(), Facts: f}
 		if existing != nil {
 			refreshed = append(refreshed, id)
@@ -181,6 +192,13 @@ func runInit(c *Ctx) (*Result, error) {
 		}
 	}
 	next := []string{"cutroom inspect " + p.IDs()[0] + "   (full facts)"}
+	if len(todo) == 0 && !created {
+		lines = append(lines, "nothing changed on disk since the last inspect")
+	}
+	for _, id := range resyncs {
+		lines = append(lines, fmt.Sprintf("WARN %s changed, so its alignment was reset: run `cutroom sync %s` again", id, id))
+		next = append([]string{"cutroom sync " + id}, next...)
+	}
 	return &Result{Text: strings.Join(lines, "\n"), Next: next, Data: map[string]any{
 		"project": absDir(c.Dir), "created": created, "added": nz(added), "reinspected": nz(refreshed), "unchanged": nz(unchanged), "sources": p.Sources}}, nil
 }
