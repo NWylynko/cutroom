@@ -18,6 +18,12 @@ Move done items to the journal, not here.
 - `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
 
 ## NEXT
+- [friction r5] Acknowledge a warning you decided to keep (`cutroom timeline --accept retake-kept@4.09`
+  or similar), so status/check show it as decided (recorder-haiku, phone-haiku).
+- [friction r5] `edit cut --phrase N` using `cutroom transcript` phrase numbers (tighten-haiku).
+- [friction r5] tighten: say which removed suspect sounds were never listened to (vfr-haiku).
+- Fixture: add a per-frame marker (frame number box) to talk.mp4 so graders can place frames exactly
+  through tone mapping (hdr-phone sync limit is 70 ms because of this).
 - Warnings whose text depends on this machine (hdr: tone mapper available?) are frozen into
   cutroom.json at inspect time; recompute `handled`/fix at display time.
 - Tone-map timing on 4K: measure render speed of a 60 s 4K HLG excerpt (VideoToolbox) for the

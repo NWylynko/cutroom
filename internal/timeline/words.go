@@ -311,7 +311,7 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 						if len(tr) > 1 {
 							cmd += " --source " + src
 						}
-						fix = "keep the last take: `" + cmd + "` removes the earlier take, " + gone + " (add --dry-run to check the join first)"
+						fix = "keep the last take: `" + cmd + "` removes the earlier take, " + gone + " (--near is a source time; add --dry-run to check the join first)"
 					}
 					add("warn", "retake-kept", nil, o, fix, "%q is still said %d× in the timeline (a retake?)", s.Text, kept)
 				}

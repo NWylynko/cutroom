@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cutroom/cutroom/internal/media"
 	"math"
 	"path/filepath"
 	"strings"
@@ -165,6 +166,13 @@ func runRender(c *Ctx) (*Result, error) {
 		used := false
 		for _, g := range e.tl.Segments {
 			used = used || g.Source == id
+		}
+		if f != nil && f.Video != nil && f.Video.HDR != "" && used {
+			if sdr := media.ReadSDR(e.p.Abs(e.p.Sources[id]), 0, 0); sdr.Method != "none" && sdr.Method != "" {
+				lines = append(lines, fmt.Sprintf("  picture: %s is HDR (%s): tone-mapped to SDR bt709 (%s); `cutroom check` compares its colour with the source", id, strings.ToUpper(f.Video.HDR), sdr.Method))
+			} else {
+				lines = append(lines, fmt.Sprintf("  WARN picture: %s is HDR (%s) but this ffmpeg can't tone-map: the render looks washed out (`cutroom doctor`)", id, strings.ToUpper(f.Video.HDR)))
+			}
 		}
 		if f != nil && f.Video != nil && f.Video.Rotation != 0 && used {
 			v := f.Video

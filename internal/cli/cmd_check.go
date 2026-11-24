@@ -105,6 +105,8 @@ func runCheck(c *Ctx) (*Result, error) {
 	} else if rep.Warnings > 0 {
 		res.Next = []string{"read each WARN: decide it is fine or fix it (they don't fail the check)"}
 	}
+	// what the file says, read back from the file itself
+	res.Next = append(res.Next, "cutroom transcript --file "+relToCwd(file)+"   (read what the render says)")
 	return res, nil
 }
 

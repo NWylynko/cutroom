@@ -173,6 +173,10 @@ func runEdit(c *Ctx) (*Result, error) {
 	}
 	before := e.tl.Duration()
 	soundsBefore := e.keptSounds()
+	var issuesBefore []timeline.Issue // warnings already open before this edit are shown in one line
+	if !e.made {
+		issuesBefore = e.validate()
+	}
 
 	switch op {
 	case "reset":
@@ -244,8 +248,16 @@ func runEdit(c *Ctx) (*Result, error) {
 		}
 	}
 	issues := e.validate()
-	lines = append(lines, fmt.Sprintf("timeline: %d segments, %s (was %s)", len(e.tl.Segments), secs(e.tl.Duration()), secs(before)))
-	lines = append(lines, issueLines(issues, 6)...)
+	lines = append(lines, fmt.Sprintf("timeline: %s, %s (was %s)", plural(len(e.tl.Segments), "segment"), secs(e.tl.Duration()), secs(before)))
+	fresh, open := splitIssues(issues, issuesBefore)
+	lines = append(lines, issueLines(fresh, 6)...)
+	if len(open) > 0 {
+		var cs []string
+		for _, x := range open {
+			cs = append(cs, fmt.Sprintf("%s at output %s", x.Code, clock(x.At)))
+		}
+		lines = append(lines, "still open (unchanged by this edit): "+strings.Join(truncList(cs, 4), "; ")+" — `cutroom timeline` shows them with fixes")
+	}
 	if c.Bool("dry-run") {
 		for i, l := range lines {
 			lines[i] = strings.Replace(l, "this also removes", "this would also remove", 1)
@@ -289,7 +301,7 @@ func issueLines(is []timeline.Issue, n int) []string {
 			out = append(out, fmt.Sprintf("… %d more problem(s): `cutroom timeline`", len(is)-n))
 			break
 		}
-		s := fmt.Sprintf("%s[%s] at %s: %s", strings.ToUpper(x.Level), x.Code, clock(x.At), x.Message)
+		s := fmt.Sprintf("%s[%s] at output %s: %s", strings.ToUpper(x.Level), x.Code, clock(x.At), x.Message)
 		if x.Fix != "" {
 			s += " → " + x.Fix
 		}
@@ -519,7 +531,7 @@ func runTimeline(c *Ctx) (*Result, error) {
 	if d, ok := e.dur[tl.Video]; ok {
 		srcTotal = d
 	}
-	lines = append(lines, fmt.Sprintf("timeline: %d segments, %s output (%s fps, %dx%d), from %s of %s; sound from %s",
+	lines = append(lines, fmt.Sprintf("timeline: %d segment(s), %s output (%s fps, %dx%d), from %s of %s; sound from %s",
 		len(tl.Segments), secs(tl.Duration()), fpsStr(tl.FPS), tl.Width, tl.Height, secs(srcTotal), tl.Video, orNone(tl.Audio)))
 	if c.Bool("joins") {
 		js := tl.Joins(e.tr)
@@ -591,4 +603,28 @@ func (e *editEnv) keptSounds() []keptSound {
 		}
 	}
 	return out
+}
+
+// splitIssues separates issues this edit introduced from ones that were already open (same code and
+// message), so an edit doesn't repeat a warning the agent has already seen in full.
+func splitIssues(now, before []timeline.Issue) (fresh, open []timeline.Issue) {
+	seen := map[string]bool{}
+	for _, x := range before {
+		seen[x.Code+"|"+x.Message] = true
+	}
+	for _, x := range now {
+		if seen[x.Code+"|"+x.Message] && x.Level != "error" {
+			open = append(open, x)
+		} else {
+			fresh = append(fresh, x)
+		}
+	}
+	return
+}
+
+func plural(n int, word string) string {
+	if n == 1 {
+		return "1 " + word
+	}
+	return fmt.Sprintf("%d %ss", n, word)
 }

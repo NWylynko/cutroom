@@ -2,6 +2,35 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 22 · 2026-11-24 · round-5 friction: HDR measured in check, one-line open warnings, clocks labelled
+Did: `check` has a **tone** item for HDR sources: the render's saturation and brightness range vs the
+source read through the tone map at the same moments (±15%); `render` says "is HDR (HLG): tone-mapped
+to SDR bt709 (videotoolbox)". Edit commands print only warnings the edit introduced in full; ones
+already open collapse to "still open (unchanged by this edit): retake-kept at output 0:04.093 — …".
+Warnings say "at output …"; the retake fix says "--near is a source time". `status`: open warnings
+put `cutroom timeline (N open warning(s)…)` first; timeline line names `cutroom edit history`.
+`check` always suggests `cutroom transcript --file <render>` to read what it says. `-o` hint shows the
+usage line. "1 segment". e2e 114/114 (+5).
+Measured: HDR fixture render: tone ok (saturation 87 vs 87, range 217 vs 217); a plain bt2020→bt709
+conversion with the same manifest: tone FAIL (saturation 103 vs 87).
+Surprises: phone-haiku reported the retake warning as stale after it was fixed; reproducing showed it
+was gone ("no problems found") — the agent saw it repeated after its other cuts. The repetition was the
+real problem.
+Next: breaths (real footage), then M2.
+
+### 21 · 2026-11-24 · eval round 5 (+ hdr-phone, resume tasks)
+Did: two new tasks; grader learned HDR: `sdr_bt709`, `tone_mapped` (signalstats saturation + luma
+range vs a VideoToolbox-tone-mapped reference, ±10%), reference decoded from the HDR fixture itself
+(`ref`, `ref_sdr`), per-task `frame_err` and `sync_limit_ms`, and frame matching by short runs instead
+of single frames. Selftest 12/12 (+3: HDR good PASS, naive FAIL on tone_mapped, 100 ms late FAIL on
+av_sync). `evals/setup-runs.sh` prepares run dirs. Ran 7 tasks × sonnet/haiku: **14/14 PASS,
+tool-only, no medium friction**; third clean sonnet round (golden criterion 3 holds).
+Measured: VideoToolbox decode vs software decode of the HDR fixture: identical frames at identical
+indices (8/8). The grader's −100 ms on the first HDR attempt was its own matching (tone-shifted
+test-pattern neighbours differ by 0.4 MSE vs ~149 of encoding noise), not the render.
+Surprises: an independent grader for HDR is hard on synthetic content: the picture can only be placed
+to ±1 frame, so hdr-phone's sync limit is 70 ms. Backlog: a per-frame marker in the fixture.
+
 ### 20 · 2026-11-24 · HDR → SDR: iPhone HLG/PQ tone-mapped in render, look and check
 Did: `media.ReadSDR` — the one way render, look and check's picture burst read a source. HDR (HLG/PQ)
 goes through VideoToolbox (`-hwaccel videotoolbox`, `scale_vt` to bt709 — scaled on the GPU to the

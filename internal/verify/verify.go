@@ -108,6 +108,7 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 
 	// 2. picture: sampled render frames vs source frames (±3)
 	pictureCheck(file, m, fps, r)
+	toneCheck(file, m, fps, r)
 
 	// 3. sync per segment + 4. words + 5. edges — all need audio
 	renderWav := filepath.Join(tmp, "render.wav")
@@ -772,4 +773,74 @@ func cameraCheck(rx []float64, cam string, m *render.Manifest, o Options, tmp st
 	}
 	it.Detail = fmt.Sprintf("%d of %d segments: the render's sound vs %s's own camera sound (independent of sync's offset): median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), cam, lags[len(lags)/2], worst)
 	r.add(it)
+}
+
+// toneCheck (L23): for segments from an HDR source, the render's colourfulness and brightness range
+// must match the source read through the tone map. A plain conversion (or a render made before tone
+// mapping existed) keeps the right tags but looks washed out; this catches it.
+func toneCheck(file string, m *render.Manifest, fps float64, r *Report) {
+	var outS, srcS, outR, srcR float64
+	n := 0
+	hdr := ""
+	for _, g := range m.Segments {
+		src, ok := m.Sources[g.Source]
+		if !ok {
+			continue
+		}
+		sdr := media.ReadSDR(src.Path, 0, 0)
+		if sdr.HDR == "" {
+			continue
+		}
+		hdr = strings.ToUpper(sdr.HDR)
+		if sdr.Method == "none" || n >= 5 {
+			continue
+		}
+		d := float64(g.Frames) / fps
+		os_, or_, ok1 := frameTone(file, g.OutStart+d/2, media.SDR{})
+		ss, sr, ok2 := frameTone(src.Path, g.In+d/2, sdr)
+		if ok1 && ok2 {
+			outS, outR, srcS, srcR, n = outS+os_, outR+or_, srcS+ss, srcR+sr, n+1
+		}
+	}
+	if hdr == "" {
+		return
+	}
+	if n == 0 {
+		r.add(Item{Check: "tone", Status: "warn", Detail: "HDR (" + hdr + ") source, but its colour could not be compared (no tone mapper, or frames unreadable)",
+			Fix: "`cutroom doctor`; look at a frame with `cutroom look --output <time>`"})
+		return
+	}
+	ds, dr := outS/srcS-1, outR/srcR-1
+	it := Item{Check: "tone", Status: "pass", Detail: fmt.Sprintf("HDR (%s) source tone-mapped to SDR: saturation %.0f vs source %.0f, brightness range %.0f vs %.0f (%d frame(s), within 15%%)",
+		hdr, outS/float64(n), srcS/float64(n), outR/float64(n), srcR/float64(n), n)}
+	if math.Abs(ds) > 0.15 || math.Abs(dr) > 0.15 {
+		it.Status = "fail"
+		it.Fix = "the render's colour doesn't match the tone-mapped source (washed out or over-saturated): render again with this cutroom, then `cutroom look --output <time>`"
+	}
+	r.add(it)
+}
+
+var satRe, yLowRe, yHighRe = regexp.MustCompile(`SATAVG=([0-9.]+)`), regexp.MustCompile(`YLOW=([0-9.]+)`), regexp.MustCompile(`YHIGH=([0-9.]+)`)
+
+// frameTone returns one frame's mean saturation and YHIGH−YLOW (8-bit units), read through sdr.
+func frameTone(p string, t float64, sdr media.SDR) (sat, rng float64, ok bool) {
+	args := []string{"-v", "error", "-ss", strconv.FormatFloat(math.Max(0, t), 'f', 3, 64)}
+	args = append(args, sdr.Pre...)
+	args = append(args, "-i", p, "-frames:v", "1", "-vf", sdr.Chain("format=yuv420p,signalstats,metadata=print:file=-"), "-f", "null", "-")
+	b, err := deps.Run("ffmpeg", args...)
+	if err != nil {
+		return 0, 0, false
+	}
+	get := func(re *regexp.Regexp) (float64, bool) {
+		m := re.FindStringSubmatch(string(b))
+		if m == nil {
+			return 0, false
+		}
+		v, _ := strconv.ParseFloat(m[1], 64)
+		return v, true
+	}
+	s, ok1 := get(satRe)
+	lo, ok2 := get(yLowRe)
+	hi, ok3 := get(yHighRe)
+	return s, hi - lo, ok1 && ok2 && ok3 && hi > lo
 }

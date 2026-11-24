@@ -137,6 +137,9 @@ g=$(go run ./evals/grade -fixtures $FIX recorder "$S" 2>&1)
 grep -q 'GRADE recorder: PASS' <<<"$g" && ok "grader passes recorder task via sync" || bad "grader passes recorder task via sync" "$(grep FAIL <<<"$g")"
 pushd "$S" >/dev/null
 expect "dry run says would"           '^would cut .*DRY RUN|would cut'  cutroom edit cut --text "Then install Linux on it." --dry-run
+expect "edit: open warning in one line" 'still open \(unchanged by this edit\): retake-kept at output' cutroom edit cut --text "Then install Linux on it." --dry-run
+expect "status: open warnings first"  'next: cutroom timeline +\([0-9]+ open warning' cutroom status
+expect "status: points to history"    'cutroom edit history. lists them all' cutroom status
 expect "transcript range past end"    'not word numbers'                cutroom transcript talk --words --from 38 --to 63
 expect "init --remove in use refused" 'used by the timeline'            cutroom init --remove mic
 # the recorder file is replaced (0.5 s later start): found on real footage (T3), sync used the old file
@@ -184,6 +187,8 @@ cutroom edit cut 0-0.5 --source talk-hdr >/dev/null 2>&1 || true
 expect "render HDR: rotation baked"  'rotation is baked into the pixels' cutroom render
 expect "check HDR render: SDR, no rotation" 'format +1280x720, display rotation 0°, colour bt709' cutroom check
 expect "check HDR render: picture"   'ok   picture'                      cutroom check
+expect "check HDR render: tone"      'ok   tone +HDR \(HLG\) source tone-mapped' cutroom check
+expect "render says HDR tone-mapped"  'is HDR \(HLG\): tone-mapped to SDR bt709' cutroom render --preview
 popd >/dev/null
 
 echo "e2e: $pass passed, $fail failed"

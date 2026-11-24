@@ -306,7 +306,7 @@ func parseArgs(ctx *Ctx, args []string) error {
 				}
 				fix := "usage: " + usageLine(ctx.Cmd) + " (positional arguments need no flag; `cutroom " + ctx.Cmd.Name + " --help` lists flags)"
 				if len(cands) == 1 {
-					fix = fmt.Sprintf("did you mean --%s?", cands[0])
+					fix = fmt.Sprintf("did you mean --%s? (usage: %s)", cands[0], usageLine(ctx.Cmd))
 				}
 				return Errf(ExitUsage, "bad-flag", fix, "%s has no flag %s (cutroom uses long flags only)", ctx.Cmd.Name, a)
 			}

@@ -154,7 +154,7 @@ func runStatus(c *Ctx) (*Result, error) {
 		}
 		l += fmt.Sprintf(", %d edit(s)", tl.Edits)
 		if tl.LastEdit != "" {
-			l += " (last: " + tl.LastEdit + ")"
+			l += " (last: " + tl.LastEdit + "; `cutroom edit history` lists them all)"
 		}
 		lines = append(lines, l)
 		if tl.Errors+tl.Warnings > 0 {
@@ -229,9 +229,9 @@ func runStatus(c *Ctx) (*Result, error) {
 	if len(next) == 0 {
 		next = statusNext(d, untranscribed)
 	}
-	if len(next) == 1 && strings.HasPrefix(next[0], "done") {
-		lines = append(lines, next[0])
-		next = nil
+	if k := len(next) - 1; k >= 0 && strings.HasPrefix(next[k], "done") {
+		lines = append(lines, next[k])
+		next = next[:k]
 	}
 	return &Result{Text: strings.Join(lines, "\n"), Data: d, Next: next}, nil
 }
@@ -246,6 +246,14 @@ func statusNext(d statusData, untranscribed string) []string {
 	if d.Timeline.Errors > 0 {
 		return []string{"cutroom timeline"}
 	}
+	var pre []string
+	if d.Timeline.Warnings > 0 { // open warnings come first: fix each or decide it is fine
+		pre = []string{fmt.Sprintf("cutroom timeline   (%d open warning(s): fix each or decide it is fine)", d.Timeline.Warnings)}
+	}
+	return append(pre, statusRenderNext(d)...)
+}
+
+func statusRenderNext(d statusData) []string {
 	var full, preview *statusRender
 	for i := range d.Renders {
 		r := &d.Renders[i]
