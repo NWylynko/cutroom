@@ -27,7 +27,15 @@ const MaxEdge = 1568
 // Frame decodes the frame shown at time t (source seconds), as displayed (rotation applied),
 // scaled so its width is at most maxW (0 = native). crop (x,y,w,h in source pixels) is optional.
 func Frame(src string, t float64, maxW int, crop *image.Rectangle) (image.Image, error) {
+	return FrameVF(src, t, maxW, crop, "")
+}
+
+// FrameVF is Frame with a filter applied first (after any HDR conversion), e.g. a punch-in crop.
+func FrameVF(src string, t float64, maxW int, crop *image.Rectangle, pre string) (image.Image, error) {
 	vf := ""
+	if pre != "" {
+		vf = pre + ","
+	}
 	if crop != nil {
 		vf = fmt.Sprintf("crop=%d:%d:%d:%d,", crop.Dx(), crop.Dy(), crop.Min.X, crop.Min.Y)
 	}
@@ -63,6 +71,7 @@ type Cell struct {
 	Label string  `json:"label"` // first line (white)
 	Say   string  `json:"saying,omitempty"`
 	Cut   bool    `json:"cut_before,omitempty"` // draw a cut marker on the left edge
+	VF    string  `json:"-"`                    // filter applied to the frame first (e.g. a punch-in crop)
 }
 
 // Sheet builds a labelled contact sheet of n frames evenly spaced over [a, b] of one file.
@@ -118,7 +127,7 @@ func Cells(cells []Cell, cols int) (image.Image, error) {
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			imgs[i], errs[i] = Frame(cells[i].Path, cells[i].T, thumbW, nil)
+			imgs[i], errs[i] = FrameVF(cells[i].Path, cells[i].T, thumbW, nil, cells[i].VF)
 		}(i)
 	}
 	wg.Wait()

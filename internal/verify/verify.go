@@ -190,7 +190,7 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 			picks = []int{int(g.Frames) / 2}
 		}
 		for _, k := range picks {
-			ss = append(ss, sample{seg: g, f: start + k, srcT: g.In + float64(k)/fps, skipped: g.Zoom > 1.001})
+			ss = append(ss, sample{seg: g, f: start + k, srcT: g.In + float64(k)/fps})
 		}
 	}
 	if len(ss) > 120 { // keep it fast on long timelines: spread samples evenly
@@ -214,7 +214,12 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			path := m.Sources[s.seg.Source].Path
-			burst, pts := greyBurst(path, s.srcT-4/fps, 9)
+			crop := ""
+			if s.seg.Zoom > 1.001 { // compare through the same punch-in crop the render used (L40)
+				ax, ay := s.seg.Anchor()
+				crop = render.ZoomCrop(s.seg.Zoom, ax, ay)
+			}
+			burst, pts := greyBurst(path, crop, s.srcT-4/fps, 9)
 			if len(burst) == 0 {
 				s.skipped = true
 				return
@@ -291,6 +296,10 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 		st = "fail"
 		d = fmt.Sprintf("%d of %d sampled frames show the wrong moment; first at output %.3f (segment %s): about %+d frames (%.0f ms) off, difference %.1f",
 			bad, n, float64(first.f)/fps, first.seg.ID, first.offset, first.distMS, first.err)
+		if first.err > 500 { // nothing nearby matches: not a timing problem
+			d = fmt.Sprintf("%d of %d sampled frames match no nearby source frame; first at output %.3f (segment %s), difference %.1f: wrong picture, framing or zoom, not timing",
+				bad, n, float64(first.f)/fps, first.seg.ID, first.err)
+		}
 		it.At, it.Segment = float64(first.f)/fps, first.seg.ID
 		it.Fix = "look at it: `cutroom look " + strconv.FormatFloat(first.srcT, 'f', 2, 64) + " --source " + first.seg.Source + "` vs the render frame"
 	}
@@ -302,11 +311,15 @@ var ptsRe = regexp.MustCompile(`pts_time:(-?[0-9.]+)`)
 
 // greyBurst decodes n frames from seek with their real presentation times (source clock, -copyts),
 // so held/dropped frames on VFR sources are judged by time, not by frame count.
-func greyBurst(p string, seek float64, n int) ([][]byte, []float64) {
+func greyBurst(p, crop string, seek float64, n int) ([][]byte, []float64) {
 	sdr := media.ReadSDR(p, 0, 0) // compare with the source as the render read it (L23)
 	args := []string{"-hide_banner", "-loglevel", "info", "-ss", strconv.FormatFloat(math.Max(0, seek), 'f', 4, 64), "-copyts"}
 	args = append(args, sdr.Pre...)
-	args = append(args, "-i", p, "-vf", sdr.Chain(fmt.Sprintf("scale=%d:%d,format=yuv420p,extractplanes=y,showinfo", gw, gh)),
+	vf := fmt.Sprintf("scale=%d:%d,format=yuv420p,extractplanes=y,showinfo", gw, gh)
+	if crop != "" {
+		vf = crop + "," + vf
+	}
+	args = append(args, "-i", p, "-vf", sdr.Chain(vf),
 		"-frames:v", strconv.Itoa(n), "-fps_mode", "passthrough", "-f", "rawvideo", "-")
 	cmd := exec.Command("ffmpeg", args...)
 	var stderr bytes.Buffer
@@ -804,8 +817,13 @@ func toneCheck(file string, m *render.Manifest, fps float64, r *Report) {
 			continue
 		}
 		d := float64(g.Frames) / fps
-		os_, or_, ok1 := frameTone(file, g.OutStart+d/2, media.SDR{})
-		ss, sr, ok2 := frameTone(src.Path, g.In+d/2, sdr)
+		crop := ""
+		if g.Zoom > 1.001 {
+			ax, ay := g.Anchor()
+			crop = render.ZoomCrop(g.Zoom, ax, ay) + ","
+		}
+		os_, or_, ok1 := frameTone(file, g.OutStart+d/2, media.SDR{}, "")
+		ss, sr, ok2 := frameTone(src.Path, g.In+d/2, sdr, crop)
 		if ok1 && ok2 {
 			outS, outR, srcS, srcR, n = outS+os_, outR+or_, srcS+ss, srcR+sr, n+1
 		}
@@ -831,10 +849,10 @@ func toneCheck(file string, m *render.Manifest, fps float64, r *Report) {
 var satRe, yLowRe, yHighRe = regexp.MustCompile(`SATAVG=([0-9.]+)`), regexp.MustCompile(`YLOW=([0-9.]+)`), regexp.MustCompile(`YHIGH=([0-9.]+)`)
 
 // frameTone returns one frame's mean saturation and YHIGH−YLOW (8-bit units), read through sdr.
-func frameTone(p string, t float64, sdr media.SDR) (sat, rng float64, ok bool) {
+func frameTone(p string, t float64, sdr media.SDR, crop string) (sat, rng float64, ok bool) {
 	args := []string{"-v", "error", "-ss", strconv.FormatFloat(math.Max(0, t), 'f', 3, 64)}
 	args = append(args, sdr.Pre...)
-	args = append(args, "-i", p, "-frames:v", "1", "-vf", sdr.Chain("format=yuv420p,signalstats,metadata=print:file=-"), "-f", "null", "-")
+	args = append(args, "-i", p, "-frames:v", "1", "-vf", sdr.Chain(crop+"format=yuv420p,signalstats,metadata=print:file=-"), "-f", "null", "-")
 	b, err := deps.Run("ffmpeg", args...)
 	if err != nil {
 		return 0, 0, false

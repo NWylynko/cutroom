@@ -140,3 +140,43 @@ func TestBrokenSentenceWarned(t *testing.T) {
 		}
 	}
 }
+
+// L40: a punch-in splits segments at its edges, pins those edges (they sit inside continuous
+// speech: tighten must not open a gap there), keeps the picture continuous, and zoom 1 undoes it.
+func TestL40_ZoomSplitsPinsAndStaysContinuous(t *testing.T) {
+	ws := words(1, 2, 2.1, 3, 6, 7, 7.1, 8)
+	tr := Transcripts{"cam": {Words: ws}}
+	tl := New("30", 1280, 720, "cam", "cam", 0, 10)
+	before := tl.Duration()
+	if n := tl.Zoom("cam", 2.0, 2.5, 1.2, 0.5, 0.3); n != 1 || len(tl.Segments) != 3 {
+		t.Fatalf("want 1 zoomed of 3 segments, got %d of %+v", n, tl.Segments)
+	}
+	m := tl.Segments[1]
+	if m.ZoomOf() != 1.2 || !m.PinIn || !m.PinOut || !tl.Segments[0].PinOut || !tl.Segments[2].PinIn {
+		t.Fatalf("zoomed piece or its neighbours not pinned: %+v", tl.Segments)
+	}
+	if !near(tl.Segments[0].Out, m.In) || !near(m.Out, tl.Segments[2].In) || !near(tl.Duration(), before) {
+		t.Fatalf("zoom must not change the picture's continuity or length: %+v", tl.Segments)
+	}
+	tl.Tighten(tr, 0.4)
+	for i := 0; i+1 < len(tl.Segments); i++ {
+		l, r := tl.Segments[i], tl.Segments[i+1]
+		if l.ZoomOf() != r.ZoomOf() && !near(l.Out, r.In) {
+			t.Fatalf("tighten opened a gap at a zoom edge: %+v", tl.Segments)
+		}
+	}
+	js := tl.Joins(tr)
+	kinds := map[string]int{}
+	for _, j := range js {
+		kinds[j.Kind]++
+	}
+	if kinds["zoom"] != 2 {
+		t.Fatalf("want 2 zoom joins, got %+v", js)
+	}
+	tl.Zoom("cam", 0, 10, 1, 0, 0)
+	for _, g := range tl.Segments {
+		if g.ZoomOf() != 1 {
+			t.Fatalf("zoom 1 must clear the punch-in: %+v", g)
+		}
+	}
+}

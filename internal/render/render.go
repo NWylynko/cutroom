@@ -159,11 +159,17 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 		lead := g.In - seek
 		nf := tl.Frames(g)
 		dur := lead + float64(nf+3)/tl.Rate() // 3 spare frames (L09)
-		sdr := media.ReadSDR(s.Path, w, h)    // HDR → SDR bt709 on the way in (L23)
+		z := g.ZoomOf()
+		// HDR → SDR bt709 on the way in (L23); a zoomed segment needs z× the pixels before its crop
+		sdr := media.ReadSDR(s.Path, even(float64(w)*z), even(float64(h)*z))
 		args = append(args, "-ss", f6(seek), "-t", f6(dur))
 		args = append(args, sdr.Pre...)
 		args = append(args, "-i", s.Path)
 		chain := fmt.Sprintf("[%d:v]", n) + sdr.Chain(fmt.Sprintf("fps=fps=%s:start_time=%s:round=near,trim=end_frame=%d,setpts=PTS-STARTPTS", fps, f6(lead), nf))
+		if z > 1 { // punch-in (L40): crop around the anchor, kept inside the frame, then scale back up
+			ax, ay := g.Anchor()
+			chain += "," + ZoomCrop(z, ax, ay)
+		}
 		chain += fmt.Sprintf(",scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1", w, h, w, h)
 		chain += ",format=yuv420p" + fmt.Sprintf("[v%d]", n)
 		fc = append(fc, chain)
@@ -477,3 +483,19 @@ func estimate(o Options, cs []Chunk, px int) float64 {
 func f6(x float64) string      { return strconv.FormatFloat(x, 'f', 6, 64) }
 func round6(f float64) float64 { return math.Round(f*1e6) / 1e6 }
 func round3(f float64) float64 { return math.Round(f*1e3) / 1e3 }
+
+func even(x float64) int { return int(math.Round(x/2)) * 2 }
+
+// ZoomCrop is the crop for a punch-in of z centred on (ax, ay) (normalised display coordinates),
+// clamped inside the frame. Render and check use the same one.
+func ZoomCrop(z, ax, ay float64) string {
+	return fmt.Sprintf("crop=w='trunc(iw/%[1]g/2)*2':h='trunc(ih/%[1]g/2)*2':x='clip(%[2]g*iw-ow/2,0,iw-ow)':y='clip(%[3]g*ih-oh/2,0,ih-oh)'", z, ax, ay)
+}
+
+// Anchor returns a manifest segment's zoom centre (default 0.5, 0.4).
+func (g MSeg) Anchor() (float64, float64) {
+	if g.AnchorX == 0 && g.AnchorY == 0 {
+		return 0.5, 0.4
+	}
+	return g.AnchorX, g.AnchorY
+}

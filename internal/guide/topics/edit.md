@@ -28,6 +28,11 @@ by your first edit as the whole first video source. Sources are never touched.
 - Explicit cuts are pinned: a later `tighten` never moves them.
 - `cutroom edit audio <source>` takes the sound from another source (a recorder) once
   `cutroom sync <source>` has aligned it.
+- `cutroom edit zoom 1.15 --from "…" --to "…"` punches in on a span (zoom 1 undoes it).
+  `--anchor x,y` (0–1, default 0.5,0.4 ≈ a face) is the point to zoom on; the crop stays inside the
+  frame. Keep the upscale ≤ 1.2× (a 1080p source at 1.3× looks soft; 4K sources can go 2× for a
+  1080p output) — edit warns above it. Check the framing with `cutroom look --output <time>`;
+  `timeline` shows `[zoom …]` on zoomed segments and `--joins` marks zoom changes (not cuts).
 - `--dry-run` previews; `cutroom edit undo` reverts the last edit; `cutroom edit history` lists them.
 
 Times in `edit` are **source** times (what `transcript` prints). Times in `timeline` output

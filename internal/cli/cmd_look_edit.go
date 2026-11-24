@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cutroom/cutroom/internal/timeline"
 	"math"
 	"os"
 	"path/filepath"
@@ -117,8 +118,8 @@ func lookEdit(c *Ctx) (*Result, error) {
 			lt := l.Out - 0.5/fps
 			rt := r.In + 0.5/fps
 			cells = append(cells,
-				perceive.Cell{Path: src(l.Source), T: lt, Label: fmt.Sprintf("cut %d @%s  before (%s %.2f)", from+k+1, clock(j.At), l.Source, lt), Say: "…" + j.Before},
-				perceive.Cell{Path: src(r.Source), T: rt, Label: fmt.Sprintf("after (%s %.2f)  pause %.2f s", r.Source, rt, j.Pause), Say: j.After + "…", Cut: true})
+				perceive.Cell{Path: src(l.Source), T: lt, Label: fmt.Sprintf("%s %d @%s  before (%s %.2f)", j.Kind, from+k+1, clock(j.At), l.Source, lt), Say: "…" + j.Before, VF: zoomVF(*l)},
+				perceive.Cell{Path: src(r.Source), T: rt, Label: fmt.Sprintf("after (%s %.2f)  pause %.2f s", r.Source, rt, j.Pause), Say: j.After + "…", Cut: true, VF: zoomVF(*r)})
 		}
 		cols = 4
 		desc = fmt.Sprintf("cuts %d–%d of %d: each pair is the last frame before | first frame after a cut (red bar), with the words either side", from+1, to, len(js))
@@ -185,6 +186,7 @@ func lookEdit(c *Ctx) (*Result, error) {
 			}
 		}
 		prev := ""
+		var prevSeg *timeline.Segment
 		for i := 0; i < n; i++ {
 			t := a
 			if n > 1 {
@@ -194,9 +196,15 @@ func lookEdit(c *Ctx) (*Result, error) {
 			if !ok {
 				continue
 			}
-			cells = append(cells, perceive.Cell{Path: src(g.Source), T: st, Label: fmt.Sprintf("out %s = %s %.2f", clock(t), g.Source, st),
-				Say: srcWords(g.Source, st), Cut: prev != "" && prev != g.ID})
-			prev = g.ID
+			label := fmt.Sprintf("out %s = %s %.2f", clock(t), g.Source, st)
+			if g.ZoomOf() > 1 {
+				label += fmt.Sprintf(" zoom %.2f×", g.ZoomOf())
+			}
+			cells = append(cells, perceive.Cell{Path: src(g.Source), T: st, Label: label,
+				Say: srcWords(g.Source, st), VF: zoomVF(*g),
+				// a cut, not just a zoom change on continuous picture
+				Cut: prev != "" && prev != g.ID && !(prevSeg != nil && prevSeg.Source == g.Source && math.Abs(prevSeg.Out-g.In) < 1e-6)})
+			prev, prevSeg = g.ID, g
 		}
 		desc = fmt.Sprintf("%d frame(s) of the edit at output %s–%s; each labelled output time = source time; red bar = a cut happened before it", len(cells), clock(a), clock(b))
 		name = fmt.Sprintf("output_%s-%s_x%d.png", stamp(a), stamp(b), n)
@@ -299,4 +307,13 @@ func listenFile(c *Ctx) (*Result, error) {
 		lines = append(lines, fmt.Sprintf("  ! sound with no planned words %s–%s (peak %.0f dB)", clock(r.Start), clock(r.End), r.PeakDB))
 	}
 	return &Result{Text: strings.Join(lines, "\n"), Data: L}, nil
+}
+
+// zoomVF is the punch-in crop a segment renders with, so look shows what the render will.
+func zoomVF(g timeline.Segment) string {
+	if z := g.ZoomOf(); z > 1 {
+		ax, ay := g.Anchor()
+		return render.ZoomCrop(z, ax, ay)
+	}
+	return ""
 }

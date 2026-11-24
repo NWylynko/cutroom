@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 
 	"github.com/cutroom/cutroom/internal/project"
@@ -12,14 +13,14 @@ import (
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
-var editOps = []string{"cut", "keep", "tighten", "audio", "undo", "history", "reset"}
+var editOps = []string{"cut", "keep", "zoom", "tighten", "audio", "undo", "history", "reset"}
 
 func init() {
 	Register(&Command{
 		Name:     "edit",
-		Args:     "<cut|keep|tighten|audio|undo|history|reset> [range|source]",
+		Args:     "<cut|keep|zoom|tighten|audio|undo|history|reset> [factor] [range|source]",
 		MinArgs:  1,
-		MaxArgs:  2,
+		MaxArgs:  3,
 		Category: "edit",
 		Summary:  "Change the timeline: cut or keep by quoted words or times, tighten pauses, undo",
 		Help: `The timeline starts as the whole first video source (created on the first edit).
@@ -29,6 +30,9 @@ Every edit is checked afterwards and problems are printed. Use --dry-run to prev
   edit cut --from "By the way" --to "keyboard."  remove from the first words through the last words
   edit cut 16.9-17.4                             remove a source time range (seconds or m:ss.mmm)
   edit keep --from "Hi, today" --to "server is ready."   keep only this span (e.g. for a short)
+  edit zoom 1.15 --from "Then install" --to "on it."   punch in on a span (1 = zoom back out)
+        --anchor 0.5,0.4   the point to zoom on (0–1 across, 0–1 down; default 0.5,0.4 = a face)
+        above 1.2× upscaling looks soft (a 1080p source at 1.3×); 4K sources can go to 2× for 1080p
   edit tighten [--min-cut 0.4]                   shorten every pause longer than the pads + min-cut
   edit audio mic                                 take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
   edit undo | edit history | edit reset [--source id]
@@ -47,6 +51,7 @@ never moves them.`,
 			{Name: "source", Kind: "string", Help: "Source id (for ranges, reset, or to restrict word matching)"},
 			{Name: "reason", Kind: "string", Help: "Why (stored with the edit; shown in the timeline)"},
 			{Name: "min-cut", Kind: "float", Default: "0.4", Help: "tighten: only shorten pauses where at least this much can go"},
+			{Name: "anchor", Kind: "string", Help: "zoom: point to zoom on as x,y in 0–1 (default 0.5,0.4)"},
 			{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"},
 		},
 		Run: runEdit,
@@ -71,11 +76,12 @@ Examples:
 
 // edit context: project, timeline, transcripts, durations.
 type editEnv struct {
-	p    *project.Project
-	tl   *timeline.Timeline
-	tr   timeline.Transcripts
-	dur  map[string]float64
-	made bool
+	zoom, ax, ay float64 // edit zoom: factor and anchor
+	p            *project.Project
+	tl           *timeline.Timeline
+	tr           timeline.Transcripts
+	dur          map[string]float64
+	made         bool
 }
 
 func loadEditEnv(c *Ctx, create bool) (*editEnv, error) {
@@ -233,6 +239,31 @@ func runEdit(c *Ctx) (*Result, error) {
 		if s.Sync != nil {
 			lines = append(lines, fmt.Sprintf("  aligned to %s: offset %+.3f s, drift %+.1f ppm", s.Sync.To, s.Sync.Offset, s.Sync.PPM))
 		}
+	case "zoom":
+		if len(c.Args) < 2 {
+			return nil, Errf(ExitUsage, "bad-args", `give the factor first: `+"`cutroom edit zoom 1.15 --from \"…\" --to \"…\"`", "edit zoom needs a factor")
+		}
+		z, err := strconv.ParseFloat(c.Args[1], 64)
+		if err != nil || z < 1 || z > 4 {
+			return nil, Errf(ExitUsage, "bad-zoom", "a zoom factor between 1 (none) and 4, e.g. 1.15", "bad zoom factor %q", c.Args[1])
+		}
+		e.zoom, e.ax, e.ay = z, 0.5, 0.4
+		if c.Has("anchor") {
+			xs, ys, ok := strings.Cut(c.Str("anchor"), ",")
+			x, err1 := strconv.ParseFloat(strings.TrimSpace(xs), 64)
+			y, err2 := strconv.ParseFloat(strings.TrimSpace(ys), 64)
+			if !ok || err1 != nil || err2 != nil || x < 0 || x > 1 || y < 0 || y > 1 {
+				return nil, Errf(ExitUsage, "bad-anchor", "x,y between 0 and 1, e.g. --anchor 0.5,0.4 (0,0 = top left)", "bad --anchor %q", c.Str("anchor"))
+			}
+			e.ax, e.ay = x, y
+		}
+		c.Args = append([]string{c.Args[0]}, c.Args[2:]...) // the rest is the span, as for cut
+		res, desc, err := e.applySpan(c, op)
+		if err != nil {
+			return nil, err
+		}
+		label = desc
+		lines = append(lines, res...)
 	case "cut", "keep":
 		res, desc, err := e.applySpan(c, op)
 		if err != nil {
@@ -342,6 +373,10 @@ func (e *editEnv) applySpan(c *Ctx, op string) ([]string, string, error) {
 			return nil, "", Errf(ExitUsage, "bad-range", "write a range as start-end in source time, e.g. 16.9-17.4", "%v", err)
 		}
 		desc := fmt.Sprintf("edit %s %s %s", op, s.ID, c.Args[1])
+		if op == "zoom" {
+			desc = fmt.Sprintf("edit zoom %g %s %s", e.zoom, s.ID, c.Args[1])
+			return e.applyZoom(s.ID, a, b), desc, nil
+		}
 		if op == "cut" {
 			rm := e.tl.Cut(s.ID, a, b, orStr(reason, "range "+c.Args[1]), true)
 			if rm == 0 {
@@ -361,7 +396,7 @@ func (e *editEnv) applySpan(c *Ctx, op string) ([]string, string, error) {
 	var src string
 	var i, j int
 	var err error
-	keptOnly := op == "cut"
+	keptOnly := op == "cut" || op == "zoom"
 	if hasText {
 		src, i, j, err = e.resolve(c, c.Str("text"), keptOnly, "", -1, -1)
 	} else {
@@ -377,6 +412,18 @@ func (e *editEnv) applySpan(c *Ctx, op string) ([]string, string, error) {
 	}
 	words := e.tr[src].Words
 	desc := fmt.Sprintf("edit %s %q", op, speech.Text(words, i, j))
+	if op == "zoom" {
+		// from just before the first word to just after the last, inside the pauses around them
+		a, b := words[i].Start-e.tl.PadBefore, words[j].End+e.tl.PadAfter
+		if i > 0 {
+			a = clampF(a, words[i-1].End, words[i].Start)
+		}
+		if j+1 < len(words) {
+			b = clampF(b, words[j].End, words[j+1].Start)
+		}
+		desc = fmt.Sprintf("edit zoom %g %q", e.zoom, ellipsize(speech.Text(words, i, j), 60))
+		return e.applyZoom(src, a, b), desc, nil
+	}
 	if op == "keep" {
 		a := words[i].Start - e.tl.PadBefore
 		b := words[j].End + e.tl.PadAfter
@@ -543,6 +590,11 @@ func runTimeline(c *Ctx) (*Result, error) {
 			if j.Pause >= 0 {
 				p = fmt.Sprintf("%.2f s", j.Pause)
 			}
+			if j.Kind == "zoom" {
+				l, r := tl.Find(j.Left), tl.Find(j.Right)
+				lines = append(lines, fmt.Sprintf("%s  %s|%s  zoom %.2f× → %.2f× (no cut; the picture continues)", clock(j.At), j.Left, j.Right, l.ZoomOf(), r.ZoomOf()))
+				continue
+			}
 			lines = append(lines, fmt.Sprintf("%s  %s|%s  …%s | %s…  (pause %s)", clock(j.At), j.Left, j.Right, j.Before, j.After, p))
 		}
 		lines = truncLines(lines, c.Bool("all"))
@@ -564,7 +616,12 @@ func runTimeline(c *Ctx) (*Result, error) {
 			text = wordsIn(tx.Words, g.In, g.Out)
 		}
 		segs = append(segs, segOut{g, g.OutStart, math.Round(d*1e6) / 1e6, text})
-		lines = append(lines, fmt.Sprintf("%s  %-4s %s %s–%s  %s", clock(g.OutStart), g.ID, g.Source, clock(g.In), clock(g.Out), ellipsize(orNone(text), 90)))
+		zt := ""
+		if z := g.ZoomOf(); z > 1 {
+			ax, ay := g.Anchor()
+			zt = fmt.Sprintf("  [zoom %.2f× at %.2f,%.2f]", z, ax, ay)
+		}
+		lines = append(lines, fmt.Sprintf("%s  %-4s %s %s–%s  %s%s", clock(g.OutStart), g.ID, g.Source, clock(g.In), clock(g.Out), ellipsize(orNone(text), 90), zt))
 	}
 	lines = truncLines(lines, c.Bool("all"))
 	if len(issues) == 0 {
@@ -627,4 +684,22 @@ func plural(n int, word string) string {
 		return "1 " + word
 	}
 	return fmt.Sprintf("%d %ss", n, word)
+}
+
+// applyZoom sets the zoom on a source span and reports it, warning when it upscales (L40).
+func (e *editEnv) applyZoom(src string, a, b float64) []string {
+	n := e.tl.Zoom(src, a, b, e.zoom, e.ax, e.ay)
+	if e.zoom == 1 {
+		return []string{fmt.Sprintf("zoomed out %s %s–%s (%d segment(s))", src, clock(e.tl.Snap(a)), clock(e.tl.Snap(b)), n)}
+	}
+	out := []string{fmt.Sprintf("zoom %.2f× on %s %s–%s, centred at %.2f,%.2f (%d segment(s))", e.zoom, src, clock(e.tl.Snap(a)), clock(e.tl.Snap(b)), e.ax, e.ay, n)}
+	if s := e.p.Sources[src]; s != nil && s.Facts != nil && s.Facts.Video != nil && s.Facts.Video.Height > 0 {
+		up := e.zoom * float64(e.tl.Height) / float64(s.Facts.Video.Height)
+		if up > 1.2+1e-9 {
+			out = append(out, fmt.Sprintf("WARN this upscales the source %.2f× (%dp source, %.2f× zoom, %dp output): above 1.2× it looks soft (L40) — try `cutroom edit zoom %.2f …`",
+				up, s.Facts.Video.Height, e.zoom, e.tl.Height, 1.2*float64(s.Facts.Video.Height)/float64(e.tl.Height)))
+		}
+	}
+	out = append(out, "check the framing: `cutroom look --output <time>` shows the zoomed picture")
+	return out
 }

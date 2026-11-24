@@ -116,3 +116,15 @@ func TestL24_OutputAlwaysTaggedBT709(t *testing.T) {
 		}
 	}
 }
+
+// L40: a zoomed segment is cropped around its anchor (kept inside the frame) before scaling;
+// unzoomed segments are not cropped.
+func TestL40_ZoomCropInChunk(t *testing.T) {
+	tl := timeline.New("30", 1280, 720, "cam", "cam", 0, 30)
+	tl.Zoom("cam", 10, 12, 1.2, 0.5, 0.3)
+	c := Plan(tl, srcs(), Options{Target: 45, CacheDir: t.TempDir()})[0]
+	args := strings.Join(chunkCmd(tl, srcs(), c, false, "out.mp4"), " ")
+	if strings.Count(args, "crop=") != 1 || !strings.Contains(args, "trunc(iw/1.2/2)*2") || !strings.Contains(args, "clip(0.3*ih-oh/2,0,ih-oh)") {
+		t.Fatalf("want one anchored crop: %s", args)
+	}
+}

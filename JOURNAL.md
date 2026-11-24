@@ -2,6 +2,25 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 24 · 2026-11-24 · `edit zoom`: punch-ins rendered, looked at and checked through the crop
+Did: `cutroom edit zoom <factor> <span> [--anchor x,y]` (span = range, --text or --from/--to; 1 =
+zoom out). Timeline.Zoom splits at the span edges and pins them (continuous speech: tighten must not
+open a gap there). Render crops around the anchor, clamped inside the frame, before scaling; on the
+HDR path `scale_vt` keeps z× the pixels for the crop. Edit warns when the upscale (zoom × out ÷ source
+height) exceeds 1.2× (L40) and suggests the largest clean factor. `timeline` tags `[zoom 1.50× at
+0.50,0.50]`; joins carry `kind` ("cut"/"zoom"), `--joins` prints zoom changes as "no cut"; `look
+--output`/`--cuts` show the cropped picture (no cut bar at a zoom change). `check` compares zoomed
+segments through the same crop (picture and tone; it skipped them before) and a frame that matches
+nothing nearby now reads "wrong picture, framing or zoom, not timing" instead of "N frames off".
+Manifest stores the anchor. Tests: TestL40_ZoomSplitsPinsAndStaysContinuous (incl. tighten after
+zoom), TestL40_ZoomCropInChunk; e2e 124/124 (+10).
+Measured: fixture zoom 1.5×: picture worst difference 26.1 (upscale softness; limit 60); manifest
+stripped of the zoom → picture FAIL difference 4258.9 "framing or zoom". HDR fixture 1.2×: picture
+26.9, tone 92 vs 92 once the tone sample also goes through the crop (92 vs 88 without).
+Surprises: the old picture failure text would have sent an agent hunting a timing bug for a framing
+problem.
+Next: `edit move` / multi-take segments (M2), then the render side of multi-source.
+
 ### 23 · 2026-11-24 · breaths aren't suspects
 Did: `speech.IsBreath` — a wordless sound shorter than 0.8 s and more than 12 dB below speech level is
 a breath or mouth noise. Transcripts label it `breath` (Algorithm 3), so retake/kept-sound warnings,

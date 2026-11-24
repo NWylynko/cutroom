@@ -332,6 +332,7 @@ type Join struct {
 	Before string  `json:"before"`
 	After  string  `json:"after"`
 	Pause  float64 `json:"pause_s"` // silence across the join, -1 if unknown
+	Kind   string  `json:"kind"`    // "cut", or "zoom" where the picture continues and only the zoom changes
 	Left   string  `json:"left_segment"`
 	Right  string  `json:"right_segment"`
 }
@@ -341,7 +342,10 @@ func (t *Timeline) Joins(tr Transcripts) []Join {
 	var js []Join
 	for i := 0; i+1 < len(t.Segments); i++ {
 		l, r := t.Segments[i], t.Segments[i+1]
-		j := Join{At: r.OutStart, Left: l.ID, Right: r.ID, Pause: -1}
+		j := Join{At: r.OutStart, Left: l.ID, Right: r.ID, Pause: -1, Kind: "cut"}
+		if l.Source == r.Source && math.Abs(r.In-l.Out) < 1e-6 {
+			j.Kind = "zoom" // continuous: only the zoom changes here, nothing is cut
+		}
 		var lastEnd, firstStart float64 = -1, -1
 		if tx := tr[l.Source]; tx != nil {
 			var ws []string

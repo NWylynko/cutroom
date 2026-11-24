@@ -224,6 +224,67 @@ func (t *Timeline) Keep(source string, a, b float64, reason string) {
 	t.Recompute()
 }
 
+// Zoom punches in on [a, b) of a source (L40): segments are split at a and b and the pieces inside
+// get zoom z centred on (ax, ay) — normalised display coordinates; the crop stays inside the frame.
+// z = 1 zooms back out. Split edges are pinned: they sit inside continuous speech, so tighten must
+// never move them. Returns how many segments now carry the zoom.
+func (t *Timeline) Zoom(source string, a, b, z, ax, ay float64) int {
+	a, b = t.Snap(a), t.Snap(b)
+	if b <= a {
+		return 0
+	}
+	if z == 1 {
+		ax, ay, z = 0, 0, 0
+	}
+	n := 0
+	var out []Segment
+	for _, g := range t.Segments {
+		if g.Source != source || b <= g.In || a >= g.Out {
+			out = append(out, g)
+			continue
+		}
+		lo, hi := math.Max(a, g.In), math.Min(b, g.Out)
+		m := g
+		m.In, m.Out = lo, hi
+		if lo > g.In {
+			left := g
+			left.Out, left.PinOut = lo, true
+			out = append(out, left)
+			m.ID, m.PinIn = t.newID(), true
+		}
+		m.Zoom, m.AnchorX, m.AnchorY = z, ax, ay
+		if hi < g.Out {
+			m.PinOut = true
+		}
+		out = append(out, m)
+		n++
+		if hi < g.Out {
+			right := g
+			right.ID, right.In, right.PinIn = t.newID(), hi, true
+			out = append(out, right)
+		}
+	}
+	t.Segments = dropTiny(out, t.fpsNum)
+	t.Recompute()
+	return n
+}
+
+// ZoomOf returns a segment's zoom factor (1 when unset).
+func (g Segment) ZoomOf() float64 {
+	if g.Zoom <= 0 {
+		return 1
+	}
+	return g.Zoom
+}
+
+// Anchor returns the zoom centre, defaulting to (0.5, 0.4): a face slightly above centre.
+func (g Segment) Anchor() (float64, float64) {
+	if g.AnchorX == 0 && g.AnchorY == 0 {
+		return 0.5, 0.4
+	}
+	return g.AnchorX, g.AnchorY
+}
+
 func dropTiny(s []Segment, fps float64) []Segment {
 	var out []Segment
 	for _, g := range s {

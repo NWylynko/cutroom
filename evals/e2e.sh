@@ -166,6 +166,21 @@ expect "resolved repeat marked"      'resolved: only one take'         cutroom t
 popd >/dev/null
 expect "no project → fix"      'run `cutroom init'                   cutroom inspect --project "$W/nothing-here"
 
+# punch-ins (L40): zoom a span, warn above 1.2× upscale, render, check through the crop
+Z="$W/zoom"; mkdir -p "$Z"; cp $FIX/talk.mp4 "$Z/"; pushd "$Z" >/dev/null
+cutroom init talk.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+expect "zoom a span"               'zoom 1\.15× on talk .*centred at 0\.50,0\.40' cutroom edit zoom 1.15 --from "Then install" --to "on it."
+expect "zoom upscale warning"      'upscales the source 1\.50×.*L40'   cutroom edit zoom 1.5 --text "Your server is ready." --anchor 0.5,0.5
+expect "timeline shows zoom"       '\[zoom 1\.50× at 0\.50,0\.50\]' cutroom timeline
+expect "joins: zoom is not a cut"  'zoom 1\.00× → 1\.50× \(no cut'    cutroom timeline --joins
+expect "look --output labels zoom" 'wrote .*output_'                  cutroom look --output 19.5
+cutroom render >/dev/null 2>&1
+expect "check through the zoom"    'ok   picture +[0-9]+ sampled frames match' cutroom check
+python3 -c "import json;m=json.load(open('out/final.mp4.cutroom.json'));[g.pop('zoom',None) for g in m['segments']];json.dump(m,open('out/final.mp4.cutroom.json','w'))"
+expect "check: framing mismatch"   'match no nearby source frame.*framing or zoom' cutroom check
+expect "bad zoom factor"           'between 1 \(none\) and 4'          cutroom edit zoom 0.5 --text "Your server is ready."
+popd >/dev/null
+
 # rotated phone footage: render says the rotation is baked in
 mkdir -p "$W/rot" && cp $FIX/talk-rot.mov "$W/rot/" && pushd "$W/rot" >/dev/null
 cutroom init talk-rot.mov >/dev/null

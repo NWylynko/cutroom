@@ -31,14 +31,12 @@ Move done items to the journal, not here.
   but could cut all but the last in one command once `edit cut` accepts several spans.
 
 ## M2 — decide/act
-- `edit zoom` (punch-ins with anchor; warn > 1.2× on 1080p) once render exists. [L40]
 - `edit move` / reorder and multi-source (takes) segments. 
 - `look`: untagged HD sources are converted with bt601 by ffmpeg but shown as bt709 by players; assume bt709 for untagged ≥720p (in_color_matrix) so `look` matches renders.
 - Render: segments from a source other than the audio source (multi-take); per-source audio mapping.
 - Render: zoom/punch-in filters. Overlay inputs (M4).
 
 ## M3 — verify
-- `check` picture check skips zoomed segments; compare through the zoom once punch-ins exist.
 - `check --frames` full frame-by-frame PSNR vs an overlay-free render once overlays exist (L20, L21).
 
 ## M4 — overlays & text

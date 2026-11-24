@@ -40,6 +40,8 @@ type MSeg struct {
 	OutStart float64 `json:"out_start"` // in the file (range renders start at 0)
 	Frames   int64   `json:"frames"`
 	Zoom     float64 `json:"zoom,omitempty"`
+	AnchorX  float64 `json:"anchor_x,omitempty"`
+	AnchorY  float64 `json:"anchor_y,omitempty"`
 }
 
 type MSource struct {
@@ -70,7 +72,7 @@ func writeManifest(tl *timeline.Timeline, srcs map[string]Source, chunks []Chunk
 		for _, k := range c.Segments {
 			g := tl.Segments[k]
 			m.Segments = append(m.Segments, MSeg{ID: g.ID, Source: g.Source, In: g.In, Out: g.Out,
-				OutStart: round6(g.OutStart - res.RangeStart), Frames: tl.Frames(g), Zoom: g.Zoom})
+				OutStart: round6(g.OutStart - res.RangeStart), Frames: tl.Frames(g), Zoom: g.Zoom, AnchorX: g.AnchorX, AnchorY: g.AnchorY})
 			s := srcs[g.Source]
 			m.Sources[g.Source] = MSource{s.Path, s.Size, s.ModTime, s.AudioStart, s.Sync}
 		}
