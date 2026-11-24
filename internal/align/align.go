@@ -266,6 +266,10 @@ func xcorr(seg, ref []float64, maxLag int) (int, float64) {
 	return bl, best
 }
 
+// Bandpass keeps the speech band (300–3000 Hz), so two microphones with different frequency
+// responses correlate on what they share.
+func Bandpass(x []float64) []float64 { return bandpass(x) }
+
 // bandpass: 2nd-order high-pass at 300 Hz and low-pass at 3000 Hz (cascaded one-pole sections).
 func bandpass(x []float64) []float64 {
 	y := append([]float64(nil), x...)

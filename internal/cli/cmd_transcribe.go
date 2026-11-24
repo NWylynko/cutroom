@@ -178,7 +178,12 @@ func sourceByID(p *project.Project, id string) (*project.Source, error) {
 		if src := p.FindByPath(id); src != nil {
 			return src, nil
 		}
-		fix = fmt.Sprintf("add it first: `cutroom init %s`", id)
+		if _, err := os.Stat(id + ".cutroom.json"); err == nil {
+			// A render (it has a manifest): adding it as a source would be wrong. Read it as a file.
+			fix = fmt.Sprintf("%s is a render, not a source; read it as a file: `cutroom transcript --file %s`, `cutroom look %s <time>`, `cutroom check %s`", id, id, id, id)
+		} else {
+			fix = fmt.Sprintf("to edit it, add it as a source: `cutroom init %s`; to just read it: `cutroom transcript --file %s`", id, id)
+		}
 	}
 	return nil, Errf(ExitUsage, "unknown-source", fix, "no source %q", id)
 }
@@ -219,6 +224,12 @@ func runTranscript(c *Ctx) (*Result, error) {
 	id := ""
 	if len(c.Args) == 1 {
 		id = c.Args[0]
+	}
+	// `transcript out/final.mp4` means `transcript --file out/final.mp4` when the path isn't a source.
+	if !c.Has("file") && id != "" && p.Sources[id] == nil && p.FindByPath(id) == nil {
+		if takeFileArg(c); c.Has("file") {
+			id = ""
+		}
 	}
 	var t *speech.Transcript
 	if c.Has("file") {

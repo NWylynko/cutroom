@@ -307,11 +307,11 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 				if kept >= 2 {
 					o, _ := t.ToOutput(src, s.Related[0]+0.05)
 					fix := "cut all but one take: `cutroom transcript --search \"" + s.Text + "\"`"
-					if cmd := t.retakeCut(tx, src, s); cmd != "" {
+					if cmd, gone := t.retakeCut(tx, src, s); cmd != "" {
 						if len(tr) > 1 {
 							cmd += " --source " + src
 						}
-						fix = "keep the last take: `" + cmd + "` (add --dry-run to check the join first)"
+						fix = "keep the last take: `" + cmd + "` removes the earlier take, " + gone + " (add --dry-run to check the join first)"
 					}
 					add("warn", "retake-kept", nil, o, fix, "%q is still said %d× in the timeline (a retake?)", s.Text, kept)
 				}
@@ -398,7 +398,7 @@ func tail(ws []string, n int) string {
 // retakeCut builds a ready-to-run `edit cut` that removes the first kept take of a repeat, from its
 // first words up to the last word before the next kept take, in the --from/--near/--to form the CLI
 // resolves. The --to phrase is checked to resolve to exactly that word; "" if none does.
-func (t *Timeline) retakeCut(tx *speech.Transcript, src string, s speech.Suspect) string {
+func (t *Timeline) retakeCut(tx *speech.Transcript, src string, s speech.Suspect) (cmd, removes string) {
 	var takes []float64
 	for _, at := range s.Related {
 		if t.Kept(src, at+0.05) {
@@ -406,7 +406,7 @@ func (t *Timeline) retakeCut(tx *speech.Transcript, src string, s speech.Suspect
 		}
 	}
 	if len(takes) < 2 {
-		return ""
+		return "", ""
 	}
 	ws := tx.Words
 	kept := func(k int) bool { return t.Kept(src, (ws[k].Start+ws[k].End)/2) }
@@ -422,7 +422,7 @@ func (t *Timeline) retakeCut(tx *speech.Transcript, src string, s speech.Suspect
 		}
 	}
 	if fi < 0 || bd > 0.5 {
-		return ""
+		return "", ""
 	}
 	j := -1
 	for k := fl + 1; k < len(ws); k++ {
@@ -434,7 +434,7 @@ func (t *Timeline) retakeCut(tx *speech.Transcript, src string, s speech.Suspect
 		}
 	}
 	if j < 0 {
-		return ""
+		return "", ""
 	}
 	for n := 1; n <= 6 && j-n+1 > fi; n++ {
 		phrase := speech.Text(ws, j-n+1, j)
@@ -450,10 +450,17 @@ func (t *Timeline) retakeCut(tx *speech.Transcript, src string, s speech.Suspect
 				continue
 			}
 			if m.Last == j && len(strings.Fields(phrase)) >= 2 || m.Last == j && n == j-fi {
-				return fmt.Sprintf("cutroom edit cut --from %q --near %.2f --to %q", s.Text, takes[0], phrase)
+				return fmt.Sprintf("cutroom edit cut --from %q --near %.2f --to %q", s.Text, takes[0], phrase),
+					fmt.Sprintf("source %s–%s %q", mss(ws[fi].Start), mss(ws[j].End), speech.Text(ws, fi, j))
 			}
 			break // first match after --from is the wrong one: use more words
 		}
 	}
-	return ""
+	return "", ""
+}
+
+// mss formats seconds as m:ss.mmm.
+func mss(x float64) string {
+	ms := int64(math.Round(x * 1000))
+	return fmt.Sprintf("%d:%02d.%03d", ms/60000, ms/1000%60, ms%1000)
 }

@@ -7,6 +7,7 @@ package verify
 import (
 	"bytes"
 	"fmt"
+	"github.com/cutroom/cutroom/internal/align"
 	"math"
 	"os"
 	"os/exec"
@@ -138,6 +139,9 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 		return t
 	}
 	syncCheck(rx, sx, src.AudioStart, mapT, m, r)
+	if src.Sync != nil {
+		cameraCheck(rx, src.Sync.To, m, o, tmp, r)
+	}
 	if o.Model != "" {
 		wordCheck(renderWav, tmp, m, o, r)
 	}
@@ -358,11 +362,10 @@ func mse(a, b []byte) float64 {
 
 // --- sync ------------------------------------------------------------------------------------
 
-func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, float64) float64, m *render.Manifest, r *Report) {
+// measureSync cross-correlates the render's sound with a source's sound at the moment each segment's
+// picture shows; minC is the correlation a window needs to count.
+func measureSync(rx, sx []float64, audioStart float64, mapT func(render.MSeg, float64) float64, m *render.Manifest, minC float64) (all, measured []SegSync, worst float64, worstSeg SegSync) {
 	win, maxLag := int(0.5*sr), int(0.15*sr)
-	var measured []SegSync
-	worst := 0.0
-	var worstSeg SegSync
 	for _, g := range m.Segments {
 		d := float64(g.Frames) / rate(m.FPS)
 		ss := SegSync{Segment: g.ID, OutStart: g.OutStart}
@@ -383,7 +386,7 @@ func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, floa
 				continue
 			}
 			lag, c := xcorr(seg, sx[si-maxLag:si+win+maxLag], maxLag)
-			if c > bestC && c > 0.5 {
+			if c > bestC && c > minC {
 				bestC = c
 				ss.AudioLagMS = round1(float64(lag) / sr * 1000)
 				ss.Measured = true
@@ -395,8 +398,14 @@ func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, floa
 				worst, worstSeg = ss.AudioLagMS, ss
 			}
 		}
-		r.Sync = append(r.Sync, ss)
+		all = append(all, ss)
 	}
+	return all, measured, worst, worstSeg
+}
+
+func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, float64) float64, m *render.Manifest, r *Report) {
+	all, measured, worst, worstSeg := measureSync(rx, sx, audioStart, mapT, m, 0.5)
+	r.Sync = append(r.Sync, all...)
 	if len(measured) == 0 {
 		r.add(Item{Check: "sync", Status: "warn", Detail: "no segment had enough speech to measure sync"})
 		return
@@ -414,11 +423,11 @@ func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, floa
 		it.Fix = "audio and picture disagree; if the audio comes from another device, align it first (see `cutroom guide`)"
 	}
 	it.Status = st
-	ref := m.Audio
+	ref := m.Audio + "'s sound"
 	if s, ok := m.Sources[m.Audio]; ok && s.Sync != nil {
-		ref += " (aligned to " + s.Sync.To + " by sync)"
+		ref = m.Audio + "'s sound, aligned to " + s.Sync.To + " by sync,"
 	}
-	it.Detail = fmt.Sprintf("%d of %d segments measured: the render's sound vs %s's sound at the source moment its picture shows: median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), ref, lags[len(lags)/2], worst)
+	it.Detail = fmt.Sprintf("%d of %d segments measured: the render's sound vs %s at the source moment its picture shows: median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), ref, lags[len(lags)/2], worst)
 	if st == "pass" {
 		it.Detail += "; with picture ok, lip sync is as the source plays (its audio start offset included)"
 	}
@@ -720,3 +729,43 @@ func orDash(s string) string {
 }
 func round1(f float64) float64 { return math.Round(f*10) / 10 }
 func round3(f float64) float64 { return math.Round(f*1000) / 1000 }
+
+// cameraCheck verifies a separate recorder's alignment independently of `sync`: the render's sound
+// (from the recorder) against the camera's own sound at the same moment. Both are band-passed so
+// two different microphones correlate. A wrong sync offset passes syncCheck (it uses the same
+// offset) but fails here.
+func cameraCheck(rx []float64, cam string, m *render.Manifest, o Options, tmp string, r *Report) {
+	cs, ok := m.Sources[cam]
+	if !ok {
+		return
+	}
+	cw := speech.WavPath(o.CacheDir, cam)
+	if _, err := os.Stat(cw); err != nil {
+		cw = filepath.Join(tmp, "camera.wav")
+		if err := speech.ExtractWav(cs.Path, cw); err != nil {
+			return // camera has no audio: nothing independent to compare with
+		}
+	}
+	cx, _ := speech.ReadWav(cw)
+	if len(cx) == 0 {
+		return
+	}
+	ident := func(g render.MSeg, t float64) float64 { return t }
+	_, measured, worst, worstSeg := measureSync(align.Bandpass(rx), align.Bandpass(cx), cs.AudioStart, ident, m, 0.3)
+	if len(measured) == 0 {
+		r.add(Item{Check: "sync-camera", Status: "warn", Detail: "could not compare with " + cam + "'s own sound (too little shared speech)"})
+		return
+	}
+	lags := make([]float64, len(measured))
+	for i, s := range measured {
+		lags[i] = s.AudioLagMS
+	}
+	sort.Float64s(lags)
+	it := Item{Check: "sync-camera", Status: "pass"}
+	if math.Abs(worst) > 45 {
+		it.Status, it.At, it.Segment = "fail", worstSeg.OutStart, worstSeg.Segment
+		it.Fix = fmt.Sprintf("the recorder's alignment looks wrong: re-run `cutroom sync %s`, then render again", m.Audio)
+	}
+	it.Detail = fmt.Sprintf("%d of %d segments: the render's sound vs %s's own camera sound (independent of sync's offset): median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), cam, lags[len(lags)/2], worst)
+	r.add(it)
+}

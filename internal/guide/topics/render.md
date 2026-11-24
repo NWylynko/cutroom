@@ -6,6 +6,8 @@
 - **Preview first.** `--preview` renders 540p with a fast encode. Check it, then render the final.
 - **Ask before long work.** `--dry-run` shows the chunks, which are already cached, and a time estimate
   (it learns from this project's previous renders).
+- **Output path.** `cutroom render out/x.mp4` or `--output out/x.mp4`; default out/final.mp4
+  (out/preview.mp4 with --preview, *-range.mp4 with --range).
 - **Partial renders.** `--range 0:20-0:40` renders only the chunks covering that *output* range.
 - **Caching.** The video is rendered in ~45 s chunks split at cuts. Re-rendering after an edit only
   redoes the chunks that changed; with no changes a render takes about a second.

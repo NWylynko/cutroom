@@ -2,6 +2,33 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 17 · 2026-11-24 · round-4 friction: render paths, honest fix lines, independent recorder sync check
+Did: `transcript out/final.mp4` reads the file (as `--file`); any command given a render path where a
+source is expected says "is a render, not a source; read it as a file" instead of suggesting `init`.
+`check <missing>` lists the renders that exist. `render --output PATH` works (agents guessed it three
+rounds running; `-o` now says "did you mean --output"); dry-run names the output path and `next:`
+keeps --preview/--range/path. Render says when a source's display rotation was baked into the pixels.
+`retake-kept` names what its command removes ("removes the earlier take, source 0:06.314–0:09.214
+\"The first thing you need is, UM, …\""). New check **sync-camera**: with a separate recorder, the
+render's sound vs the camera's own sound (both band-passed), independent of `sync`'s offset. Guide:
+render output path, sync-camera row. e2e 92/92 (+6), grader selftest 9/9.
+Measured: recorder fixture, correct offset: sync-camera 7/7 segments, worst 0 ms. Offset planted
++100 ms in cutroom.json then rendered: `sync` still PASS (worst 0 ms — it trusts the same offset),
+sync-camera FAIL worst −100 ms with "re-run `cutroom sync mic`".
+Surprises: the recorder-haiku agent found a real verification gap by reasoning about what `check`
+compares, not by hitting an error. vfr-sonnet reported the retake hint as wrong; dry-running it shows
+it was right — the hint just didn't say what it would remove, which is the actual fix.
+Next: golden criterion 3 is met (sonnet clean in rounds 3 and 4). Move to spec coverage: `status`,
+then M2 (`edit zoom`, `edit move`, multi-take render), and T3 prep on real footage.
+
+### 16 · 2026-11-24 · eval round 4
+Did: decisions recorded (name cutroom, Apache-2.0 LICENSE, sonnet gates T2, full v1 target; real
+footage for T3 indexed in evals/local, gitignored). Ran 5 tasks × sonnet/haiku at 3e8fe0e: **10/10
+grader passes, all tool-only, no medium friction**. Sonnet median 7 tool calls (round 3: 9), haiku 10
+(13). Five cutroom errors in total, each unstuck. Results: evals/results/2026-11-24-4.md.
+Surprises: haiku agents now re-read the render as text by habit and hit the one wrong fix line left.
+Next: fix the seven low items.
+
 ### 15 · 2026-11-18 · round-3 friction: runnable retake fix, tighten/cut say what they removed
 Did: `retake-kept` now prints a ready `cutroom edit cut --from "<take>" --near <t> --to "<last words>"`
 that removes the earlier take(s) and keeps the last; the --to phrase is grown until the CLI's own

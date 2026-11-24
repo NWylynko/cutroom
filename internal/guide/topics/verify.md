@@ -10,6 +10,7 @@ file). It measures the file itself:
 | format | wrong size, rotation metadata left in, or untagged colour |
 | picture | frames don't match their source frames (shifted/frozen video); it says where |
 | sync | audio vs picture per segment, limit 45 ms. Separate recorder? Align it first |
+| sync-camera | separate recorder only: the render's sound vs the camera's own sound, so a wrong `sync` offset can't pass |
 | words | the render re-transcribed vs the timeline's words, in order |
 | clipped-word | a cut goes through a word; cut by words instead |
 | stray-sound | sound with no words kept (breath, bump, piece of a cut take) |

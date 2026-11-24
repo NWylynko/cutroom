@@ -89,7 +89,7 @@ expect "listen --output (render)"   'cuts in range: 0:03\.933'         cutroom l
 expect "look --file"                'of out/final.mp4 at 0:03\.900 \(file time\)' cutroom look 3.9 --file out/final.mp4
 expect "look <file> <time>"         'of out/final.mp4 at 0:03\.900 \(file time\)' cutroom look out/final.mp4 3.9
 expect "listen <file> needs range"  'cutroom listen out/final.mp4 3-5' cutroom listen out/final.mp4
-expect "render --output → usage"    'usage: cutroom render \[output.mp4\]' cutroom render --output out/x.mp4
+expect "render --output works"     "out/x\.mp4"                       cutroom render --output out/x.mp4 --dry-run
 expect "range says whole chunk"     'whole timeline \(it fits in one chunk\)' cutroom render --dry-run --range 0:02-0:04
 expect "check passes a good render" '^PASS out/final.mp4'              cutroom check
 # planted faults: each must be caught by the right check
@@ -102,6 +102,9 @@ cutroom edit cut 1.9-2.9 >/dev/null; cutroom render out/clip.mp4 >/dev/null 2>&1
 expect "check: clipped word"        'WARN clipped-word .*inside the word' cutroom check out/clip.mp4
 expect "timeline: broken sentence"  'broken-sentence'                 cutroom timeline
 expect "transcript --file render"   'out/clip\.mp4 — [0-9]+ words'     cutroom transcript --file out/clip.mp4
+expect "transcript <render path>"   'out/clip\.mp4 — [0-9]+ words'     cutroom transcript out/clip.mp4
+expect "render as source → --file"  'is a render, not a source.*transcript --file out/clip\.mp4' cutroom sync out/clip.mp4
+expect "check missing → lists renders" 'renders here: .*out/clip\.mp4' cutroom check out/nothere.mp4
 cutroom edit undo >/dev/null
 expect "check: stale timeline"      'WARN stale'                      cutroom check out/clip.mp4
 expect "check exit code 4 on fail"  '^4$'                             sh -c 'cutroom check out/late.mp4 >/dev/null; echo $?'
@@ -121,6 +124,12 @@ expect "edit audio after sync"        'takes its sound from mic'        cutroom 
 expect "timeline shows audio source"  'sound from mic'                  cutroom timeline
 expect "render with recorder audio"   'wrote out/final.mp4'             cutroom render
 expect "check passes synced render"   '^PASS'                           cutroom check
+expect "check: camera cross-check"    'ok   sync-camera .*worst [+-]?[0-9] ms' cutroom check
+cp cutroom.json cutroom.json.bak
+python3 -c "import json;p=json.load(open('cutroom.json'));p['sources']['mic']['sync']['offset']+=0.1;json.dump(p,open('cutroom.json','w'))"
+cutroom render out/wrongsync.mp4 >/dev/null 2>&1
+expect "check: wrong recorder offset caught" 'FAIL sync-camera .*worst -(9[0-9]|10[0-9]) ms' cutroom check out/wrongsync.mp4
+mv cutroom.json.bak cutroom.json; rm -f out/wrongsync.mp4*
 popd >/dev/null
 g=$(go run ./evals/grade -fixtures $FIX recorder "$S" 2>&1)
 grep -q 'GRADE recorder: PASS' <<<"$g" && ok "grader passes recorder task via sync" || bad "grader passes recorder task via sync" "$(grep FAIL <<<"$g")"
@@ -136,11 +145,17 @@ expect "dry run would create"        'would create timeline'           cutroom e
 cutroom edit tighten >/dev/null; cutroom edit cut --from "The first thing you need is, um" --to "the first thing." >/dev/null; cutroom render >/dev/null 2>&1
 expect "check passes VFR render (no false FAIL)" '^PASS'               cutroom check
 expect "picture measured on VFR"     'ok   picture     1[0-9] sampled'   cutroom check
-expect "short flag hint"             'positional arguments need no flag' cutroom render -o x.mp4
+expect "short flag maps to --output"  'did you mean --output'           cutroom render -o x.mp4
 expect "short flag maps to long"     'did you mean --preview'          cutroom render -p
 expect "resolved repeat marked"      'resolved: only one take'         cutroom transcript --suspects
 popd >/dev/null
 expect "no project → fix"      'run `cutroom init'                   cutroom inspect --project "$W/nothing-here"
+
+# rotated phone footage: render says the rotation is baked in
+mkdir -p "$W/rot" && cp $FIX/talk-rot.mov "$W/rot/" && pushd "$W/rot" >/dev/null
+cutroom init talk-rot.mov >/dev/null; cutroom edit cut 0-0.5 >/dev/null
+expect "render reports baked rotation" 'rotation is baked into the pixels' cutroom render --preview
+popd >/dev/null
 
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

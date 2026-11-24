@@ -7,8 +7,10 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- **Eval round 4** (all 5 tasks × haiku/sonnet). Round 3 was clean (10/10, no medium friction); golden
-  criterion 3 needs round 4 clean too. Then T3 real footage and the other golden criteria.
+- `status` (SPEC rule 6: an agent with no memory runs it and knows everything). Golden criterion 3 met
+  in rounds 3+4; the remaining gap to golden is spec coverage (M2–M6) plus T3 and doctor/README.
+- T3 prep: cut 60–120 s excerpts from evals/local/README.md's productions (read-only sources) and run
+  `inspect`/`transcribe` on them; compare suspects with what the published edit cut.
 
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
@@ -20,6 +22,8 @@ Move done items to the journal, not here.
 - `status`.
 
 ## NEXT
+- [friction r4] `edit history` could flag the edit that a timeline warning comes from (fix-edit-sonnet:
+  "have `edit history` flag edits that trigger a timeline warning").
 - Retake suggestion for 3+ takes: the fix removes only the first kept take; re-warns for the next. Fine,
   but could cut all but the last in one command once `edit cut` accepts several spans.
 

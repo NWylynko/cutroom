@@ -30,6 +30,7 @@ Examples:
   cutroom render                        (final quality)`,
 		Flags: []Flag{
 			{Name: "preview", Kind: "bool", Help: "540p, fast encode"},
+			{Name: "output", Kind: "string", Help: "Output path (same as the positional [output.mp4])"},
 			{Name: "range", Kind: "string", Help: "Only chunks covering this OUTPUT time range (start-end)"},
 			{Name: "dry-run", Kind: "bool", Help: "Print the plan and time estimate; render nothing"},
 			{Name: "jobs", Kind: "int", Default: "4", Help: "Chunks rendered in parallel"},
@@ -89,12 +90,18 @@ func runRender(c *Ctx) (*Result, error) {
 		o.Range = [2]float64{a, b}
 	}
 	out := ""
-	if len(c.Args) == 1 {
-		out = c.Args[0]
-		if !filepath.IsAbs(out) {
-			out = filepath.Join(e.p.Dir, out)
+	if c.Has("output") {
+		if len(c.Args) == 1 && c.Args[0] != c.Str("output") {
+			return nil, Errf(ExitUsage, "bad-args", "give the path once: `cutroom render out/final.mp4`", "two output paths: %q and --output %q", c.Args[0], c.Str("output"))
 		}
-	} else {
+		out = c.Str("output")
+	} else if len(c.Args) == 1 {
+		out = c.Args[0]
+	}
+	if out != "" && !filepath.IsAbs(out) {
+		out = filepath.Join(e.p.Dir, out)
+	}
+	if out == "" {
 		name := "final.mp4"
 		if o.Preview {
 			name = "preview.mp4"
@@ -133,7 +140,7 @@ func runRender(c *Ctx) (*Result, error) {
 		}
 	}
 	if res.DryRun {
-		lines = append(lines, fmt.Sprintf("dry run (%s, %dx%d): %d chunk(s), %d cached, %s of video", mode, res.Width, res.Height, len(res.Chunks), cached, secs(res.Expected)))
+		lines = append(lines, fmt.Sprintf("dry run → %s (%s, %dx%d): %d chunk(s), %d cached, %s of video", relToCwd(out), mode, res.Width, res.Height, len(res.Chunks), cached, secs(res.Expected)))
 		for _, ch := range res.Chunks {
 			st := "render"
 			if ch.Cached {
@@ -145,13 +152,24 @@ func runRender(c *Ctx) (*Result, error) {
 			lines = append(lines, rangeNote)
 		}
 		lines = append(lines, fmt.Sprintf("estimate: ~%.0f s", math.Ceil(res.Estimate)))
-		return &Result{Text: strings.Join(lines, "\n"), Data: res, Next: []string{strings.TrimSpace("cutroom render " + flagIf(o.Preview, "--preview"))}}, nil
+		return &Result{Text: strings.Join(lines, "\n"), Data: res, Next: []string{strings.Join(strings.Fields(strings.Join([]string{"cutroom render", flagIf(o.Preview, "--preview"), flagIf(c.Has("range"), "--range "+c.Str("range")), customOut(c)}, " ")), " ")}}, nil
 	}
 	lines = append(lines, fmt.Sprintf("wrote %s (%s, %dx%d)", relToCwd(res.Output), mode, res.Width, res.Height))
 	lines = append(lines, fmt.Sprintf("  %s, %d frames (timeline says %s)  rendered in %.1f s, %d of %d chunk(s) cached",
 		secs(res.Duration), res.Frames, secs(res.Expected), res.Seconds, cached, len(res.Chunks)))
 	if math.Abs(res.Duration-res.Expected) > 0.5/e.tl.Rate() {
 		lines = append(lines, fmt.Sprintf("WARN duration differs from the timeline by %.3f s", res.Duration-res.Expected))
+	}
+	for _, id := range e.p.IDs() {
+		f := e.p.Sources[id].Facts
+		used := false
+		for _, g := range e.tl.Segments {
+			used = used || g.Source == id
+		}
+		if f != nil && f.Video != nil && f.Video.Rotation != 0 && used {
+			v := f.Video
+			lines = append(lines, fmt.Sprintf("  picture: %s's %d° display rotation is baked into the pixels; the file has no rotation metadata (upright in every player)", id, v.Rotation))
+		}
 	}
 	a := res.Audio
 	lines = append(lines, fmt.Sprintf("  audio: %.1f LUFS (target %.0f), peak %.1f dBTP, gain %+.1f dB", a.LUFS, a.Target, a.TruePeak, a.GainDB))
@@ -165,6 +183,17 @@ func runRender(c *Ctx) (*Result, error) {
 func flagIf(b bool, f string) string {
 	if b {
 		return f
+	}
+	return ""
+}
+
+// customOut repeats a user-given output path in a suggested command.
+func customOut(c *Ctx) string {
+	if c.Has("output") {
+		return c.Str("output")
+	}
+	if len(c.Args) == 1 {
+		return c.Args[0]
 	}
 	return ""
 }

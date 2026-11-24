@@ -61,7 +61,11 @@ func runCheck(c *Ctx) (*Result, error) {
 		}
 	}
 	if _, err := os.Stat(file); err != nil {
-		return nil, Errf(ExitUsage, "no-render", "check the path, or render first", "%s not found", file)
+		fix := "check the path, or render first"
+		if have := rendersIn(filepath.Join(e.p.Dir, "out")); len(have) > 0 {
+			fix = "renders here: " + strings.Join(have, ", ") + " (`render --range` writes out/preview-range.mp4)"
+		}
+		return nil, Errf(ExitUsage, "no-render", fix, "%s not found", file)
 	}
 	m, err := render.LoadManifest(file)
 	if err != nil {
@@ -99,4 +103,17 @@ func runCheck(c *Ctx) (*Result, error) {
 		res.Next = []string{"read each WARN: decide it is fine or fix it (they don't fail the check)"}
 	}
 	return res, nil
+}
+
+// rendersIn lists files in dir that have a render manifest, as paths relative to the cwd.
+func rendersIn(dir string) []string {
+	ms, _ := filepath.Glob(filepath.Join(dir, "*.cutroom.json"))
+	var out []string
+	for _, m := range ms {
+		f := strings.TrimSuffix(m, ".cutroom.json")
+		if _, err := os.Stat(f); err == nil {
+			out = append(out, relToCwd(f))
+		}
+	}
+	return out
 }
