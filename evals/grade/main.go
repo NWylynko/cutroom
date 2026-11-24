@@ -30,6 +30,17 @@ type spec struct {
 	ExactlyOnce    []string  `json:"exactly_once"`
 	Duration       []float64 `json:"duration"`
 	Checks         []string  `json:"checks"`
+	// Ref is the fixture whose frames the output must come from (default talk.mp4). RefSDR decodes
+	// it through VideoToolbox HLG→bt709 (the recipe real productions used), sequentially and without
+	// seeking, so the reference timing is the grader's own.
+	Ref    string `json:"ref,omitempty"`
+	RefSDR bool   `json:"ref_sdr,omitempty"`
+	// FrameErr is the luma MSE under which an output frame counts as matching a reference frame
+	// (default 30, tuned on SDR fixtures; a flipped frame scores in the thousands).
+	FrameErr float64 `json:"frame_err,omitempty"`
+	// SyncLimit (ms, default 45). The HDR fixture is HEVC-encoded test pattern whose neighbouring
+	// frames differ less than its encoding noise, so the grader can place a frame only to ±1 (33 ms).
+	SyncLimit float64 `json:"sync_limit_ms,omitempty"`
 }
 
 type result struct {
@@ -99,6 +110,18 @@ func main() {
 			add(c, r == 0, "display rotation %d", r)
 		case c == "upright", c == "frames_from_source", c == "av_sync":
 			// computed together below
+		case c == "sdr_bt709":
+			tr, pr := colourTags(out)
+			add(c, tr == "bt709" && pr == "bt709", "colour transfer %s, primaries %s (want bt709/bt709)", orDash(tr), orDash(pr))
+		case c == "tone_mapped":
+			// L23: a plain matrix conversion of HLG keeps the tags right but flattens the picture.
+			// Compare colourfulness and luma spread with the reference decoded through a tone map.
+			ref := filepath.Join(fixtures, sp.Ref)
+			os_, or_ := toneStats(out, nil, "")
+			rs, rr := toneStats(ref, []string{"-hwaccel", "videotoolbox", "-hwaccel_output_format", "videotoolbox_vld", "-display_rotation", "0"},
+				"scale_vt=color_matrix=bt709:color_primaries=bt709:color_transfer=bt709,hwdownload,format=p010le")
+			ok := rs > 0 && rr > 0 && math.Abs(os_/rs-1) < 0.1 && math.Abs(or_/rr-1) < 0.1
+			add(c, ok, "saturation %.1f vs tone-mapped source %.1f; luma range %.0f vs %.0f (within 10%%)", os_, rs, or_, rr)
 		case strings.HasPrefix(c, "size="):
 			w, h := size(out)
 			add(c, fmt.Sprintf("size=%dx%d", w, h) == c, "%dx%d", w, h)
@@ -112,7 +135,7 @@ func main() {
 		}
 	}
 	if has(sp.Checks, "upright") || has(sp.Checks, "frames_from_source") || has(sp.Checks, "av_sync") {
-		frameAndSync(out, sp.Checks, add)
+		frameAndSync(out, sp, add)
 	}
 	res = append(res, result{"transcript", true, truncate(text, 400)})
 	finish(task, res)
@@ -138,9 +161,23 @@ func finish(task string, res []result) {
 
 // --- frames and sync -------------------------------------------------------------------------
 
-func frameAndSync(out string, checks []string, add func(string, bool, string, ...any)) {
+func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
+	checks := sp.Checks
+	maxErr := 30.0
+	if sp.FrameErr > 0 {
+		maxErr = sp.FrameErr
+	}
 	ref := filepath.Join(fixtures, "talk.mp4")
-	refFrames := greyFrames(ref, "")
+	if sp.Ref != "" {
+		ref = filepath.Join(fixtures, sp.Ref)
+	}
+	var refFrames [][]byte
+	if sp.RefSDR {
+		refFrames = greyFramesPre(ref, []string{"-hwaccel", "videotoolbox", "-hwaccel_output_format", "videotoolbox_vld"},
+			"scale_vt=color_matrix=bt709:color_primaries=bt709:color_transfer=bt709,hwdownload,format=p010le,transpose=clock,transpose=clock")
+	} else {
+		refFrames = greyFrames(ref, "")
+	}
 	outFrames := greyFrames(out, "fps=30") // resample to a 30 fps grid in output time
 	if len(outFrames) == 0 || len(refFrames) == 0 {
 		add("frames", false, "could not decode frames")
@@ -151,24 +188,51 @@ func frameAndSync(out string, checks []string, add func(string, bool, string, ..
 	}
 	var ms []match
 	for i := 0; i < len(outFrames); i += 6 { // every 0.2 s
-		best, bi := math.Inf(1), 0
+		// match a short run of frames, not one: neighbouring frames of a near-static picture differ
+		// less than encoding noise, and a ±1 frame error is a ±33 ms sync error. The run is taken on
+		// whichever side of frame i fits better, so a cut next to i doesn't spoil it.
+		run := func(j, d0, d1 int) float64 {
+			t, n := 0.0, 0
+			for d := d0; d <= d1; d++ {
+				if i+d < 0 || i+d >= len(outFrames) || j+d < 0 || j+d >= len(refFrames) {
+					continue
+				}
+				t += mse(outFrames[i+d], refFrames[j+d])
+				n++
+			}
+			if n == 0 {
+				return math.Inf(1)
+			}
+			return t / float64(n)
+		}
+		bestRun, bi := math.Inf(1), 0
 		for j, rf := range refFrames {
-			if e := mse(outFrames[i], rf); e < best {
-				best, bi = e, j
+			if mse(outFrames[i], rf) > 4*maxErr+1000 {
+				continue // cheap reject before scoring the run
+			}
+			if e := math.Min(run(j, -2, 0), run(j, 0, 2)); e < bestRun {
+				bestRun, bi = e, j
 			}
 		}
+		best := mse(outFrames[i], refFrames[bi])
 		fl := mse(flip(outFrames[i]), refFrames[bi])
 		ms = append(ms, match{float64(i) / refFPS, float64(bi) / refFPS, best, fl})
 	}
 	// upright: best match error small and much smaller than the flipped comparison
 	bad := 0
 	for _, m := range ms {
-		if !(m.err < 30 && m.err < m.flippedErr) {
+		if !(m.err < maxErr && m.err < m.flippedErr) {
 			bad++
 		}
 	}
 	if has(checks, "upright") || has(checks, "frames_from_source") {
-		add("frames_from_source/upright", bad == 0, "%d/%d sampled frames match an upright source frame (worst err %.1f)", len(ms)-bad, len(ms), worst(ms, func(m match) float64 { return m.err }))
+		es, fs := make([]float64, len(ms)), make([]float64, len(ms))
+		for i, m := range ms {
+			es[i], fs[i] = m.err, m.flippedErr
+		}
+		sort.Float64s(es)
+		sort.Float64s(fs)
+		add("frames_from_source/upright", bad == 0, "%d/%d sampled frames match an upright source frame (err median %.1f, worst %.1f; flipped median %.1f)", len(ms)-bad, len(ms), es[len(es)/2], es[len(es)-1], fs[len(fs)/2])
 	}
 	if !has(checks, "av_sync") {
 		return
@@ -200,7 +264,11 @@ func frameAndSync(out string, checks []string, add func(string, bool, string, ..
 	sort.Float64s(lags)
 	med := lags[len(lags)/2]
 	mx := math.Max(math.Abs(lags[0]), math.Abs(lags[len(lags)-1]))
-	add("av_sync", mx <= 45, "%d windows, median %+.0f ms, worst %.0f ms (limit 45)", len(lags), med, mx)
+	lim := 45.0
+	if sp.SyncLimit > 0 {
+		lim = sp.SyncLimit
+	}
+	add("av_sync", mx <= lim, "%d windows, median %+.0f ms, worst %.0f ms (limit %.0f)", len(lags), med, mx, lim)
 }
 
 func worst[T any](xs []T, f func(T) float64) float64 {
@@ -211,13 +279,20 @@ func worst[T any](xs []T, f func(T) float64) float64 {
 	return w
 }
 
-func greyFrames(p, extra string) [][]byte {
+func greyFrames(p, extra string) [][]byte { return greyFramesPre(p, nil, extra) }
+
+func greyFramesPre(p string, pre []string, extra string) [][]byte {
 	// raw luma plane: independent of colour tags (untagged sources vs bt709-tagged renders)
 	vf := fmt.Sprintf("scale=%d:%d,format=yuv420p,extractplanes=y", gw, gh)
 	if extra != "" {
 		vf = extra + "," + vf
 	}
-	b, err := exec.Command("ffmpeg", "-v", "error", "-i", p, "-vf", vf, "-f", "rawvideo", "-").Output()
+	args := append([]string{"-v", "error"}, pre...)
+	if len(pre) > 0 {
+		args = append(args, "-display_rotation", "0") // hardware frames: rotate by hand in extra
+	}
+	args = append(args, "-i", p, "-vf", vf, "-f", "rawvideo", "-")
+	b, err := exec.Command("ffmpeg", args...).Output()
 	if err != nil {
 		return nil
 	}
@@ -461,4 +536,54 @@ func must(err error) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+}
+
+func colourTags(p string) (transfer, primaries string) {
+	b, _ := exec.Command("ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=color_transfer,color_primaries", "-of", "default=nw=1", p).Output()
+	for _, l := range strings.Split(string(b), "\n") {
+		k, v, _ := strings.Cut(strings.TrimSpace(l), "=")
+		switch k {
+		case "color_transfer":
+			transfer = v
+		case "color_primaries":
+			primaries = v
+		}
+	}
+	return
+}
+
+func orDash(s string) string {
+	if s == "" || s == "unknown" {
+		return "untagged"
+	}
+	return s
+}
+
+var satRe, lowRe, highRe = regexp.MustCompile(`SATAVG=([0-9.]+)`), regexp.MustCompile(`YLOW=([0-9.]+)`), regexp.MustCompile(`YHIGH=([0-9.]+)`)
+
+// toneStats returns mean saturation and mean (YHIGH−YLOW) over one frame per second, in 8-bit units.
+func toneStats(p string, pre []string, vf string) (sat, rng float64) {
+	f := "fps=1,format=yuv420p,signalstats,metadata=print:file=-"
+	if vf != "" {
+		f = vf + "," + f
+	}
+	args := append([]string{"-v", "error"}, pre...)
+	args = append(args, "-i", p, "-vf", f, "-f", "null", "-")
+	b, err := exec.Command("ffmpeg", args...).Output()
+	if err != nil {
+		return 0, 0
+	}
+	mean := func(re *regexp.Regexp) float64 {
+		ms := re.FindAllStringSubmatch(string(b), -1)
+		t := 0.0
+		for _, m := range ms {
+			v, _ := strconv.ParseFloat(m[1], 64)
+			t += v
+		}
+		if len(ms) == 0 {
+			return 0
+		}
+		return t / float64(len(ms))
+	}
+	return mean(satRe), mean(highRe) - mean(lowRe)
 }

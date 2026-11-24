@@ -63,5 +63,18 @@ ffmpeg -v error -y -i $FIX/recorder.wav -af "atrim=start=1.7,asetpts=PTS-STARTPT
 cut $FIX/talk.mp4 "$W/recok/out/final.mp4" null "$W/rec-fixed.wav"
 want PASS recorder "$W/recok"
 
+# HDR (HLG, rotated): a correct tone map of the right cut passes; a plain matrix conversion fails on tone
+ffmpeg -v error -y -hwaccel videotoolbox -hwaccel_output_format videotoolbox_vld -display_rotation 0 -i $FIX/talk-hdr.mov \
+  -vf "scale_vt=color_matrix=bt709:color_primaries=bt709:color_transfer=bt709,hwdownload,format=p010le,hflip,vflip,format=yuv420p" \
+  -c:v libx264 -preset veryfast -crf 18 -color_trc bt709 -color_primaries bt709 -colorspace bt709 -c:a copy "$W/hdr-sdr.mp4"
+cut "$W/hdr-sdr.mp4" "$W/hdrgood/out/final.mp4"
+want PASS hdr-phone "$W/hdrgood"
+ffmpeg -v error -y -i $FIX/talk-hdr.mov -vf "colorspace=all=bt709:iall=bt2020:format=yuv420p" -c:v libx264 -preset veryfast \
+  -color_trc bt709 -color_primaries bt709 -colorspace bt709 -c:a copy "$W/hdr-naive.mp4"
+cut "$W/hdr-naive.mp4" "$W/hdrnaive/out/final.mp4"
+want FAIL hdr-phone "$W/hdrnaive" "tone_mapped"
+cut "$W/hdr-sdr.mp4" "$W/hdrlate/out/final.mp4" null "$W/hdr-sdr.mp4" 100
+want FAIL hdr-phone "$W/hdrlate" "av_sync"
+
 echo "selftest: $pass passed, $fail failed"
 [ $fail -eq 0 ]

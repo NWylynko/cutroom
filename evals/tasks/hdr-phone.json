@@ -1,0 +1,30 @@
+{
+  "fixtures": [
+    "talk-hdr.mov"
+  ],
+  "output": "out/final.mp4",
+  "must_contain": [
+    "install Linux on it",
+    "your server is ready"
+  ],
+  "must_not_contain": [
+    "my cat",
+    "um"
+  ],
+  "duration": [
+    13.0,
+    23.0
+  ],
+  "checks": [
+    "upright",
+    "no_rotation_meta",
+    "sdr_bt709",
+    "tone_mapped",
+    "av_sync"
+  ],
+  "ref": "talk-hdr.mov",
+  "ref_sdr": true,
+  "frame_err": 120,
+  "sync_limit_ms": 70,
+  "setup": "mv talk-hdr.mov clip.mov"
+}

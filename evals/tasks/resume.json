@@ -1,0 +1,10 @@
+{
+  "fixtures": ["talk.mp4"],
+  "setup": "cutroom init talk.mp4 && cutroom transcribe --passes 1 && cutroom edit tighten && cutroom edit cut --from \"By the way\" --to \"keyboard.\" && cutroom render --preview",
+  "output": "out/final.mp4",
+  "must_contain": ["show you how to set up a home server", "first thing you need is an old laptop", "install Linux on it", "open the terminal and run the update command", "your server is ready"],
+  "must_not_contain": ["um", "my cat"],
+  "exactly_once": ["first thing you need"],
+  "duration": [13.0, 18.5],
+  "checks": ["av_sync", "frames_from_source"]
+}
