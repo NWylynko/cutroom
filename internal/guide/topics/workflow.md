@@ -25,3 +25,12 @@ every render (current or stale, checked or not) and the next step.
 3. `cutroom edit audio mic` — the timeline now takes its sound from the recorder, aligned.
 Transcribe and cut using the camera source as usual; renders and `check` use the alignment
 automatically. Never point the timeline at another source's audio without `sync`: cutroom refuses.
+
+## Several takes (re-recorded lines, a second camera roll)
+1. `cutroom init take1.mov take2.mov` — the first edit starts from the longest video.
+2. Cut the weak version from the main take; put the better one in from the other take:
+   `cutroom edit add --source take2 --from "So the" --to "works." --after s3` (`--before`, `--after start`).
+3. `cutroom edit move s5 --after s2` reorders. `cutroom timeline` shows which take each segment is from.
+4. Sound: each take uses its own sound unless a recorder is mapped to it —
+   `cutroom sync mic2 --to take2` then `cutroom edit audio mic2 --for take2`. `timeline` warns
+   (`audio-mixed`) where takes use different microphones; `check` measures sync per segment.

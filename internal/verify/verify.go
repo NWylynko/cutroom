@@ -125,31 +125,50 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 		n := min(len(rx), int(math.Round(-ast*sr)))
 		rx = rx[n:]
 	}
-	src := m.Sources[m.Audio]
-	srcWav := speech.WavPath(o.CacheDir, m.Audio)
-	if _, err := os.Stat(srcWav); err != nil {
-		srcWav = filepath.Join(tmp, "src.wav")
-		if err := speech.ExtractWav(src.Path, srcWav); err != nil {
-			return nil, err
+	// each segment's sound came from its own audio source (multi-take); load each once
+	tracks := map[string][]float64{}
+	load := func(id string) []float64 {
+		if x, ok := tracks[id]; ok {
+			return x
 		}
-	}
-	sx, _ := speech.ReadWav(srcWav)
-	mapT := func(g render.MSeg, t float64) float64 { // source-of-segment time → audio-source time
-		if g.Source != m.Audio && src.Sync != nil {
-			return src.Sync.Map(t)
+		var x []float64
+		if s, ok := m.Sources[id]; ok {
+			w := speech.WavPath(o.CacheDir, id)
+			if _, err := os.Stat(w); err != nil {
+				w = filepath.Join(tmp, "src-"+id+".wav")
+				if err := speech.ExtractWav(s.Path, w); err != nil {
+					w = ""
+				}
+			}
+			if w != "" {
+				x, _ = speech.ReadWav(w)
+			}
 		}
-		return t
+		tracks[id] = x
+		return x
 	}
-	syncCheck(rx, sx, src.AudioStart, mapT, m, r)
-	if src.Sync != nil {
-		cameraCheck(rx, src.Sync.To, m, o, tmp, r)
+	audioTrack := func(g render.MSeg) ([]float64, float64, func(float64) float64, bool) {
+		a := m.AudioOf(g)
+		s := m.Sources[a]
+		x := load(a)
+		if len(x) == 0 {
+			return nil, 0, nil, false
+		}
+		if g.Source != a && s.Sync != nil {
+			return x, s.AudioStart, s.Sync.Map, true
+		}
+		return x, s.AudioStart, func(t float64) float64 { return t }, true
 	}
+	syncCheck(rx, audioTrack, m, r)
+	cameraCheck(rx, m, load, r)
 	if o.Model != "" {
 		wordCheck(renderWav, tmp, m, o, r)
 	}
-	if tr := o.Transcripts[m.Audio]; tr != nil && len(sx) > 0 {
-		edgeCheck(sx, src.AudioStart, tr, m, r)
-		cutThroughWords(tr, m, r)
+	for id := range audioSources(m) {
+		if tr := o.Transcripts[id]; tr != nil && len(load(id)) > 0 {
+			edgeCheck(load(id), m.Sources[id].AudioStart, tr, id, m, r)
+			cutThroughWords(tr, id, m, r)
+		}
 	}
 
 	// 6. loudness
@@ -382,11 +401,19 @@ func mse(a, b []byte) float64 {
 
 // measureSync cross-correlates the render's sound with a source's sound at the moment each segment's
 // picture shows; minC is the correlation a window needs to count.
-func measureSync(rx, sx []float64, audioStart float64, mapT func(render.MSeg, float64) float64, m *render.Manifest, minC float64) (all, measured []SegSync, worst float64, worstSeg SegSync) {
+// trackFor gives, for a segment, the sound to compare with: samples, their start on the source clock,
+// and the map from the segment's picture time to that clock. ok = false skips the segment.
+type trackFor func(g render.MSeg) (sx []float64, start float64, mapT func(float64) float64, ok bool)
+
+func measureSync(rx []float64, get trackFor, m *render.Manifest, minC float64) (all, measured []SegSync, worst float64, worstSeg SegSync) {
 	win, maxLag := int(0.5*sr), int(0.15*sr)
 	for _, g := range m.Segments {
 		d := float64(g.Frames) / rate(m.FPS)
 		ss := SegSync{Segment: g.ID, OutStart: g.OutStart}
+		sx, audioStart, mapT, ok := get(g)
+		if !ok {
+			continue
+		}
 		// try a few windows inside the segment; keep the most confident speech window
 		bestC := 0.0
 		for _, frac := range []float64{0.5, 0.3, 0.7} {
@@ -394,7 +421,7 @@ func measureSync(rx, sx []float64, audioStart float64, mapT func(render.MSeg, fl
 				break
 			}
 			to := g.OutStart + d*frac
-			so := mapT(g, g.In+d*frac) - audioStart
+			so := mapT(g.In+d*frac) - audioStart
 			oi, si := int(to*sr)-win/2, int(so*sr)-win/2
 			if oi < 0 || oi+win > len(rx) || si-maxLag < 0 || si+win+maxLag > len(sx) {
 				continue
@@ -421,8 +448,8 @@ func measureSync(rx, sx []float64, audioStart float64, mapT func(render.MSeg, fl
 	return all, measured, worst, worstSeg
 }
 
-func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, float64) float64, m *render.Manifest, r *Report) {
-	all, measured, worst, worstSeg := measureSync(rx, sx, audioStart, mapT, m, 0.5)
+func syncCheck(rx []float64, get trackFor, m *render.Manifest, r *Report) {
+	all, measured, worst, worstSeg := measureSync(rx, get, m, 0.5)
 	r.Sync = append(r.Sync, all...)
 	if len(measured) == 0 {
 		r.add(Item{Check: "sync", Status: "warn", Detail: "no segment had enough speech to measure sync"})
@@ -444,6 +471,14 @@ func syncCheck(rx, sx []float64, audioStart float64, mapT func(render.MSeg, floa
 	ref := m.Audio + "'s sound"
 	if s, ok := m.Sources[m.Audio]; ok && s.Sync != nil {
 		ref = m.Audio + "'s sound, aligned to " + s.Sync.To + " by sync,"
+	}
+	if as := audioSources(m); len(as) > 1 {
+		var ids []string
+		for id := range as {
+			ids = append(ids, id)
+		}
+		sort.Strings(ids)
+		ref = "each segment's own sound source (" + strings.Join(ids, ", ") + ")"
 	}
 	it.Detail = fmt.Sprintf("%d of %d segments measured: the render's sound vs %s at the source moment its picture shows: median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), ref, lags[len(lags)/2], worst)
 	if st == "pass" {
@@ -621,14 +656,14 @@ func segAt(m *render.Manifest, t float64) string {
 
 // --- edges (L33) -----------------------------------------------------------------------------
 
-func edgeCheck(sx []float64, audioStart float64, tr *speech.Transcript, m *render.Manifest, r *Report) {
+func edgeCheck(sx []float64, audioStart float64, tr *speech.Transcript, id string, m *render.Manifest, r *Report) {
 	env := speech.NewEnvelope(sx)
 	env.Floor, env.Peak = tr.RoomTone, tr.SpeechDB
 	env.Thr = env.Floor + math.Max(10, 0.35*(env.Peak-env.Floor))
 	regions := env.Regions()
 	found, breaths := 0, 0
 	for _, g := range m.Segments {
-		if g.Source != m.Audio {
+		if g.Source != id || m.AudioOf(g) != id {
 			continue
 		}
 		for _, rg := range regions {
@@ -658,7 +693,7 @@ func edgeCheck(sx []float64, audioStart float64, tr *speech.Transcript, m *rende
 				Fix:    fmt.Sprintf("`cutroom listen %.2f-%.2f`; cut it with `cutroom edit cut %.2f-%.2f` if unwanted", math.Max(a, g.In)-0.5, math.Min(b, g.Out)+0.5, math.Max(a, g.In), math.Min(b, g.Out))})
 		}
 	}
-	if found == 0 {
+	if found == 0 && !r.has("stray-sound") {
 		d := "no sound without words kept at any cut or inside segments"
 		if breaths > 0 {
 			d += fmt.Sprintf(" (%d breath(s) kept: quiet, normal)", breaths)
@@ -668,10 +703,10 @@ func edgeCheck(sx []float64, audioStart float64, tr *speech.Transcript, m *rende
 }
 
 // cutThroughWords reports segment edges that fall inside a word (a clipped word in the render).
-func cutThroughWords(tr *speech.Transcript, m *render.Manifest, r *Report) {
+func cutThroughWords(tr *speech.Transcript, id string, m *render.Manifest, r *Report) {
 	fps := rate(m.FPS)
 	for _, g := range m.Segments {
-		if g.Source != m.Audio {
+		if g.Source != id || m.AudioOf(g) != id {
 			continue
 		}
 		for _, w := range tr.Words {
@@ -760,24 +795,37 @@ func round3(f float64) float64 { return math.Round(f*1000) / 1000 }
 // (from the recorder) against the camera's own sound at the same moment. Both are band-passed so
 // two different microphones correlate. A wrong sync offset passes syncCheck (it uses the same
 // offset) but fails here.
-func cameraCheck(rx []float64, cam string, m *render.Manifest, o Options, tmp string, r *Report) {
-	cs, ok := m.Sources[cam]
-	if !ok {
-		return
-	}
-	cw := speech.WavPath(o.CacheDir, cam)
-	if _, err := os.Stat(cw); err != nil {
-		cw = filepath.Join(tmp, "camera.wav")
-		if err := speech.ExtractWav(cs.Path, cw); err != nil {
-			return // camera has no audio: nothing independent to compare with
+func cameraCheck(rx []float64, m *render.Manifest, load func(string) []float64, r *Report) {
+	// segments whose sound came from a recorder, compared with their camera's own sound
+	cams := map[string]bool{}
+	bp := map[string][]float64{}
+	get := func(g render.MSeg) ([]float64, float64, func(float64) float64, bool) {
+		if m.AudioOf(g) == g.Source {
+			return nil, 0, nil, false
 		}
+		cx, ok := bp[g.Source]
+		if !ok {
+			if x := load(g.Source); len(x) > 0 {
+				cx = align.Bandpass(x)
+			}
+			bp[g.Source] = cx
+		}
+		if len(cx) == 0 {
+			return nil, 0, nil, false // camera has no audio: nothing independent to compare with
+		}
+		cams[g.Source] = true
+		return cx, m.Sources[g.Source].AudioStart, func(t float64) float64 { return t }, true
 	}
-	cx, _ := speech.ReadWav(cw)
-	if len(cx) == 0 {
+	_, measured, worst, worstSeg := measureSync(align.Bandpass(rx), get, m, 0.3)
+	if len(cams) == 0 {
 		return
 	}
-	ident := func(g render.MSeg, t float64) float64 { return t }
-	_, measured, worst, worstSeg := measureSync(align.Bandpass(rx), align.Bandpass(cx), cs.AudioStart, ident, m, 0.3)
+	var camList []string
+	for c := range cams {
+		camList = append(camList, c)
+	}
+	sort.Strings(camList)
+	cam := strings.Join(camList, ", ")
 	if len(measured) == 0 {
 		r.add(Item{Check: "sync-camera", Status: "warn", Detail: "could not compare with " + cam + "'s own sound (too little shared speech)"})
 		return
@@ -790,7 +838,7 @@ func cameraCheck(rx []float64, cam string, m *render.Manifest, o Options, tmp st
 	it := Item{Check: "sync-camera", Status: "pass"}
 	if math.Abs(worst) > 45 {
 		it.Status, it.At, it.Segment = "fail", worstSeg.OutStart, worstSeg.Segment
-		it.Fix = fmt.Sprintf("the recorder's alignment looks wrong: re-run `cutroom sync %s`, then render again", m.Audio)
+		it.Fix = fmt.Sprintf("the recorder's alignment looks wrong: re-run `cutroom sync %s`, then render again", m.AudioOf(segByID(m, worstSeg.Segment)))
 	}
 	it.Detail = fmt.Sprintf("%d of %d segments: the render's sound vs %s's own camera sound (independent of sync's offset): median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), cam, lags[len(lags)/2], worst)
 	r.add(it)
@@ -869,4 +917,31 @@ func frameTone(p string, t float64, sdr media.SDR, crop string) (sat, rng float6
 	lo, ok2 := get(yLowRe)
 	hi, ok3 := get(yHighRe)
 	return s, hi - lo, ok1 && ok2 && ok3 && hi > lo
+}
+
+// audioSources lists the audio sources the render's segments used.
+func audioSources(m *render.Manifest) map[string]bool {
+	out := map[string]bool{}
+	for _, g := range m.Segments {
+		out[m.AudioOf(g)] = true
+	}
+	return out
+}
+
+func segByID(m *render.Manifest, id string) render.MSeg {
+	for _, g := range m.Segments {
+		if g.ID == id {
+			return g
+		}
+	}
+	return render.MSeg{}
+}
+
+func (r *Report) has(check string) bool {
+	for _, it := range r.Items {
+		if it.Check == check {
+			return true
+		}
+	}
+	return false
 }

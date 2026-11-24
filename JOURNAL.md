@@ -2,6 +2,24 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 25 · 2026-11-24 · multi-take: `edit add`, `edit move`, each take's own sound
+Did: `edit add` puts a span of any source into the edit (by words with --text/--from/--to across all
+transcripts, or a range with --source; --after/--before id, --after start; default end; edges pinned;
+warns when it duplicates kept material). `edit move <id> --after/--before`. Timeline `audio_for` maps a
+video source to its recorder (`edit audio mic2 --for take2`). `render.AudioFor` resolves each take's
+sound — mapped recorder; else the timeline audio when it is that take or synced to it; else, for
+another take, its own sound — and still refuses a recorder synced to nothing (L05). Render assembles
+audio from several files (mono when mixed); the manifest records each segment's audio source; check
+measures sync, camera cross-check, edges and clipped words per segment against the right sound.
+`timeline` warns `audio-mixed` where takes use different microphones. The first edit now starts from
+the longest video (it was the alphabetically first: a 2.5 s pickup became the whole timeline) and says
+so. Guide: "Several takes" recipe. Tests: TestAudioForMultiTake; e2e 132/132 (+9) incl. a negated
+second take placed by PSNR (25.8 dB vs take2, 3.7 dB vs talk).
+Surprises: (1) the default-video bug only shows with two videos — every fixture so far had one.
+(2) a hue-rotated second take was invisible to every luma-based check (check's picture and the
+grader's), so the e2e take is negated.
+Next: real multi-take footage (securing-personal-software: two HEVC takes + two recorders) as T3.
+
 ### 24 · 2026-11-24 · `edit zoom`: punch-ins rendered, looked at and checked through the crop
 Did: `cutroom edit zoom <factor> <span> [--anchor x,y]` (span = range, --text or --from/--to; 1 =
 zoom out). Timeline.Zoom splits at the span edges and pins them (continuous speech: tighten must not

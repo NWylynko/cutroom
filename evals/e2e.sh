@@ -119,7 +119,7 @@ S="$W/sync"; mkdir -p "$S"; cp $FIX/talk.mp4 $FIX/recorder.wav "$S/"; pushd "$S"
 cutroom init talk.mp4 --source mic=recorder.wav >/dev/null; cutroom transcribe talk --passes 1 >/dev/null; cutroom edit tighten >/dev/null
 expect "edit audio refuses unsynced"  'cutroom sync mic --to talk'      cutroom edit audio mic
 python3 -c "import json;t=json.load(open('timeline.json'));t['audio']='mic';json.dump(t,open('timeline.json','w'))"
-expect "render refuses hand-set unsynced audio" 'audio-not-synced|have not been aligned' cutroom render
+expect "render refuses hand-set unsynced audio" 'audio-not-synced|have not been aligned|is not aligned to' cutroom render
 cutroom edit undo >/dev/null; cutroom edit tighten >/dev/null
 expect "sync measures offset"         'mic started recording 1\.70[01] s before talk' cutroom sync mic
 expect "edit audio after sync"        'takes its sound from mic'        cutroom edit audio mic
@@ -179,6 +179,25 @@ expect "check through the zoom"    'ok   picture +[0-9]+ sampled frames match' c
 python3 -c "import json;m=json.load(open('out/final.mp4.cutroom.json'));[g.pop('zoom',None) for g in m['segments']];json.dump(m,open('out/final.mp4.cutroom.json','w'))"
 expect "check: framing mismatch"   'match no nearby source frame.*framing or zoom' cutroom check
 expect "bad zoom factor"           'between 1 \(none\) and 4'          cutroom edit zoom 0.5 --text "Your server is ready."
+popd >/dev/null
+
+# multi-take: replace a line with another take's version, reorder, render, check per-segment sound
+T="$W/takes"; mkdir -p "$T"; cp $FIX/talk.mp4 "$T/"; pushd "$T" >/dev/null
+ffmpeg -v error -y -ss 13.5 -t 2.5 -i talk.mp4 -vf negate -c:v libx264 -preset veryfast -c:a aac take2.mp4
+cutroom init talk.mp4 take2.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null
+expect "first edit uses longest take" 'created timeline from talk .*longest video' cutroom edit tighten
+cutroom edit cut --from "Then install" --to "on it." >/dev/null
+expect "add another take's line"   'added take2 .* after s3: "Then install Linux on it\."' cutroom edit add --source take2 --text "Then install Linux on it." --after s3
+expect "mixed sound warned"        'WARN\[audio-mixed\].*take2 use take2.s own sound' cutroom timeline
+expect "recorder for wrong take refused" 'not been aligned to take2' cutroom edit audio talk --for take2 --dry-run
+expect "move a segment"            'moved s1 to the end'               cutroom edit move s1 --before end
+cutroom edit undo >/dev/null
+cutroom render >/dev/null 2>&1
+expect "check: each take's sound"  'ok   sync .*each segment.s own sound source \(take2, talk\)' cutroom check
+expect "check: take2 picture"      'ok   picture'                     cutroom check
+ffmpeg -v error -y -ss 10.5 -i out/final.mp4 -frames:v 1 o.png; ffmpeg -v error -y -ss 1.3 -i take2.mp4 -frames:v 1 t2.png
+d=$(ffmpeg -i o.png -i t2.png -lavfi "[0:v]format=gray[a];[1:v]format=gray[b];[a][b]psnr" -f null - 2>&1 | grep -o 'average:[0-9.]*' | cut -d: -f2)
+awk -v d="$d" 'BEGIN{exit !(d > 20)}' && ok "render shows take2 where added (psnr $d)" || bad "render shows take2 where added" "psnr $d"
 popd >/dev/null
 
 # rotated phone footage: render says the rotation is baked in

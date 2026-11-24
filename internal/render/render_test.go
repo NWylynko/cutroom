@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cutroom/cutroom/internal/align"
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
@@ -88,7 +89,7 @@ func TestL01_AssembleSampleExactWithFades(t *testing.T) {
 	}
 	f.Close()
 	out := filepath.Join(d, "out.wav")
-	total, err := Assemble(src, out, []Piece{{0, 4800}, {24000, 28800}}, 20)
+	total, err := Assemble([]string{src}, out, []Piece{{0, 0, 4800}, {0, 24000, 28800}}, 20)
 	if err != nil || total != 9600 {
 		t.Fatalf("total %d err %v", total, err)
 	}
@@ -126,5 +127,38 @@ func TestL40_ZoomCropInChunk(t *testing.T) {
 	args := strings.Join(chunkCmd(tl, srcs(), c, false, "out.mp4"), " ")
 	if strings.Count(args, "crop=") != 1 || !strings.Contains(args, "trunc(iw/1.2/2)*2") || !strings.Contains(args, "clip(0.3*ih-oh/2,0,ih-oh)") {
 		t.Fatalf("want one anchored crop: %s", args)
+	}
+}
+
+// L05/L24 multi-take: each video source's sound is resolved explicitly; a recorder is used only where
+// it is synced; other takes fall back to their own sound; a hand-set recorder synced to nothing is refused.
+func TestAudioForMultiTake(t *testing.T) {
+	sync := func(to string) *align.Sync { return &align.Sync{To: to, Offset: 1} }
+	srcs := map[string]Source{
+		"cam1": {HasAudio: true}, "cam2": {HasAudio: true}, "mute": {},
+		"mic1": {HasAudio: true, Sync: sync("cam1")}, "mic2": {HasAudio: true, Sync: sync("cam2")}, "loose": {HasAudio: true},
+	}
+	tl := timeline.New("30", 1280, 720, "cam1", "mic1", 0, 30)
+	tl.Insert("cam2", 1, 2, 1, "take 2")
+	for _, c := range []struct {
+		video, want string
+		own, err    bool
+	}{{"cam1", "mic1", false, false}, {"cam2", "cam2", true, false}} {
+		a, own, err := AudioFor(tl, srcs, c.video)
+		if a != c.want || own != c.own || (err != nil) != c.err {
+			t.Errorf("%s: got %s own=%v err=%v", c.video, a, own, err)
+		}
+	}
+	tl.AudioFor = map[string]string{"cam2": "mic2"}
+	if a, own, err := AudioFor(tl, srcs, "cam2"); a != "mic2" || own || err != nil {
+		t.Errorf("mapped recorder: %s %v %v", a, own, err)
+	}
+	tl.AudioFor = map[string]string{"cam2": "mic1"} // mic1 is synced to cam1, not cam2
+	if _, _, err := AudioFor(tl, srcs, "cam2"); err == nil {
+		t.Error("a recorder synced to another take must be refused")
+	}
+	tl.AudioFor, tl.Audio = nil, "loose"
+	if _, _, err := AudioFor(tl, srcs, "cam1"); err == nil {
+		t.Error("a hand-set recorder synced to nothing must be refused (L05)")
 	}
 }

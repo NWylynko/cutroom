@@ -118,10 +118,16 @@ func defaultVideo(p *project.Project, id string) (*project.Source, error) {
 		}
 		return s, nil
 	}
+	// the longest video: with several takes, the main recording (ties: first id)
+	var best *project.Source
 	for _, id := range p.IDs() {
-		if p.Sources[id].Facts.Video != nil {
-			return p.Sources[id], nil
+		s := p.Sources[id]
+		if s.Facts.Video != nil && (best == nil || s.Facts.Duration > best.Facts.Duration+1e-6) {
+			best = s
 		}
+	}
+	if best != nil {
+		return best, nil
 	}
 	return nil, Errf(ExitInvalid, "no-video", "add a video: `cutroom init <file>`", "the project has no video source")
 }

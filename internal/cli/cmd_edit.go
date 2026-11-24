@@ -13,12 +13,12 @@ import (
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
-var editOps = []string{"cut", "keep", "zoom", "tighten", "audio", "undo", "history", "reset"}
+var editOps = []string{"cut", "keep", "add", "move", "zoom", "tighten", "audio", "undo", "history", "reset"}
 
 func init() {
 	Register(&Command{
 		Name:     "edit",
-		Args:     "<cut|keep|zoom|tighten|audio|undo|history|reset> [factor] [range|source]",
+		Args:     "<cut|keep|add|move|zoom|tighten|audio|undo|history|reset> [factor|segment] [range|source]",
 		MinArgs:  1,
 		MaxArgs:  3,
 		Category: "edit",
@@ -33,8 +33,14 @@ Every edit is checked afterwards and problems are printed. Use --dry-run to prev
   edit zoom 1.15 --from "Then install" --to "on it."   punch in on a span (1 = zoom back out)
         --anchor 0.5,0.4   the point to zoom on (0–1 across, 0–1 down; default 0.5,0.4 = a face)
         above 1.2× upscaling looks soft (a 1080p source at 1.3×); 4K sources can go to 2× for 1080p
+  edit add --source take2 --from "So the" --to "works." [--after s3 | --before s1]
+                                                 put a span of another take (or source) into the edit
+                                                 (default: at the end); its edges are pinned
+  edit move s5 --after s2 | --before s1 | --after start      reorder a segment
   edit tighten [--min-cut 0.4]                   shorten every pause longer than the pads + min-cut
   edit audio mic                                 take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
+  edit audio mic2 --for take2                    multi-take: segments from take2 use recorder mic2
+                                                 (unmapped takes use their own sound; timeline warns)
   edit undo | edit history | edit reset [--source id]
 
 Words are matched ignoring case, punctuation and um/uh. --from must match once (add --near <time>
@@ -52,6 +58,9 @@ never moves them.`,
 			{Name: "reason", Kind: "string", Help: "Why (stored with the edit; shown in the timeline)"},
 			{Name: "min-cut", Kind: "float", Default: "0.4", Help: "tighten: only shorten pauses where at least this much can go"},
 			{Name: "anchor", Kind: "string", Help: "zoom: point to zoom on as x,y in 0–1 (default 0.5,0.4)"},
+			{Name: "for", Kind: "string", Help: "audio: only for segments from this video source (multi-take)"},
+			{Name: "after", Kind: "string", Help: "add/move: put it after this segment id (or \"start\")"},
+			{Name: "before", Kind: "string", Help: "add/move: put it before this segment id (default for add: at the end)"},
 			{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"},
 		},
 		Run: runEdit,
@@ -175,7 +184,17 @@ func runEdit(c *Ctx) (*Result, error) {
 		if c.Bool("dry-run") {
 			verb = "would create"
 		}
-		lines = append(lines, fmt.Sprintf("%s timeline from %s (whole source, %s)", verb, e.tl.Video, secs(e.tl.Duration())))
+		l := fmt.Sprintf("%s timeline from %s (whole source, %s)", verb, e.tl.Video, secs(e.tl.Duration()))
+		videos := 0
+		for _, id := range e.p.IDs() {
+			if s := e.p.Sources[id]; s.Facts != nil && s.Facts.Video != nil {
+				videos++
+			}
+		}
+		if videos > 1 && !c.Has("source") {
+			l += "; it is the longest video — other takes go in with `cutroom edit add --source <take> …` (or start from another with --source)"
+		}
+		lines = append(lines, l)
 	}
 	before := e.tl.Duration()
 	soundsBefore := e.keptSounds()
@@ -227,11 +246,39 @@ func runEdit(c *Ctx) (*Result, error) {
 		if s.Facts.Audio == nil {
 			return nil, Errf(ExitUsage, "no-audio", "pick a source with sound (`cutroom inspect`)", "source %q has no audio", s.ID)
 		}
-		for _, g := range e.tl.Segments {
-			if g.Source != s.ID && (s.Sync == nil || s.Sync.To != g.Source) {
-				return nil, Errf(ExitInvalid, "audio-not-synced", fmt.Sprintf("align it first: `cutroom sync %s --to %s`", s.ID, g.Source),
-					"%s has not been aligned to %s, so its sound would be out of sync", s.ID, g.Source)
+		if c.Has("for") { // multi-take: this recorder supplies the sound for one video source
+			v := c.Str("for")
+			vs, err := sourceByID(e.p, v)
+			if err != nil {
+				return nil, err
 			}
+			if s.ID != vs.ID && (s.Sync == nil || s.Sync.To != vs.ID) {
+				return nil, Errf(ExitInvalid, "audio-not-synced", fmt.Sprintf("align it first: `cutroom sync %s --to %s`", s.ID, vs.ID),
+					"%s has not been aligned to %s, so its sound would be out of sync", s.ID, vs.ID)
+			}
+			if e.tl.AudioFor == nil {
+				e.tl.AudioFor = map[string]string{}
+			}
+			if s.ID == vs.ID {
+				delete(e.tl.AudioFor, vs.ID) // its own sound: the default for an unmapped take
+				e.tl.AudioFor[vs.ID] = vs.ID
+			} else {
+				e.tl.AudioFor[vs.ID] = s.ID
+			}
+			label = fmt.Sprintf("edit audio %s --for %s", s.ID, vs.ID)
+			lines = append(lines, fmt.Sprintf("segments from %s now take their sound from %s", vs.ID, s.ID))
+			break
+		}
+		ok := false
+		for _, g := range e.tl.Segments {
+			if g.Source == s.ID || (s.Sync != nil && s.Sync.To == g.Source) {
+				ok = true
+			}
+		}
+		if !ok && len(e.tl.Segments) > 0 {
+			g := e.tl.Segments[0]
+			return nil, Errf(ExitInvalid, "audio-not-synced", fmt.Sprintf("align it first: `cutroom sync %s --to %s`", s.ID, g.Source),
+				"%s has not been aligned to %s, so its sound would be out of sync", s.ID, g.Source)
 		}
 		e.tl.Audio = s.ID
 		label = "edit audio " + s.ID
@@ -264,6 +311,28 @@ func runEdit(c *Ctx) (*Result, error) {
 		}
 		label = desc
 		lines = append(lines, res...)
+	case "add":
+		res, desc, err := e.applyAdd(c)
+		if err != nil {
+			return nil, err
+		}
+		label = desc
+		lines = append(lines, res...)
+	case "move":
+		if len(c.Args) != 2 {
+			return nil, Errf(ExitUsage, "bad-args", "name the segment: `cutroom edit move s5 --after s2` (ids from `cutroom timeline`)", "edit move needs a segment id")
+		}
+		id := c.Args[1]
+		if e.tl.Find(id) == nil {
+			return nil, Errf(ExitUsage, "unknown-segment", "segment ids: "+strings.Join(e.tl.IDs(), ", "), "no segment %q", id)
+		}
+		pos, where, err := e.position(c, id)
+		if err != nil {
+			return nil, err
+		}
+		e.tl.Move(id, pos)
+		label = fmt.Sprintf("edit move %s %s", id, where)
+		lines = append(lines, fmt.Sprintf("moved %s %s; it now starts at output %s", id, where, clock(e.tl.Find(id).OutStart)))
 	case "cut", "keep":
 		res, desc, err := e.applySpan(c, op)
 		if err != nil {
@@ -702,4 +771,104 @@ func (e *editEnv) applyZoom(src string, a, b float64) []string {
 	}
 	out = append(out, "check the framing: `cutroom look --output <time>` shows the zoomed picture")
 	return out
+}
+
+// position resolves --after/--before into an index in the timeline without segment `moving` ("" for add).
+func (e *editEnv) position(c *Ctx, moving string) (int, string, error) {
+	ids := []string{}
+	for _, g := range e.tl.Segments {
+		if g.ID != moving {
+			ids = append(ids, g.ID)
+		}
+	}
+	find := func(id string) (int, error) {
+		for i, x := range ids {
+			if x == id {
+				return i, nil
+			}
+		}
+		return 0, Errf(ExitUsage, "unknown-segment", "segment ids: "+strings.Join(ids, ", ")+" (or --after start)", "no segment %q", id)
+	}
+	switch {
+	case c.Has("after") && c.Has("before"):
+		return 0, "", Errf(ExitUsage, "bad-args", "give one of --after or --before", "both --after and --before")
+	case c.Has("after"):
+		if c.Str("after") == "start" {
+			return 0, "to the start", nil
+		}
+		i, err := find(c.Str("after"))
+		return i + 1, "after " + c.Str("after"), err
+	case c.Has("before"):
+		if c.Str("before") == "end" {
+			return len(ids), "to the end", nil
+		}
+		i, err := find(c.Str("before"))
+		return i, "before " + c.Str("before"), err
+	}
+	if moving != "" {
+		return 0, "", Errf(ExitUsage, "bad-args", "say where: --after <id>, --before <id>, --after start or --before end", "edit move needs --after or --before")
+	}
+	return len(ids), "at the end", nil
+}
+
+// applyAdd inserts a span of any source (another take) by range or by words.
+func (e *editEnv) applyAdd(c *Ctx) ([]string, string, error) {
+	pos, where, err := e.position(c, "")
+	if err != nil {
+		return nil, "", err
+	}
+	reason := c.Str("reason")
+	if len(c.Args) == 2 { // range: needs --source
+		if !c.Has("source") {
+			return nil, "", Errf(ExitUsage, "bad-args", "say which source: `cutroom edit add 12.0-20.5 --source take2`", "a range needs --source")
+		}
+		s, err := sourceByID(e.p, c.Str("source"))
+		if err != nil {
+			return nil, "", err
+		}
+		a, b, err := parseRange(c.Args[1], sourceRate(s))
+		if err != nil {
+			return nil, "", Errf(ExitUsage, "bad-range", "write a range as start-end in source time, e.g. 12.0-20.5", "%v", err)
+		}
+		id := e.tl.Insert(s.ID, a, b, pos, orStr(reason, "add "+c.Args[1]))
+		e.dur[s.ID] = s.Facts.Duration
+		return []string{fmt.Sprintf("added %s %s–%s as %s %s", s.ID, clock(a), clock(b), id, where)}, fmt.Sprintf("edit add %s %s", s.ID, c.Args[1]), nil
+	}
+	if !(c.Has("text") || (c.Has("from") && c.Has("to"))) {
+		return nil, "", Errf(ExitUsage, "bad-span", `give --from "first words" --to "last words" (or --text, or a range with --source)`, "edit add needs a span")
+	}
+	var src string
+	var i, j int
+	if c.Has("text") {
+		src, i, j, err = e.resolve(c, c.Str("text"), false, "", -1, -1)
+	} else {
+		var iLast int
+		src, i, iLast, err = e.resolve(c, c.Str("from"), false, "", -1, -1)
+		if err == nil {
+			_, _, j, err = e.resolve(c, c.Str("to"), false, src, i+1, iLast)
+		}
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	words := e.tr[src].Words
+	a, b := words[i].Start-e.tl.PadBefore, words[j].End+e.tl.PadAfter
+	if i > 0 {
+		a = clampF(a, words[i-1].End, words[i].Start)
+	}
+	if j+1 < len(words) {
+		b = clampF(b, words[j].End, words[j+1].Start)
+	}
+	text := speech.Text(words, i, j)
+	id := e.tl.Insert(src, a, b, pos, orStr(reason, "add \""+ellipsize(text, 60)+"\""))
+	out := []string{fmt.Sprintf("added %s %s–%s as %s %s: %q", src, clock(a), clock(b), id, where, ellipsize(text, 120))}
+	if e.tl.Kept(src, (a+b)/2) && e.tl.Index(id) >= 0 {
+		for _, g := range e.tl.Segments {
+			if g.ID != id && g.Source == src && g.In < b && g.Out > a {
+				out = append(out, fmt.Sprintf("WARN %s already contains part of this (segment %s): it will play twice", src, g.ID))
+				break
+			}
+		}
+	}
+	return out, fmt.Sprintf("edit add %q", ellipsize(text, 60)), nil
 }

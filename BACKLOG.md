@@ -7,6 +7,8 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
+- T3 multi-take: securing-personal-software take-1/take-2 (HEVC 4K HLG) + audio-1/audio-2 excerpts:
+  sync each recorder to its take, add a line from take 2, render, check. [L24 L05]
 - Golden criterion 3 met in rounds 3+4; the remaining gap is spec coverage (M2–M6), T3, doctor/README.
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
@@ -31,9 +33,7 @@ Move done items to the journal, not here.
   but could cut all but the last in one command once `edit cut` accepts several spans.
 
 ## M2 — decide/act
-- `edit move` / reorder and multi-source (takes) segments. 
 - `look`: untagged HD sources are converted with bt601 by ffmpeg but shown as bt709 by players; assume bt709 for untagged ≥720p (in_color_matrix) so `look` matches renders.
-- Render: segments from a source other than the audio source (multi-take); per-source audio mapping.
 - Render: zoom/punch-in filters. Overlay inputs (M4).
 
 ## M3 — verify

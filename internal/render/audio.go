@@ -21,13 +21,20 @@ const SR = 48000
 
 // AudioWav decodes the first audio stream of src to 48 kHz float32 WAV (cached by key). Sample 0 is
 // the stream's first sample (source time = audio start).
-func AudioWav(src, dst string) (channels int, err error) {
+func AudioWav(src, dst string) (channels int, err error) { return AudioWavCh(src, dst, 0) }
+
+// AudioWavCh is AudioWav with a fixed channel count (0 = the source's own); several sources joined
+// in one timeline are read as mono so their pieces line up.
+func AudioWavCh(src, dst string, chans int) (channels int, err error) {
 	if ch, ok := wavChannels(dst); ok {
 		return ch, nil
 	}
 	tmp := dst + ".tmp.wav"
-	if _, err := deps.Run("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-i", src, "-vn", "-map", "0:a:0",
-		"-ar", strconv.Itoa(SR), "-c:a", "pcm_f32le", tmp); err != nil {
+	args := []string{"-hide_banner", "-loglevel", "error", "-y", "-i", src, "-vn", "-map", "0:a:0", "-ar", strconv.Itoa(SR)}
+	if chans > 0 {
+		args = append(args, "-ac", strconv.Itoa(chans))
+	}
+	if _, err := deps.Run("ffmpeg", append(args, "-c:a", "pcm_f32le", tmp)...); err != nil {
 		return 0, err
 	}
 	if err := os.Rename(tmp, dst); err != nil {
@@ -92,20 +99,33 @@ func wavChannels(p string) (int, bool) {
 }
 
 // Piece is a range of source samples [From, To) to copy into the output.
-type Piece struct{ From, To int64 }
+// Piece is a sample range [From, To) of source file Src (index into Assemble's srcs).
+type Piece struct {
+	Src      int
+	From, To int64
+}
 
 // Assemble writes the pieces of src (a float32 WAV) back to back into dst, with fadeMS raised-cosine
 // fades at every piece edge (L22) so cuts don't click. Samples before 0 or past the end are silence.
-func Assemble(src, dst string, pieces []Piece, fadeMS float64) (int64, error) {
-	wi, err := readWavInfo(src)
-	if err != nil {
-		return 0, err
+func Assemble(srcs []string, dst string, pieces []Piece, fadeMS float64) (int64, error) {
+	wis := make([]wavInfo, len(srcs))
+	ins := make([]*os.File, len(srcs))
+	for i, src := range srcs {
+		wi, err := readWavInfo(src)
+		if err != nil {
+			return 0, err
+		}
+		if i > 0 && wi.channels != wis[0].channels {
+			return 0, fmt.Errorf("audio sources differ in channel count (%d vs %d); read them with the same count", wis[0].channels, wi.channels)
+		}
+		in, err := os.Open(src)
+		if err != nil {
+			return 0, err
+		}
+		defer in.Close()
+		wis[i], ins[i] = wi, in
 	}
-	in, err := os.Open(src)
-	if err != nil {
-		return 0, err
-	}
-	defer in.Close()
+	wi := wis[0]
 	out, err := os.Create(dst)
 	if err != nil {
 		return 0, err
@@ -118,15 +138,16 @@ func Assemble(src, dst string, pieces []Piece, fadeMS float64) (int64, error) {
 	ch := wi.channels
 	frameBytes := int64(4 * ch)
 	writeWavHeader(out, ch, total)
-	nSrc := wi.dataLen / frameBytes
 	fade := int64(fadeMS / 1000 * SR)
 	buf := make([]byte, 0, 1<<20)
 	for _, p := range pieces {
+		in, pw := ins[p.Src], wis[p.Src]
+		nSrc := pw.dataLen / frameBytes
 		n := p.To - p.From
 		data := make([]byte, n*frameBytes)
 		lo, hi := max(p.From, 0), min(p.To, nSrc)
 		if hi > lo {
-			if _, err := in.ReadAt(data[(lo-p.From)*frameBytes:(hi-p.From)*frameBytes], wi.dataOff+lo*frameBytes); err != nil && err != io.EOF {
+			if _, err := in.ReadAt(data[(lo-p.From)*frameBytes:(hi-p.From)*frameBytes], pw.dataOff+lo*frameBytes); err != nil && err != io.EOF {
 				return 0, err
 			}
 		}

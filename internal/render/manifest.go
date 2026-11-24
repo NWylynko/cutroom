@@ -42,6 +42,15 @@ type MSeg struct {
 	Zoom     float64 `json:"zoom,omitempty"`
 	AnchorX  float64 `json:"anchor_x,omitempty"`
 	AnchorY  float64 `json:"anchor_y,omitempty"`
+	Audio    string  `json:"audio,omitempty"` // audio source this segment's sound came from (multi-take)
+}
+
+// AudioOf is the audio source a segment's sound came from.
+func (m *Manifest) AudioOf(g MSeg) string {
+	if g.Audio != "" {
+		return g.Audio
+	}
+	return m.Audio
 }
 
 type MSource struct {
@@ -60,7 +69,7 @@ func TimelineHash(tl *timeline.Timeline) string {
 	for _, g := range tl.Segments {
 		segs = append(segs, []any{g.Source, g.In, g.Out, g.Zoom, g.AnchorX, g.AnchorY})
 	}
-	return hash([]any{tl.FPS, tl.Width, tl.Height, tl.Audio, tl.Grid, segs})
+	return hash([]any{tl.FPS, tl.Width, tl.Height, tl.Audio, tl.Grid, segs, tl.AudioFor})
 }
 
 func writeManifest(tl *timeline.Timeline, srcs map[string]Source, chunks []Chunk, res *Result, o Options) error {
@@ -71,10 +80,14 @@ func writeManifest(tl *timeline.Timeline, srcs map[string]Source, chunks []Chunk
 	for _, c := range chunks {
 		for _, k := range c.Segments {
 			g := tl.Segments[k]
+			a, _, _ := AudioFor(tl, srcs, g.Source)
 			m.Segments = append(m.Segments, MSeg{ID: g.ID, Source: g.Source, In: g.In, Out: g.Out,
-				OutStart: round6(g.OutStart - res.RangeStart), Frames: tl.Frames(g), Zoom: g.Zoom, AnchorX: g.AnchorX, AnchorY: g.AnchorY})
-			s := srcs[g.Source]
-			m.Sources[g.Source] = MSource{s.Path, s.Size, s.ModTime, s.AudioStart, s.Sync}
+				OutStart: round6(g.OutStart - res.RangeStart), Frames: tl.Frames(g), Zoom: g.Zoom, AnchorX: g.AnchorX, AnchorY: g.AnchorY, Audio: a})
+			for _, id := range []string{g.Source, a} {
+				if s, ok := srcs[id]; ok {
+					m.Sources[id] = MSource{s.Path, s.Size, s.ModTime, s.AudioStart, s.Sync}
+				}
+			}
 		}
 	}
 	if s, ok := srcs[tl.Audio]; ok {

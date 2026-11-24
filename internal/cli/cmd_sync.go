@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"github.com/cutroom/cutroom/internal/render"
 	"math"
 	"os"
 	"path/filepath"
@@ -136,31 +137,57 @@ func (e *editEnv) audioIssues() []timeline.Issue {
 	if tl.Audio == "" {
 		return []timeline.Issue{{Level: "error", Code: "no-audio", Message: "the timeline has no audio source", Fix: "`cutroom edit audio <source>`"}}
 	}
-	a := e.p.Sources[tl.Audio]
-	if a == nil {
+	if e.p.Sources[tl.Audio] == nil {
 		return []timeline.Issue{{Level: "error", Code: "unknown-audio", Message: fmt.Sprintf("audio source %q is not in the project", tl.Audio), Fix: "`cutroom edit audio <source>`"}}
 	}
+	srcs := renderSources(e.p)
 	var is []timeline.Issue
 	seen := map[string]bool{}
 	for _, g := range tl.Segments {
-		if g.Source == tl.Audio || seen[g.Source] {
+		if seen[g.Source] {
 			continue
 		}
 		seen[g.Source] = true
-		if a.Sync == nil || a.Sync.To != g.Source {
-			is = append(is, timeline.Issue{Level: "error", Code: "audio-not-synced", Segment: g.ID, At: g.OutStart,
-				Message: fmt.Sprintf("audio comes from %q but the picture from %q, and they have not been aligned", tl.Audio, g.Source),
-				Fix:     fmt.Sprintf("`cutroom sync %s --to %s`", tl.Audio, g.Source)})
+		a, own, err := render.AudioFor(tl, srcs, g.Source)
+		if err != nil {
+			fix := fmt.Sprintf("`cutroom sync %s --to %s`", tl.Audio, g.Source)
+			if m := tl.AudioFor[g.Source]; m != "" {
+				fix = fmt.Sprintf("`cutroom sync %s --to %s`, or `cutroom edit audio %s --for %s` to use its own sound", m, g.Source, g.Source, g.Source)
+			}
+			is = append(is, timeline.Issue{Level: "error", Code: "audio-not-synced", Segment: g.ID, At: g.OutStart, Message: err.Error(), Fix: fix})
 			continue
 		}
+		if own {
+			is = append(is, timeline.Issue{Level: "warn", Code: "audio-mixed", Segment: g.ID, At: g.OutStart,
+				Message: fmt.Sprintf("segments from %s use %s's own sound while the rest use %s (different microphones sound different)", g.Source, g.Source, tl.Audio),
+				Fix:     fmt.Sprintf("if %s has its own recorder: `cutroom sync <recorder> --to %s` then `cutroom edit audio <recorder> --for %s`; otherwise this is fine", g.Source, g.Source, g.Source)})
+			continue
+		}
+		if a == g.Source {
+			continue
+		}
+		rec := e.p.Sources[a]
 		for _, h := range tl.Segments {
-			if h.Source == g.Source && (h.In < a.Sync.Overlap[0]-0.05 || h.Out > a.Sync.Overlap[1]+0.05) {
+			if h.Source == g.Source && rec.Sync != nil && (h.In < rec.Sync.Overlap[0]-0.05 || h.Out > rec.Sync.Overlap[1]+0.05) {
 				is = append(is, timeline.Issue{Level: "warn", Code: "audio-gap", Segment: h.ID, At: h.OutStart,
-					Message: fmt.Sprintf("segment %s (%s %.2f–%.2f) is outside what %s recorded; it will be silent there", h.ID, h.Source, h.In, h.Out, tl.Audio)})
+					Message: fmt.Sprintf("segment %s (%s %.2f–%.2f) is outside what %s recorded; it will be silent there", h.ID, h.Source, h.In, h.Out, a)})
 			}
 		}
 	}
 	return is
+}
+
+// renderSources describes the project's sources for render (and for resolving each take's audio).
+func renderSources(p *project.Project) map[string]render.Source {
+	srcs := map[string]render.Source{}
+	for id, s := range p.Sources {
+		rs := render.Source{Path: p.Abs(s), HasAudio: s.Facts != nil && s.Facts.Audio != nil, Size: s.Size, ModTime: s.ModTime, Sync: s.Sync}
+		if rs.HasAudio {
+			rs.AudioStart = s.Facts.Audio.Start
+		}
+		srcs[id] = rs
+	}
+	return srcs
 }
 
 func (e *editEnv) validate() []timeline.Issue {

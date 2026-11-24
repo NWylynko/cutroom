@@ -11,6 +11,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strconv"
 	"strings"
@@ -329,27 +330,95 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 	return res, nil
 }
 
+// AudioFor resolves which audio source a video source's segments use: its mapped recorder
+// (timeline audio_for), else the timeline's audio when that is the source itself or is synced to it,
+// else — for another take in a multi-take edit — the take's own sound (own = true). err is set when
+// the timeline's audio can't be used for any segment (a hand-set, unaligned recorder, L05).
+func AudioFor(tl *timeline.Timeline, srcs map[string]Source, video string) (audio string, own bool, err error) {
+	if a := tl.AudioFor[video]; a != "" {
+		s, ok := srcs[a]
+		if !ok || !s.HasAudio {
+			return "", false, fmt.Errorf("audio source %q for %q has no sound", a, video)
+		}
+		if a != video && (s.Sync == nil || s.Sync.To != video) {
+			return "", false, fmt.Errorf("audio source %q is not aligned to %q: run `cutroom sync %s --to %s`", a, video, a, video)
+		}
+		return a, false, nil
+	}
+	if tl.Audio == video {
+		return video, false, nil
+	}
+	main, ok := srcs[tl.Audio]
+	if ok && main.Sync != nil && main.Sync.To == video {
+		return tl.Audio, false, nil
+	}
+	// the timeline's audio belongs to some take in this edit? then other takes fall back to their own sound
+	related := false
+	for _, g := range tl.Segments {
+		if g.Source == tl.Audio || (ok && main.Sync != nil && main.Sync.To == g.Source) {
+			related = true
+		}
+	}
+	if !related {
+		return "", false, fmt.Errorf("audio source %q is not aligned to %q: run `cutroom sync %s --to %s`", tl.Audio, video, tl.Audio, video)
+	}
+	if v, ok := srcs[video]; ok && v.HasAudio {
+		return video, true, nil
+	}
+	return "", false, fmt.Errorf("%q has no sound of its own and no recorder mapped to it: `cutroom edit audio <recorder> --for %s`", video, video)
+}
+
 func renderAudio(tl *timeline.Timeline, srcs map[string]Source, chunks, all []Chunk, o Options) (AudioResult, error) {
-	src, ok := srcs[tl.Audio]
-	if tl.Audio == "" || !ok || !src.HasAudio {
+	if tl.Audio == "" {
 		return AudioResult{}, fmt.Errorf("the timeline has no audio source")
+	}
+	// which audio source each segment uses
+	audioOf := map[string]string{}
+	var ids []string
+	for _, g := range tl.Segments {
+		if _, done := audioOf[g.Source]; done {
+			continue
+		}
+		a, _, err := AudioFor(tl, srcs, g.Source)
+		if err != nil {
+			return AudioResult{}, err
+		}
+		audioOf[g.Source] = a
+		if !slices.Contains(ids, a) {
+			ids = append(ids, a)
+		}
 	}
 	cache := filepath.Join(o.CacheDir, "render")
 	os.MkdirAll(cache, 0o755)
-	full := filepath.Join(cache, "src-"+hash([]any{src.Path, src.Size, src.ModTime.UnixNano()})+".wav")
-	if _, err := AudioWav(src.Path, full); err != nil {
-		return AudioResult{}, err
+	chans := 0
+	if len(ids) > 1 {
+		chans = 1 // several sources: one channel layout so their pieces join
+	}
+	files := make([]string, len(ids))
+	idx := map[string]int{}
+	for i, id := range ids {
+		src := srcs[id]
+		files[i] = filepath.Join(cache, "src-"+hash([]any{src.Path, src.Size, src.ModTime.UnixNano(), chans})+".wav")
+		if chans == 0 {
+			files[i] = filepath.Join(cache, "src-"+hash([]any{src.Path, src.Size, src.ModTime.UnixNano()})+".wav")
+		}
+		if _, err := AudioWavCh(src.Path, files[i], chans); err != nil {
+			return AudioResult{}, err
+		}
+		idx[id] = i
 	}
 	pieces := func(cs []Chunk) []Piece {
 		var ps []Piece
 		for _, c := range cs {
 			for _, k := range c.Segments {
 				g := tl.Segments[k]
+				aid := audioOf[g.Source]
+				src := srcs[aid]
 				// frames × (SR/fps) samples exactly, so audio length always equals video length
 				n := int64(math.Round(float64(tl.Frames(g)) * SR / tl.Rate()))
-				if g.Source == tl.Audio {
+				if g.Source == aid {
 					from := int64(math.Round((g.In - src.AudioStart) * SR))
-					ps = append(ps, Piece{from, from + n})
+					ps = append(ps, Piece{idx[aid], from, from + n})
 					continue
 				}
 				// audio from another device: map through its measured offset + drift (L05), in
@@ -359,23 +428,20 @@ func renderAudio(tl *timeline.Timeline, srcs map[string]Source, chunks, all []Ch
 					m := min(step, n-o)
 					t := g.In + float64(o)/SR
 					from := int64(math.Round((src.Sync.Map(t) - src.AudioStart) * SR))
-					ps = append(ps, Piece{from, from + m})
+					ps = append(ps, Piece{idx[aid], from, from + m})
 				}
 			}
 		}
 		return ps
 	}
-	for _, c := range all {
-		for _, k := range c.Segments {
-			if g := tl.Segments[k]; g.Source != tl.Audio && (src.Sync == nil || src.Sync.To != g.Source) {
-				return AudioResult{}, fmt.Errorf("audio source %q is not aligned to %q: run `cutroom sync %s --to %s`", tl.Audio, g.Source, tl.Audio, g.Source)
-			}
-		}
+	var syncs []any
+	for _, id := range ids {
+		syncs = append(syncs, srcs[id].Sync)
 	}
-	key := hash([]any{Version, full, pieces(all), o.Chain, o.Loudness, o.TruePeak, src.Sync})
+	key := hash([]any{Version, files, pieces(all), o.Chain, o.Loudness, o.TruePeak, syncs})
 	allWav := filepath.Join(cache, "timeline-"+key+".wav")
 	if _, err := os.Stat(allWav); err != nil {
-		if _, err := Assemble(full, allWav, pieces(all), 20); err != nil {
+		if _, err := Assemble(files, allWav, pieces(all), 20); err != nil {
 			return AudioResult{}, err
 		}
 	}
@@ -395,7 +461,7 @@ func renderAudio(tl *timeline.Timeline, srcs map[string]Source, chunks, all []Ch
 	in := allWav
 	if len(chunks) != len(all) {
 		in = filepath.Join(cache, "range-"+rkey+".wav")
-		if _, err := Assemble(full, in, pieces(chunks), 20); err != nil {
+		if _, err := Assemble(files, in, pieces(chunks), 20); err != nil {
 			return AudioResult{}, err
 		}
 	}

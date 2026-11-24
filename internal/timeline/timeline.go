@@ -33,20 +33,23 @@ type Segment struct {
 }
 
 type Timeline struct {
-	Version    int       `json:"version"`
-	FPS        string    `json:"fps"`
-	Width      int       `json:"width"`
-	Height     int       `json:"height"`
-	SampleRate int       `json:"sample_rate"`
-	Video      string    `json:"video"`       // default video source
-	Audio      string    `json:"audio"`       // source whose audio is used
-	PadBefore  float64   `json:"pad_before"`  // kept before a word at a cut (s)
-	PadAfter   float64   `json:"pad_after"`   // kept after a word at a cut (s)
-	Grid       float64   `json:"grid_origin"` // frame grid origin in source time (audio start)
-	Segments   []Segment `json:"segments"`
-	NextID     int       `json:"next_id"`
-	Modified   time.Time `json:"modified"`
-	fpsNum     float64
+	Version    int    `json:"version"`
+	FPS        string `json:"fps"`
+	Width      int    `json:"width"`
+	Height     int    `json:"height"`
+	SampleRate int    `json:"sample_rate"`
+	Video      string `json:"video"` // default video source
+	Audio      string `json:"audio"` // source whose audio is used
+	// AudioFor maps a video source to the audio source its segments use (multi-take: each take's own
+	// recorder). Unmapped sources use Audio when Audio is them or is synced to them, else their own sound.
+	AudioFor  map[string]string `json:"audio_for,omitempty"`
+	PadBefore float64           `json:"pad_before"`  // kept before a word at a cut (s)
+	PadAfter  float64           `json:"pad_after"`   // kept after a word at a cut (s)
+	Grid      float64           `json:"grid_origin"` // frame grid origin in source time (audio start)
+	Segments  []Segment         `json:"segments"`
+	NextID    int               `json:"next_id"`
+	Modified  time.Time         `json:"modified"`
+	fpsNum    float64
 }
 
 var ErrNone = errors.New("no timeline yet")
@@ -267,6 +270,42 @@ func (t *Timeline) Zoom(source string, a, b, z, ax, ay float64) int {
 	t.Segments = dropTiny(out, t.fpsNum)
 	t.Recompute()
 	return n
+}
+
+// Insert adds [a, b) of a source as a new segment at position pos (0 = first, len = last) — a span
+// of another take, or of an earlier part of the same one. Its edges are pinned (explicit). Returns
+// the new segment's id.
+func (t *Timeline) Insert(source string, a, b float64, pos int, reason string) string {
+	g := Segment{ID: t.newID(), Source: source, In: t.Snap(a), Out: t.Snap(b), Reason: reason, PinIn: true, PinOut: true}
+	pos = max(0, min(pos, len(t.Segments)))
+	t.Segments = append(t.Segments[:pos], append([]Segment{g}, t.Segments[pos:]...)...)
+	t.Recompute()
+	return g.ID
+}
+
+// Move puts segment id at position pos of the timeline without it (0 = first). Returns false if
+// there is no such segment.
+func (t *Timeline) Move(id string, pos int) bool {
+	i := t.Index(id)
+	if i < 0 {
+		return false
+	}
+	g := t.Segments[i]
+	rest := append(append([]Segment{}, t.Segments[:i]...), t.Segments[i+1:]...)
+	pos = max(0, min(pos, len(rest)))
+	t.Segments = append(rest[:pos], append([]Segment{g}, rest[pos:]...)...)
+	t.Recompute()
+	return true
+}
+
+// Index is a segment's position, or -1.
+func (t *Timeline) Index(id string) int {
+	for i, g := range t.Segments {
+		if g.ID == id {
+			return i
+		}
+	}
+	return -1
 }
 
 // ZoomOf returns a segment's zoom factor (1 when unset).
