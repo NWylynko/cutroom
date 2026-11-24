@@ -3,6 +3,7 @@ package timeline
 import (
 	"fmt"
 	"math"
+	"sort"
 	"strings"
 
 	"github.com/cutroom/cutroom/internal/speech"
@@ -293,28 +294,71 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 			fmt.Sprintf("if unintended: `cutroom edit undo`, or cut whole sentences with --from/--to (check with `cutroom transcript --file` after rendering)"),
 			"the cut at %.3f removes %q from inside a sentence: …%s | %s…", r.OutStart, strings.Join(removed, " "), lw.Text, fw.Text)
 	}
-	// suspects still in the cut
+	// retakes still in the cut: repeats whose attempts interleave (each first take comes before the
+	// other's last take) are one retake — one warning, one cut
+	for src, tx := range tr {
+		type rep struct {
+			s           speech.Suspect
+			first, last float64
+		}
+		var reps []rep
+		for _, s := range tx.Suspects {
+			if s.Kind != "repeat" {
+				continue
+			}
+			var takes []float64
+			for _, at := range s.Related {
+				if t.Kept(src, at+0.05) {
+					takes = append(takes, at)
+				}
+			}
+			if len(takes) >= 2 {
+				reps = append(reps, rep{s, takes[0], takes[len(takes)-1]})
+			}
+		}
+		sort.Slice(reps, func(a, b int) bool { return reps[a].first < reps[b].first })
+		for len(reps) > 0 {
+			g := []rep{reps[0]}
+			var rest []rep
+			for _, r := range reps[1:] {
+				in := false
+				for _, x := range g {
+					if r.first < x.last && x.first < r.last {
+						in = true
+					}
+				}
+				if in {
+					g = append(g, r)
+				} else {
+					rest = append(rest, r)
+				}
+			}
+			reps = rest
+			var sus []speech.Suspect
+			for _, r := range g {
+				sus = append(sus, r.s)
+			}
+			o, _ := t.ToOutput(src, g[0].first+0.05)
+			fix := "cut all but one take: `cutroom transcript --search \"" + g[0].s.Text + "\"`"
+			if cmd, gone := t.retakeCut(tx, src, sus); cmd != "" {
+				if len(tr) > 1 {
+					cmd += " --source " + src
+				}
+				fix = "keep the last take: `" + cmd + "` removes the earlier take, " + gone + " (--near is a source time; add --dry-run to check the join first)"
+			}
+			msg := fmt.Sprintf("%q is still said %d× in the timeline (a retake?)", g[0].s.Text, len(g[0].s.Related))
+			if len(g) > 1 {
+				msg = fmt.Sprintf("%q and %d more phrase(s) are said again later (one retake?)", g[0].s.Text, len(g)-1)
+			}
+			add("warn", "retake-kept", nil, o, fix, "%s", msg)
+		}
+	}
+	// other suspects still in the cut
 	for src, tx := range tr {
 		for _, s := range tx.Suspects {
 			switch s.Kind {
 			case "repeat":
-				kept := 0
-				for _, at := range s.Related {
-					if t.Kept(src, at+0.05) {
-						kept++
-					}
-				}
-				if kept >= 2 {
-					o, _ := t.ToOutput(src, s.Related[0]+0.05)
-					fix := "cut all but one take: `cutroom transcript --search \"" + s.Text + "\"`"
-					if cmd, gone := t.retakeCut(tx, src, s); cmd != "" {
-						if len(tr) > 1 {
-							cmd += " --source " + src
-						}
-						fix = "keep the last take: `" + cmd + "` removes the earlier take, " + gone + " (--near is a source time; add --dry-run to check the join first)"
-					}
-					add("warn", "retake-kept", nil, o, fix, "%q is still said %d× in the timeline (a retake?)", s.Text, kept)
-				}
+				// grouped into retakes below
 			case "sound":
 				if o, ok := t.ToOutput(src, (s.Start+s.End)/2); ok {
 					add("warn", "kept-sound", nil, o, fmt.Sprintf("`cutroom listen %.2f-%.2f`; cut it with `cutroom edit cut %.2f-%.2f` if unwanted", s.Start-0.5, s.End+0.5, s.Start, s.End),
@@ -402,48 +446,88 @@ func tail(ws []string, n int) string {
 // retakeCut builds a ready-to-run `edit cut` that removes the first kept take of a repeat, from its
 // first words up to the last word before the next kept take, in the --from/--near/--to form the CLI
 // resolves. The --to phrase is checked to resolve to exactly that word; "" if none does.
-func (t *Timeline) retakeCut(tx *speech.Transcript, src string, s speech.Suspect) (cmd, removes string) {
-	var takes []float64
-	for _, at := range s.Related {
-		if t.Kept(src, at+0.05) {
-			takes = append(takes, at)
-		}
-	}
-	if len(takes) < 2 {
-		return "", ""
-	}
+func (t *Timeline) retakeCut(tx *speech.Transcript, src string, group []speech.Suspect) (cmd, removes string) {
 	ws := tx.Words
 	kept := func(k int) bool { return t.Kept(src, (ws[k].Start+ws[k].End)/2) }
-	// the --from match nearest the first kept take, among kept occurrences (as the CLI picks it)
-	fi, fl, bd := -1, -1, math.Inf(1)
-	for _, m := range speech.Search(ws, s.Text) {
-		ok := true
-		for k := m.First; k <= m.Last; k++ {
-			ok = ok && kept(k)
+	// a kept occurrence of phrase nearest time at (as the CLI picks with --near)
+	nearest := func(phrase string, at float64) (int, int, float64) {
+		fi, fl, bd := -1, -1, math.Inf(1)
+		for _, m := range speech.Search(ws, phrase) {
+			ok := true
+			for k := m.First; k <= m.Last; k++ {
+				ok = ok && kept(k)
+			}
+			if d := math.Abs(m.Start - at); ok && d < bd {
+				fi, fl, bd = m.First, m.Last, d
+			}
 		}
-		if d := math.Abs(m.Start - takes[0]); ok && d < bd {
-			fi, fl, bd = m.First, m.Last, d
-		}
+		return fi, fl, bd
 	}
-	if fi < 0 || bd > 0.5 {
+	type occ struct{ fi, fl, ni int }
+	var os []occ
+	for _, s := range group {
+		var takes []float64
+		for _, at := range s.Related {
+			if t.Kept(src, at+0.05) {
+				takes = append(takes, at)
+			}
+		}
+		if len(takes) < 2 {
+			continue
+		}
+		fi, fl, bd := nearest(s.Text, takes[0])
+		if fi < 0 || bd > 0.5 {
+			continue
+		}
+		ni, _, bd2 := nearest(s.Text, takes[1])
+		if bd2 > 0.5 || ni <= fl {
+			ni = -1
+		}
+		os = append(os, occ{fi, fl, ni})
+	}
+	if len(os) == 0 {
 		return "", ""
 	}
-	j := -1
-	for k := fl + 1; k < len(ws); k++ {
-		if ws[k].Start >= takes[1]-0.05 {
-			break
-		}
-		if kept(k) {
-			j = k
+	// An editor cuts the whole first attempt: from the start of the sentence that holds its first
+	// repeated phrase to the start of the sentence where the next attempt begins (T3: real retakes
+	// repeat a sentence's tail, and one retake repeats several phrases).
+	from, fromLast, firstLast, next := len(ws), -1, -1, len(ws)
+	for _, o := range os {
+		from = min(from, sentenceStart(ws, o.fi, kept))
+		firstLast = max(firstLast, o.fl)
+		if o.ni >= 0 {
+			next = min(next, sentenceStart(ws, o.ni, kept))
 		}
 	}
-	if j < 0 {
-		return "", ""
+	// …but never past the end of the first attempt: words after it may exist only in the next one
+	j := min(next-1, sentenceEnd(ws, firstLast, kept))
+	for j > firstLast && !kept(j) {
+		j--
 	}
-	for n := 1; n <= 6 && j-n+1 > fi; n++ {
+	if next == len(ws) || j < firstLast || next <= from {
+		// no clean sentence boundary: cut from the first repeated phrase to just before the next take
+		o := os[0]
+		from, j = o.fi, -1
+		firstLast = o.fl
+		at := group[0].Related
+		for k := o.fl + 1; k < len(ws) && len(at) > 1; k++ {
+			if ws[k].Start >= at[len(at)-1]-0.05 {
+				break
+			}
+			if kept(k) {
+				j = k
+			}
+		}
+		if j < 0 {
+			return "", ""
+		}
+	}
+	fromLast = min(from+4, j)
+	fromText := speech.Text(ws, from, fromLast)
+	for n := 1; n <= 6 && j-n+1 > from; n++ {
 		phrase := speech.Text(ws, j-n+1, j)
 		for _, m := range speech.Search(ws, phrase) {
-			if m.First < fi+1 || m.Last < fl {
+			if m.First < from+1 || m.Last < fromLast {
 				continue
 			}
 			all := true
@@ -453,14 +537,31 @@ func (t *Timeline) retakeCut(tx *speech.Transcript, src string, s speech.Suspect
 			if !all {
 				continue
 			}
-			if m.Last == j && len(strings.Fields(phrase)) >= 2 || m.Last == j && n == j-fi {
-				return fmt.Sprintf("cutroom edit cut --from %q --near %.2f --to %q", s.Text, takes[0], phrase),
-					fmt.Sprintf("source %s–%s %q", mss(ws[fi].Start), mss(ws[j].End), speech.Text(ws, fi, j))
+			if m.Last == j && len(strings.Fields(phrase)) >= 2 || m.Last == j && n == j-from {
+				return fmt.Sprintf("cutroom edit cut --from %q --near %.2f --to %q", fromText, ws[from].Start, phrase),
+					fmt.Sprintf("source %s–%s %q", mss(ws[from].Start), mss(ws[j].End), speech.Text(ws, from, j))
 			}
 			break // first match after --from is the wrong one: use more words
 		}
 	}
 	return "", ""
+}
+
+// sentenceEnd walks forward from word k to the last word of its sentence (same stops as sentenceStart).
+func sentenceEnd(ws []speech.Word, k int, kept func(int) bool) int {
+	for k+1 < len(ws) && kept(k+1) && !endsSentence(ws[k].Text) && ws[k+1].Start-ws[k].End < 1.0 {
+		k++
+	}
+	return k
+}
+
+// sentenceStart walks back from word k to the first word of its sentence: stop after a word that
+// ends a sentence, at a pause of a second or more, or at a word the timeline doesn't keep.
+func sentenceStart(ws []speech.Word, k int, kept func(int) bool) int {
+	for k > 0 && kept(k-1) && !endsSentence(ws[k-1].Text) && ws[k].Start-ws[k-1].End < 1.0 {
+		k--
+	}
+	return k
 }
 
 // mss formats seconds as m:ss.mmm.

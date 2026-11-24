@@ -2,6 +2,23 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 27 · 2026-11-24 · retakes: one warning per retake, cut at sentence boundaries
+Did: repeat suspects whose attempts interleave (each first take before the other's last take) are one
+retake: one `retake-kept` warning ("… and N more phrase(s) are said again later"), one suggested cut.
+The cut runs from the start of the sentence holding the first attempt's earliest repeated phrase to the
+start of the sentence where the next attempt begins — capped at the end of the first attempt's last
+repeated sentence, so words only the next attempt has are never cut. Falls back to the phrase cut when
+no clean boundary exists (and the fixture's retake, already sentence-aligned, is unchanged). Test:
+TestL36_RetakeCutAtSentences (the sec pattern). e2e 132/132.
+Measured (real footage, each suggestion dry-run through the CLI): sec take 1: 7 → 1 warning; cuts
+2.17–14.70 "Instead of making sure … layer of security." → join "…write secure code. | My solution is
+to…" (the editor's cut). deploy: 5 → 2 warnings; 0.73–7.47 (the published edit cut 0.12–8.61, the same
+attempt) and 21.57–31.47.
+Surprises: (1) the first grouping cut into "My solution is to bare-hug the software," — the next
+attempt's sentence started with new words; capping at the first attempt's sentence end fixed it.
+(2) an off-by-one (`j <= firstLast`) silently sent the perfect case to the fallback.
+Next: eval round 6 is due (iteration 26 was 5 after round 5); then M4 captions.
+
 ### 26 · 2026-11-24 · T3 multi-take on real footage: two HEVC HDR takes, two recorders
 Did: excerpts (local) of securing-personal-software take-1/take-2 (4K HLG, 180° rotation) and their
 recorders. `sync` failed on both ("only 2 confident windows"): the camera across the room correlates

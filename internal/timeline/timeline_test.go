@@ -2,6 +2,7 @@ package timeline
 
 import (
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/cutroom/cutroom/internal/speech"
@@ -178,5 +179,55 @@ func TestL40_ZoomSplitsPinsAndStaysContinuous(t *testing.T) {
 		if g.ZoomOf() != 1 {
 			t.Fatalf("zoom 1 must clear the punch-in: %+v", g)
 		}
+	}
+}
+
+// L36 on real speech (T3, securing-personal-software take 1): a retake repeats several phrases of a
+// sentence, not its start. One warning per retake, cutting the whole first attempt at sentence
+// boundaries — never into words that exist only in the next attempt ("My solution is…").
+func TestL36_RetakeCutAtSentences(t *testing.T) {
+	text := "Instead of making sure every endpoint is secure, I'm going to wrap the website in security. " +
+		"My solution is to hug the software, instead of making sure every endpoint is secure, I'm going to wrap the website in security. Done."
+	var ws []speech.Word
+	at := 1.0
+	for _, w := range strings.Fields(text) {
+		ws = append(ws, speech.Word{I: len(ws), Text: w, Start: at, End: at + 0.25})
+		at += 0.3
+		if strings.HasSuffix(w, ".") {
+			at += 0.6
+		}
+	}
+	find := func(from int, phrase string) float64 {
+		ms := speech.Search(ws, phrase)
+		for _, m := range ms {
+			if m.First >= from {
+				return m.Start
+			}
+		}
+		t.Fatalf("no %q", phrase)
+		return 0
+	}
+	p1, p2 := "instead of making sure every endpoint", "to wrap the website in security"
+	sus := []speech.Suspect{
+		{Kind: "repeat", Text: p1, Related: []float64{find(0, p1), find(10, p1)}},
+		{Kind: "repeat", Text: p2, Related: []float64{find(0, p2), find(20, p2)}},
+	}
+	tr := Transcripts{"cam": {Words: ws, Suspects: sus}}
+	tl := New("30", 1280, 720, "cam", "cam", 0, at+1)
+	var rk []Issue
+	for _, is := range tl.Validate(map[string]float64{"cam": at + 1}, tr) {
+		if is.Code == "retake-kept" {
+			rk = append(rk, is)
+		}
+	}
+	if len(rk) != 1 {
+		t.Fatalf("want one retake warning for one retake, got %d: %+v", len(rk), rk)
+	}
+	f := rk[0].Fix
+	if !strings.Contains(f, `--from "Instead of making sure every"`) || !strings.Contains(f, `"Instead of making sure every endpoint is secure, I'm going to wrap the website in security." (`) {
+		t.Fatalf("cut should run from the first attempt's sentence start to its end: %s", f)
+	}
+	if strings.Contains(f, "My solution") {
+		t.Fatalf("cut must not remove words only the next attempt has: %s", f)
 	}
 }
