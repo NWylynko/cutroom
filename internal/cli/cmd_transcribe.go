@@ -267,6 +267,13 @@ func runTranscript(c *Ctx) (*Result, error) {
 		if tl == nil {
 			return ""
 		}
+		used := false
+		for _, g := range tl.Segments {
+			used = used || g.Source == t.Source
+		}
+		if !used { // audio-only (a recorder) or not in the edit: "already cut" would be wrong
+			return ""
+		}
 		if !tl.Kept(t.Source, a+0.01) && !tl.Kept(t.Source, (a+b)/2) && !tl.Kept(t.Source, b-0.01) {
 			return "  (already cut)"
 		}

@@ -296,7 +296,7 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 		}
 	}
 	st := "pass"
-	d := fmt.Sprintf("%d sampled frames match their source frames (worst difference %.1f)", n, worst)
+	d := fmt.Sprintf("%d sampled frames match their source frames as a player shows them — upright, right moment (worst difference %.1f)", n, worst)
 	it := Item{Check: "picture"}
 	if n == 0 && len(ss) > 0 {
 		zoomed := true

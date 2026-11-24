@@ -159,8 +159,8 @@ func (e *editEnv) audioIssues() []timeline.Issue {
 		}
 		if own {
 			is = append(is, timeline.Issue{Level: "warn", Code: "audio-mixed", Segment: g.ID, At: g.OutStart,
-				Message: fmt.Sprintf("segments from %s use %s's own sound while the rest use %s (different microphones sound different)", g.Source, g.Source, tl.Audio),
-				Fix:     fmt.Sprintf("if %s has its own recorder: `cutroom sync <recorder> --to %s` then `cutroom edit audio <recorder> --for %s`; otherwise this is fine", g.Source, g.Source, g.Source)})
+				Message: fmt.Sprintf("segments from %s use %s's own sound while the rest use %s; if they were recorded on different microphones the change will be audible", g.Source, g.Source, tl.Audio),
+				Fix:     fmt.Sprintf("same microphone (e.g. a pickup on the same camera): fine as it is. If %s has its own recorder: `cutroom sync <recorder> --to %s` then `cutroom edit audio <recorder> --for %s`", g.Source, g.Source, g.Source)})
 			continue
 		}
 		if a == g.Source {

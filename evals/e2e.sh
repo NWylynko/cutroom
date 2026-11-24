@@ -200,6 +200,16 @@ d=$(ffmpeg -i o.png -i t2.png -lavfi "[0:v]format=gray[a];[1:v]format=gray[b];[a
 awk -v d="$d" 'BEGIN{exit !(d > 20)}' && ok "render shows take2 where added (psnr $d)" || bad "render shows take2 where added" "psnr $d"
 popd >/dev/null
 
+# pickup: replace a line with the re-recorded version in one command, in the original's place
+K="$W/pickup"; mkdir -p "$K"; cp $FIX/talk.mp4 $FIX/pickup.mp4 "$K/"; pushd "$K" >/dev/null
+cutroom init talk.mp4 pickup.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+expect "replace with pickup"       'in its place: pickup .*"Then install Linux on it\."' cutroom edit replace --text "Then install Linux on it." --with pickup
+expect "pickup sits where the line was" 'laptop\.\n?.*' sh -c 'cutroom timeline | grep -A1 "old laptop" | tail -1 | grep -q "pickup .*Then install Linux" && echo laptop.'
+expect "look --output takes no value" '--output is a switch' cutroom look 2 --output 0:02
+cutroom render >/dev/null 2>&1
+expect "check pickup edit"         '^PASS'                            cutroom check
+popd >/dev/null
+
 # rotated phone footage: render says the rotation is baked in
 mkdir -p "$W/rot" && cp $FIX/talk-rot.mov "$W/rot/" && pushd "$W/rot" >/dev/null
 cutroom init talk-rot.mov >/dev/null

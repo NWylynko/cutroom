@@ -13,12 +13,12 @@ import (
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
-var editOps = []string{"cut", "keep", "add", "move", "zoom", "tighten", "audio", "undo", "history", "reset"}
+var editOps = []string{"cut", "keep", "add", "replace", "move", "zoom", "tighten", "audio", "undo", "history", "reset"}
 
 func init() {
 	Register(&Command{
 		Name:     "edit",
-		Args:     "<cut|keep|add|move|zoom|tighten|audio|undo|history|reset> [factor|segment] [range|source]",
+		Args:     "<cut|keep|add|replace|move|zoom|tighten|audio|undo|history|reset> [factor|segment] [range|source]",
 		MinArgs:  1,
 		MaxArgs:  3,
 		Category: "edit",
@@ -36,6 +36,9 @@ Every edit is checked afterwards and problems are printed. Use --dry-run to prev
   edit add --source take2 --from "So the" --to "works." [--after s3 | --before s1]
                                                  put a span of another take (or source) into the edit
                                                  (default: at the end); its edges are pinned
+  edit replace --text "Then install Linux on it." --with pickup
+                                                 swap a line for another take's version of it (cut +
+                                                 add in one step; --from/--to for longer spans)
   edit move s5 --after s2 | --before s1 | --after start      reorder a segment
   edit tighten [--min-cut 0.4]                   shorten every pause longer than the pads + min-cut
   edit audio mic                                 take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
@@ -59,6 +62,7 @@ never moves them.`,
 			{Name: "min-cut", Kind: "float", Default: "0.4", Help: "tighten: only shorten pauses where at least this much can go"},
 			{Name: "anchor", Kind: "string", Help: "zoom: point to zoom on as x,y in 0–1 (default 0.5,0.4)"},
 			{Name: "for", Kind: "string", Help: "audio: only for segments from this video source (multi-take)"},
+			{Name: "with", Kind: "string", Help: "replace: the source whose version of the words goes in (a pickup or another take)"},
 			{Name: "after", Kind: "string", Help: "add/move: put it after this segment id (or \"start\")"},
 			{Name: "before", Kind: "string", Help: "add/move: put it before this segment id (default for add: at the end)"},
 			{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"},
@@ -318,6 +322,13 @@ func runEdit(c *Ctx) (*Result, error) {
 		}
 		label = desc
 		lines = append(lines, res...)
+	case "replace":
+		res, desc, err := e.applyReplace(c)
+		if err != nil {
+			return nil, err
+		}
+		label = desc
+		lines = append(lines, res...)
 	case "move":
 		if len(c.Args) != 2 {
 			return nil, Errf(ExitUsage, "bad-args", "name the segment: `cutroom edit move s5 --after s2` (ids from `cutroom timeline`)", "edit move needs a segment id")
@@ -447,7 +458,13 @@ func (e *editEnv) applySpan(c *Ctx, op string) ([]string, string, error) {
 			return e.applyZoom(s.ID, a, b), desc, nil
 		}
 		if op == "cut" {
-			rm := e.tl.Cut(s.ID, a, b, orStr(reason, "range "+c.Args[1]), true)
+			why := "range " + c.Args[1]
+			if tx := e.tr[s.ID]; tx != nil {
+				if w := wordsIn(tx.Words, a, b); w != "" {
+					why += ": \"" + ellipsize(w, 60) + "\"" // so `timeline` and history show what it took
+				}
+			}
+			rm := e.tl.Cut(s.ID, a, b, orStr(reason, why), true)
 			if rm == 0 {
 				return nil, "", Errf(ExitUsage, "nothing-cut", "that range is not in the timeline (already cut?); `cutroom timeline` shows what is kept", "nothing to cut in %s %s", s.ID, c.Args[1])
 			}
@@ -871,4 +888,84 @@ func (e *editEnv) applyAdd(c *Ctx) ([]string, string, error) {
 		}
 	}
 	return out, fmt.Sprintf("edit add %q", ellipsize(text, 60)), nil
+}
+
+// applyReplace swaps the kept words of a span for another source's version of them: the original is
+// cut by words and the other take's span goes in where it was.
+func (e *editEnv) applyReplace(c *Ctx) ([]string, string, error) {
+	with := c.Str("with")
+	if with == "" {
+		return nil, "", Errf(ExitUsage, "bad-args", `name the other take: `+"`cutroom edit replace --text \"…\" --with pickup`", "edit replace needs --with")
+	}
+	if _, err := sourceByID(e.p, with); err != nil {
+		return nil, "", err
+	}
+	if e.tr[with] == nil {
+		return nil, "", Errf(ExitInvalid, "no-transcript", "run `cutroom transcribe "+with+"`", "source %q has not been transcribed", with)
+	}
+	if !(c.Has("text") || (c.Has("from") && c.Has("to"))) {
+		return nil, "", Errf(ExitUsage, "bad-span", `give --text "words" (or --from "first words" --to "last words")`, "edit replace needs the words to swap")
+	}
+	span := func(keptOnly bool) (string, int, int, error) {
+		if c.Has("text") {
+			return e.resolve(c, c.Str("text"), keptOnly, "", -1, -1)
+		}
+		src, i, iLast, err := e.resolve(c, c.Str("from"), keptOnly, "", -1, -1)
+		if err != nil {
+			return "", 0, 0, err
+		}
+		_, _, j, err := e.resolve(c, c.Str("to"), keptOnly, src, i+1, iLast)
+		return src, i, j, err
+	}
+	// 1. the version in the edit now (kept words, any source but --with)
+	src, i, j, err := span(true)
+	if err != nil {
+		return nil, "", err
+	}
+	if src == with {
+		return nil, "", Errf(ExitUsage, "bad-args", "the edit already uses "+with+"'s version of these words", "nothing to replace")
+	}
+	words := e.tr[src].Words
+	// where the original sits: the segment holding its first word, and that segment's index
+	sid, sidx := "", len(e.tl.Segments)
+	for k, g := range e.tl.Segments {
+		if g.Source == src && words[i].Start >= g.In-1e-6 && words[i].Start < g.Out {
+			sid, sidx = g.ID, k
+			break
+		}
+	}
+	r := e.tl.CutWords(src, words, i, j, "replaced by "+with)
+	if r.Removed == 0 {
+		return nil, "", Errf(ExitUsage, "nothing-cut", "those words are not in the timeline; `cutroom timeline` shows what is kept", "nothing to replace")
+	}
+	// 2. the other take's version, inserted where the original was
+	old := c.vals["source"]
+	c.vals["source"] = []string{with}
+	_, wi, wj, err := span(false)
+	c.vals["source"] = old
+	if err != nil {
+		return nil, "", err
+	}
+	ww := e.tr[with].Words
+	a, b := ww[wi].Start-e.tl.PadBefore, ww[wj].End+e.tl.PadAfter
+	if wi > 0 {
+		a = clampF(a, ww[wi-1].End, ww[wi].Start)
+	}
+	if wj+1 < len(ww) {
+		b = clampF(b, ww[wj].End, ww[wj+1].Start)
+	}
+	pos := min(sidx, len(e.tl.Segments))
+	if k := e.tl.Index(sid); k >= 0 {
+		if g := e.tl.Segments[k]; g.Out <= r.From+1e-6 {
+			pos = k + 1 // the original's segment kept its start: the new take goes right after it
+		} else {
+			pos = k // it kept only what follows the cut: the new take goes before it
+		}
+	}
+	text := speech.Text(ww, wi, wj)
+	id := e.tl.Insert(with, a, b, pos, "replaces "+src+": \""+ellipsize(text, 60)+"\"")
+	return []string{
+		fmt.Sprintf("cut %s %s–%s: %q", src, clock(r.From), clock(r.To), ellipsize(r.Text, 100)),
+		fmt.Sprintf("in its place: %s %s–%s as %s: %q", with, clock(a), clock(b), id, ellipsize(text, 100)),
+	}, fmt.Sprintf("edit replace %q with %s", ellipsize(text, 50), with), nil
 }

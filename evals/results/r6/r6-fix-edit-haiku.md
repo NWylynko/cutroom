@@ -1,0 +1,21 @@
+# Friction report: r6-fix-edit-haiku
+
+- **Outcome:** done. `out/final.mp4` now passes `cutroom check` with 0 failures and 0 warnings, and the render transcript reads as complete sentences with no retake, no aside and no long pauses. I did not listen to the joins or look at frames, so the audio and picture judgments rest on the tool's checks.
+- **Commands run:** about 28 cutroom commands plus 2 shell listings (`ls`, `cat`). In order: `guide`, `guide workflow`, `guide edit`, `guide verify`, `guide perceive`, `guide render`, `guide pitfalls`, `status`, `transcript`, `timeline`, `timeline --joins`, `check`, `edit history`, `transcript talk --suspects`, `edit --help`, `edit undo --help`, `edit reset`, `edit cut --from "The first thing you need" --near 6.31 --to "first thing." --dry-run`, `edit cut --from "By the way" --to "keyboard." --dry-run`, `edit cut` (same two, for real), `edit tighten`, `timeline`, `timeline --joins`, `render --preview`, `render`, `check out/final.mp4`, `transcript --file out/final.mp4`.
+- **Errors hit:** none. No command failed.
+- **Guessed wrong:** `cutroom edit undo --help` and `edit cut --help` print the same full `edit` usage block, not help for the subcommand. I had to check `edit --help` first to learn that `reset` exists; the workflow guide does not mention it. I did not guess any flags wrong.
+- **Confusing output:**
+  - The original problems were not all visible in one place. `timeline` showed `edge-in-word` and `broken-sentence` at 0:01.433, but the bad 1.9-2.9 cut was labelled `cut after: range 1.9-2.9` with no word text. Only the transcript showed that "going to show you how" was removed. A cut by time range inside a phrase should say which words it removes.
+  - `timeline` lists segments in output order, but the ids are not sequential after tighten (`s1, s2, s4, s3, s5`). That reads as a bug at first glance.
+  - `tighten` printed "2 segment edges trimmed" without saying which edges or by how much.
+- **Missing:**
+  - No `--dry-run` on `edit tighten`, so I could not preview pause changes before applying them.
+  - No per-subcommand help. `edit --help` is long, and I had to scan it for `reset`.
+  - `transcript` still shows the original phrase timing (`0:00.580–0:04.180`) after a cut inside it, so the transcript does not show that a phrase was split. I had to infer that from the timeline.
+- **Not sure it's right:**
+  - I judged the off-topic "By the way, my cat just walked across the keyboard." aside as something to remove. The brief did not say to remove asides, so this is my call and easy to reverse.
+  - The join after "Then install Linux on it." (pause 0.33 s) and the other joins are judged by pause length and transcript text, not by listening. `cutroom listen` on the joins would have settled this, and I did not run it.
+  - I did not run `cutroom look --cuts` or view any frames. The picture check passed, but I did not look at the cut frames.
+  - `reset` discarded the whole timeline, including the earlier tighten. I then re-applied the edits and tighten from scratch, so the final timeline should be correct, but I checked it only through `timeline` and `check`.
+- **Best part:** `timeline` and `check` together made the problems and the fixes obvious. The retake warning printed a ready-to-run `edit cut --near ...` command, and `--dry-run` showed the join before I applied it. `check` then confirmed the render: all 44 words in order, sync OK, loudness OK.
+- **One change:** have `timeline` show the words a cut removes, and warn when a cut or range lies inside a transcript phrase, e.g. `cut 1.9-2.9 removes "going to show you how"`. That would have caught the bad cut on the first `timeline` call.

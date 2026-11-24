@@ -367,6 +367,10 @@ func fileArg(c *Ctx) error {
 	if !c.Has("file") {
 		takeFileArg(c)
 	}
+	if len(c.Args) > 1 && c.Bool("output") {
+		return Errf(ExitUsage, "bad-args", fmt.Sprintf("--output is a switch, the time follows it once: `cutroom %s --output %s`", c.Cmd.Name, c.Args[len(c.Args)-1]),
+			"two times given (%s); --output takes no value", strings.Join(c.Args, ", "))
+	}
 	if len(c.Args) > 1 {
 		return Errf(ExitUsage, "bad-args", fmt.Sprintf("one time or range, optionally after a file: `cutroom %s out/final.mp4 3-5`", c.Cmd.Name),
 			"%q is not a file and %s takes one time or range", c.Args[0], c.Cmd.Name)

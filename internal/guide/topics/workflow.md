@@ -30,6 +30,8 @@ automatically. Never point the timeline at another source's audio without `sync`
 1. `cutroom init take1.mov take2.mov` — the first edit starts from the longest video.
 2. Cut the weak version from the main take; put the better one in from the other take:
    `cutroom edit add --source take2 --from "So the" --to "works." --after s3` (`--before`, `--after start`).
+   A re-recorded line (pickup) swaps in one step: `cutroom edit replace --text "…" --with pickup`
+   cuts the edit's version and puts the pickup's in its place.
 3. `cutroom edit move s5 --after s2` reorders. `cutroom timeline` shows which take each segment is from.
 4. Sound: each take uses its own sound unless a recorder is mapped to it —
    `cutroom sync mic2 --to take2` then `cutroom edit audio mic2 --for take2`. `timeline` warns
