@@ -403,5 +403,25 @@ expect "moved warning still accepted" 'accepted retake-kept'              cutroo
 expect "listen defaults to the talk"  'talk 0:16\.500–0:17\.800'           cutroom listen 16.5-17.8
 popd >/dev/null
 
+# M7 SPEC rows: edit split / pin, transcript --retakes / --output / --range, look --overlays
+P="$W/spec"; mkdir -p "$P"; cp $FIX/talk.mp4 "$P/"; pushd "$P" >/dev/null
+cutroom init talk.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null
+expect "retakes before an edit"       'no edit yet +takes: 0:0[0-9.]+, 0:1[0-9.]+'  cutroom transcript --retakes
+cutroom edit tighten >/dev/null
+expect "retakes open"                 'open: 2 takes kept'                cutroom transcript --retakes
+expect "transcript --range"           '0:06\.620–0:06\.900  first'       cutroom transcript --words --range 6-8
+expect "split keeps every frame"      'split at talk 0:1[0-9.]+: s[0-9]+ \| s[0-9]+ \(nothing removed'  cutroom edit split --text "an old laptop"
+expect "split duration unchanged"     'timeline: [0-9]+ segments, ([0-9.]+) s \(was \1 s\)'  sh -c 'cutroom edit undo >/dev/null; cutroom edit split --text "an old laptop"'
+expect "split outside the edit"       'not-in-edit'                        cutroom edit split 0.1
+expect "pin an edge"                  'pinned the start of s1'            cutroom edit pin s1 --in
+expect "output transcript marks cuts" '\| ' sh -c 'cutroom timeline --apply retake-kept >/dev/null; cutroom transcript --output'
+expect "retakes resolved"             'resolved +takes:.* cut'            cutroom transcript --retakes
+cutroom overlay add text "Install Linux" --at "Then install" >/dev/null
+expect "look --overlays"              '1 overlay\(s\), each at the middle.*o1'  sh -c 'cutroom look --overlays | tr "\n" " "'
+expect "timeline validate"            '^valid.*0 error\(s\)'          cutroom timeline validate
+expect "pin by words"                 'pinned both edges of s[0-9]+'      cutroom edit pin --text "Then install"
+expect "move by words"                'moved s[0-9]+ to the start'         cutroom edit move --text "Then install" --after start
+popd >/dev/null
+
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

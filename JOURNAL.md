@@ -2,6 +2,22 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 45 · 2026-11-24 · the last SPEC rows: split, pin, retakes, output transcript, look --overlays, validate
+Did: `edit split <time> | --text "words"` (Timeline.Split: the segment holding that source time
+becomes two at a frame, nothing removed, both new edges pinned; with --text it splits in the pause
+before the words); `edit pin <seg> [--in|--out] [--unpin]`; `move` and `pin` take `--text` for the
+segment that keeps those words (SPEC: "all accept text anchors"). `transcript --retakes` (each repeat,
+its takes kept/cut, resolved/open), `--output` (the kept words in output time by sentence, `|` at
+cuts — no render needed), `--range a-b`, `--phrases`. `look --overlays` (one frame per overlay at
+mid-window, drawn as rendered; the output cell loop is now shared with --output). `timeline validate`
+(problems only, exit 3 on errors). `look --crop` already existed. Guide perceive/edit/overlays;
+TestSplitKeepsFrames; 13 new e2e.
+Measured: make check green; e2e 251/251. Split at --text "an old laptop" lands at 11.500 (the gap
+midpoint) and the edit's duration is unchanged.
+Surprises: a Python str.replace on a help line hit both the main usage and the move sub-usage —
+check sub-help after editing shared text.
+Next: Golden 2 audit (LESSONS invariants ↔ TestLxx, DETECT ↔ fixtures).
+
 ### 44 · 2026-11-24 · M6 `export --otio --edl`
 Did: `internal/export`: Events (each segment in frames at the timeline rate: source in, length,
 record in; its sound source, a recorder's start mapped through its sync offset and drift);

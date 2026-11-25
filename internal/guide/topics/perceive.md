@@ -15,7 +15,12 @@
   - `long-word`: a word lasting > 0.75 s; it may hide a restart.
   - `pass-diff`: the second, stumble-sensitive pass heard something different. Look there.
   - `low-confidence`: the recogniser was unsure of the word.
-- `cutroom transcript --words --from 6 --to 12` — word-by-word timing for a stretch.
+- `cutroom transcript --retakes` — only the repeats, each take's time and whether the edit keeps it
+  (`resolved` once one take is left; `open: 2 takes kept` until then).
+- `cutroom transcript --words --from 6 --to 12` (or `--range 6-12`) — word-by-word timing for a stretch.
+- `cutroom transcript --output` — the edit as it plays: the kept words in OUTPUT time, a line per
+  sentence, `|` where a cut joins two pieces. Read it after editing to check every sentence is whole —
+  no render needed (`--file out/final.mp4` reads a render's own words instead).
 
 ## See and hear
 - `cutroom look 12.5` — one frame as a viewer sees it (rotation applied), labelled. `--crop x,y,w,h`
@@ -29,6 +34,8 @@
   - `cutroom look --cuts` — every cut as a pair (last frame before | first frame after) with the
     words either side and the pause. Check this once after editing: jump cuts that look wrong show here.
   - `cutroom look --output 0:03-0:06` — frames of the edit in OUTPUT time (cuts marked in red).
+  - `cutroom look --overlays` — one frame per overlay (titles, images, clips, burned captions) at the
+    middle of its window, drawn as the render will.
   - `cutroom listen --output 3-5` — listen to the current render around output 3–5 s, cuts marked.
   - `--file out/final.mp4` on either command (or the path first: `cutroom look out/final.mp4 3.9`)
     — any video file, in that file's time.

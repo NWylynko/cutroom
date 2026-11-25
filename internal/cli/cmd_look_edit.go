@@ -6,6 +6,7 @@ import (
 	"math"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/cutroom/cutroom/internal/deps"
@@ -100,8 +101,27 @@ func lookEdit(c *Ctx) (*Result, error) {
 	}
 	var cells []perceive.Cell
 	var desc, name string
+	var ts []float64 // output times to show (--output, --overlays)
 	cols := 0
 	switch {
+	case c.Bool("overlays"):
+		ps, err := render.Placements(tl, e.tr, e.p.Dir, cacheDir(e.p), tl.Width, tl.Height)
+		if err != nil {
+			return nil, Errf(ExitInvalid, "overlay-failed", "`cutroom overlay list`; fix or remove the overlay", "%v", err)
+		}
+		for _, p := range ps {
+			a, b := p.Start, p.End
+			if p.Kind == "captions" && len(p.Groups) > 0 { // the first caption group on screen
+				a, b = p.Groups[0].Start, p.Groups[0].End
+			}
+			ts = append(ts, math.Min((a+b)/2, tl.Duration()-0.5/fps))
+		}
+		if len(ts) == 0 {
+			return &Result{Text: "no overlays: `cutroom overlay add` puts one on", Data: map[string]any{"overlays": 0}, Next: []string{"cutroom guide overlays"}}, nil
+		}
+		sort.Float64s(ts)
+		desc = "overlay(s), each at the middle of its window, drawn as rendered; labelled output time = source time"
+		name = "overlays.png"
 	case c.Bool("cuts"):
 		js := tl.Joins(e.tr)
 		if len(js) == 0 {
@@ -198,6 +218,17 @@ func lookEdit(c *Ctx) (*Result, error) {
 				return nil, Errf(ExitUsage, "bad-flag-value", "use --count 2–36", "--count %d out of range", n)
 			}
 		}
+		for i := 0; i < n; i++ {
+			t := a
+			if n > 1 {
+				t = a + (b-a)*float64(i)/float64(n-1)
+			}
+			ts = append(ts, t)
+		}
+		desc = fmt.Sprintf("frame(s) of the edit at output %s–%s; each labelled output time = source time; red bar = a cut happened before it", clock(a), clock(b))
+		name = fmt.Sprintf("output_%s-%s_x%d.png", stamp(a), stamp(b), n)
+	}
+	if ts != nil {
 		prev := ""
 		var prevSeg *timeline.Segment
 		// overlays drawn as the render will (cards at the output size)
@@ -206,11 +237,7 @@ func lookEdit(c *Ctx) (*Result, error) {
 			return nil, Errf(ExitInvalid, "overlay-failed", "`cutroom overlay list`; fix or remove the overlay", "%v", err)
 		}
 		shown := map[string]bool{}
-		for i := 0; i < n; i++ {
-			t := a
-			if n > 1 {
-				t = a + (b-a)*float64(i)/float64(n-1)
-			}
+		for _, t := range ts {
 			g, st, ok := tl.ToSource(t)
 			if !ok {
 				continue
@@ -250,10 +277,10 @@ func lookEdit(c *Ctx) (*Result, error) {
 			cells = append(cells, perceive.Cell{Path: src(g.Source), T: st, Label: label, Over: over,
 				Say: srcWords(g.Source, st), VF: segVF(tl, *g),
 				// a cut, not just a zoom change on continuous picture
-				Cut: prev != "" && prev != g.ID && !(prevSeg != nil && prevSeg.Source == g.Source && math.Abs(prevSeg.Out-g.In) < 1e-6)})
+				Cut: !c.Bool("overlays") && prev != "" && prev != g.ID && !(prevSeg != nil && prevSeg.Source == g.Source && math.Abs(prevSeg.Out-g.In) < 1e-6)})
 			prev, prevSeg = g.ID, g
 		}
-		desc = fmt.Sprintf("%d frame(s) of the edit at output %s–%s; each labelled output time = source time; red bar = a cut happened before it", len(cells), clock(a), clock(b))
+		desc = fmt.Sprintf("%d %s", len(cells), desc)
 		if len(shown) > 0 {
 			var ids []string
 			for _, p := range ps {
@@ -267,7 +294,6 @@ func lookEdit(c *Ctx) (*Result, error) {
 			}
 			desc += "; with overlay(s) " + strings.Join(ids, ", ") + " drawn as rendered (+oN in the label)"
 		}
-		name = fmt.Sprintf("output_%s-%s_x%d.png", stamp(a), stamp(b), n)
 	}
 	img, err := perceive.Cells(cells, cols)
 	if err != nil {

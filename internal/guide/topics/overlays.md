@@ -29,7 +29,8 @@ look at it: `cutroom look --output 7.75`
   were cut — `cutroom timeline` warns `overlay-orphaned`). Two overlays in the same layout at the same
   time warn `overlay-overlap`. `cutroom overlay rm o1` removes one; `cutroom edit undo` brings it back.
 
-Look before rendering: `cutroom look --output <time>` draws the cards exactly as the render will
+Look before rendering: `cutroom look --overlays` shows every overlay at the middle of its window, and
+`cutroom look --output <time>` any moment — both draw the cards exactly as the render will
 (labels show `+o1`). Text is drawn by cutroom itself (no ffmpeg text filters needed, L47).
 
 `cutroom check` then verifies each overlay on the render: visible inside its window, gone on the

@@ -7,16 +7,13 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- Golden 1: SPEC rows still missing: `edit split`, `edit pin`, `transcript --retakes`, `transcript
-  --output` (the edit's words in output time), `look --overlays`, `look --crop`.
 - export: validate the .otio with the real OpenTimelineIO reader once it can be installed (it isn't
   a declared dependency); today's guarantee is the round-trip tests.
 - Golden 2: audit LESSONS.md — every INVARIANT has a TestLxx guard, every DETECT a fixture.
 - Golden 4: T3 reviewer pass on the local real-footage excerpts.
 - Golden 5: README + install; `go install` + `doctor` on a clean PATH; a fresh agent follows the README.
-- M6: `export --otio --edl`, README + install, `doctor` on a clean PATH.
-- Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
-  T3 review, doctor/README.
+- Golden 1 is code-complete (iteration 45); confirm with an eval round that exercises the new
+  commands (split/pin/--retakes/--output/--overlays/validate) before calling it met.
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
 

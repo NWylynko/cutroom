@@ -14,12 +14,12 @@ import (
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
-var editOps = []string{"cut", "keep", "add", "replace", "move", "zoom", "frame", "tighten", "audio", "undo", "redo", "history", "reset"}
+var editOps = []string{"cut", "keep", "add", "replace", "move", "split", "pin", "zoom", "frame", "tighten", "audio", "undo", "redo", "history", "reset"}
 
 func init() {
 	Register(&Command{
 		Name:     "edit",
-		Args:     "<cut|keep|add|replace|move|zoom|frame|tighten|audio|undo|redo|history|reset> [factor|segment] [range|source]",
+		Args:     "<cut|keep|add|replace|move|split|pin|zoom|frame|tighten|audio|undo|redo|history|reset> [factor|segment|time] [range|source]",
 		MinArgs:  1,
 		MaxArgs:  3,
 		Category: "edit",
@@ -41,6 +41,8 @@ Every edit is checked afterwards and problems are printed. Use --dry-run to prev
                                                  swap a line for another take's version of it (cut +
                                                  add in one step; --from/--to for longer spans)
   edit move s5 --after s2 | --before s1 | --after start      reorder a segment
+  edit split --text "Then install" | edit split 12.4        split a segment in two (nothing removed)
+  edit pin s3 [--in|--out] [--unpin]             keep tighten off a segment's edges
   edit frame --anchor 0.4,0.5                    where a filled (vertical) frame is cropped; --fill / --fit
   edit tighten [--min-cut 0.4]                   shorten every pause longer than the pads + min-cut
   edit audio mic                                 take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
@@ -71,6 +73,9 @@ never moves them.`,
 			{Name: "fill", Kind: "bool", Help: "frame: scale the picture to fill the output frame (crop the rest)"},
 			{Name: "fit", Kind: "bool", Help: "frame: fit the whole picture (bars where shapes differ)"},
 			{Name: "size", Kind: "string", Help: "frame: output size WxH (e.g. 720x1280)"},
+			{Name: "in", Kind: "bool", Help: "pin: only the segment's start"},
+			{Name: "out", Kind: "bool", Help: "pin: only the segment's end"},
+			{Name: "unpin", Kind: "bool", Help: "pin: release instead (tighten may move it)"},
 			{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"},
 		},
 		Subs: map[string]Sub{
@@ -97,9 +102,17 @@ Warns when it duplicates words already kept (to swap a line, use edit replace).`
   edit replace --from "Then install" --to "on it." --with pickup
 Cuts the edit's version of the words and puts --with's version in the same place, in one step.`,
 				Flags: []string{"with", "text", "from", "to", "near", "occurrence", "source", "reason", "dry-run"}},
-			"move": {Usage: `  edit move s5 --after s2 | --before s1 | --after start      reorder a segment
-  edit frame --anchor 0.4,0.5                    where a filled (vertical) frame is cropped; --fill / --fit (ids: cutroom timeline)`,
-				Flags: []string{"after", "before", "dry-run"}},
+			"move": {Usage: `  edit move s5 --after s2 | --before s1 | --after start      reorder a segment (ids: cutroom timeline)
+  edit move --text "Then install" --after s2                 ... the segment that keeps these words`,
+				Flags: []string{"text", "near", "occurrence", "after", "before", "dry-run"}},
+			"split": {Usage: `  edit split 12.4 [--source id]          split the segment holding this source time in two
+  edit split --text "Then install"        ... just before these words (in the pause before them)
+Nothing is removed; both new edges are pinned. Then move, zoom or cut each part on its own.`,
+				Flags: []string{"text", "source", "near", "occurrence", "dry-run"}},
+			"pin": {Usage: `  edit pin s3 [--in | --out] [--unpin]   pin a segment's edges so tighten never moves them
+  edit pin --text "Then install"          ... the segment that keeps these words
+Explicit cuts pin the edges they make already; pin is for edges you set some other way.`,
+				Flags: []string{"text", "near", "occurrence", "in", "out", "unpin", "dry-run"}},
 			"zoom": {Usage: `  edit zoom 1.15 --from "Then install" --to "on it."   punch in on a span
   edit zoom 1.15 12.0-15.5 [--source id]               ... or a source time range
   edit zoom 1 --from ... --to ...                      zoom back out
@@ -124,6 +137,8 @@ Never moves pinned edges (your explicit cuts). Prints the sounds inside removed 
 	})
 	Register(&Command{
 		Name:     "timeline",
+		Args:     "[validate]",
+		MaxArgs:  1,
 		Category: "edit",
 		Summary:  "Show the timeline: segments with output times and text, every join, and problems",
 		Help: `Default: one line per segment (output time, source range, first and last words) and any problems.
@@ -132,6 +147,7 @@ Never moves pinned edges (your explicit cuts). Prints the sounds inside removed 
 Each warning is decided one of two ways:
   --apply retake-kept@4.09    run the warning's own suggested edit (the time picks one when a code repeats)
   --accept retake-kept@4.09 --reason "both takes wanted"   keep it as it is: listed, no longer open
+  validate  only the problems; exit status 3 when any is an error (for scripts and pre-render checks)
 Examples:
   cutroom timeline
   cutroom timeline --joins
@@ -465,13 +481,56 @@ func runEdit(c *Ctx) (*Result, error) {
 		} else {
 			lines = append(lines, fmt.Sprintf("frame: the whole picture fits %dx%d (bars where the shapes differ)", e.tl.Width, e.tl.Height))
 		}
-	case "move":
-		if len(c.Args) != 2 {
-			return nil, Errf(ExitUsage, "bad-args", "name the segment: `cutroom edit move s5 --after s2` (ids from `cutroom timeline`)", "edit move needs a segment id")
+	case "split":
+		src, at := "", 0.0
+		switch {
+		case c.Has("text"):
+			sid, i, _, err := e.resolve(c, c.Str("text"), true, "", 0, 0)
+			if err != nil {
+				return nil, err
+			}
+			ws := e.tr[sid].Words
+			src, at = sid, ws[i].Start // just before the quoted words
+			if i > 0 {
+				at = (ws[i-1].End + ws[i].Start) / 2 // in the gap before them
+			}
+		case len(c.Args) == 2:
+			v, err := timecode.Parse(c.Args[1], timecode.Rate{Num: 30, Den: 1})
+			if err != nil {
+				return nil, Errf(ExitUsage, "bad-time", "a source time like 12.4 or 0:12.4, or --text \"words\" to split before them", "%v", err)
+			}
+			src, at = orStr(c.Str("source"), e.tl.Video), v.Float()
+		default:
+			return nil, Errf(ExitUsage, "bad-args", "`cutroom edit split 12.4` (source time) or `cutroom edit split --text \"Then install\"`", "edit split needs a time or --text")
 		}
-		id := c.Args[1]
-		if e.tl.Find(id) == nil {
-			return nil, Errf(ExitUsage, "unknown-segment", "segment ids: "+strings.Join(e.tl.IDs(), ", "), "no segment %q", id)
+		l, r, ok := e.tl.Split(src, at)
+		if !ok {
+			return nil, Errf(ExitUsage, "not-in-edit", "split inside a kept segment (`cutroom timeline` lists them with source ranges)", "%s %.3f is not inside a segment of the edit", src, at)
+		}
+		label = fmt.Sprintf("edit split %s %.3f", src, at)
+		lines = append(lines, fmt.Sprintf("split at %s %s: %s | %s (nothing removed; both edges pinned). Move, zoom or cut each part on its own.", src, clock(at), l, r))
+	case "pin":
+		id, err := e.segmentArg(c, "`cutroom edit pin s3` or `cutroom edit pin --text \"Then install\"`")
+		if err != nil {
+			return nil, err
+		}
+		g := e.tl.Find(id)
+		in, out := !c.Bool("out"), !c.Bool("in")
+		v := !c.Bool("unpin")
+		if in {
+			g.PinIn = v
+		}
+		if out {
+			g.PinOut = v
+		}
+		what := map[bool]string{true: "pinned", false: "unpinned"}[v]
+		edges := map[[2]bool]string{{true, true}: "both edges", {true, false}: "the start", {false, true}: "the end"}[[2]bool{in, out}]
+		label = fmt.Sprintf("edit pin %s", g.ID)
+		lines = append(lines, fmt.Sprintf("%s %s of %s: tighten %s move %s", what, edges, g.ID, map[bool]string{true: "won't", false: "may"}[v], map[bool]string{true: "them", false: "it"}[in && out]))
+	case "move":
+		id, err := e.segmentArg(c, "`cutroom edit move s5 --after s2` or `cutroom edit move --text \"Then install\" --after s2`")
+		if err != nil {
+			return nil, err
 		}
 		pos, where, err := e.position(c, id)
 		if err != nil {
@@ -808,6 +867,12 @@ func runTimeline(c *Ctx) (*Result, error) {
 	}
 	tl := e.tl
 	issues := e.validate()
+	if len(c.Args) == 1 {
+		if c.Args[0] != "validate" {
+			return nil, Errf(ExitUsage, "bad-args", "`cutroom timeline` or `cutroom timeline validate`", "unknown timeline argument %q", c.Args[0])
+		}
+		return validateOnly(issues)
+	}
 	var lines []string
 	srcTotal := 0.0
 	for _, d := range e.dur {
@@ -899,6 +964,61 @@ func runTimeline(c *Ctx) (*Result, error) {
 	}
 	return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"duration": tl.Duration(), "fps": tl.FPS, "width": tl.Width, "height": tl.Height,
 		"video": tl.Video, "audio": tl.Audio, "segments": segs, "issues": nzIssues(issues)}, Next: []string{"cutroom timeline --joins"}}, nil
+}
+
+// segmentArg is the segment an op names: an id (`s5`), or --text "words" — the segment that keeps them.
+func (e *editEnv) segmentArg(c *Ctx, usage string) (string, error) {
+	if len(c.Args) == 2 {
+		if e.tl.Find(c.Args[1]) == nil {
+			return "", Errf(ExitUsage, "unknown-segment", "segment ids: "+strings.Join(e.tl.IDs(), ", "), "no segment %q", c.Args[1])
+		}
+		return c.Args[1], nil
+	}
+	if !c.Has("text") {
+		return "", Errf(ExitUsage, "bad-args", usage, "name the segment: an id from `cutroom timeline`, or --text \"words it keeps\"")
+	}
+	sid, i, _, err := e.resolve(c, c.Str("text"), true, "", 0, 0)
+	if err != nil {
+		return "", err
+	}
+	w := e.tr[sid].Words[i]
+	m := (w.Start + w.End) / 2
+	for _, g := range e.tl.Segments {
+		if g.Source == sid && m >= g.In && m < g.Out {
+			return g.ID, nil
+		}
+	}
+	return "", Errf(ExitUsage, "not-in-edit", "those words are cut; quote words the edit keeps (`cutroom transcript --output`)", "%q (source %s %s) is not in the edit", c.Str("text"), sid, clock(w.Start))
+}
+
+// validateOnly is `timeline validate`: the problems alone, an error exit when any is an error.
+func validateOnly(issues []timeline.Issue) (*Result, error) {
+	errs, warns, acc := 0, 0, 0
+	var first string
+	for _, x := range issues {
+		switch x.Level {
+		case "error":
+			errs++
+			if first == "" {
+				first = x.Message
+			}
+		case "warn":
+			warns++
+		case "accepted":
+			acc++
+		}
+	}
+	summary := fmt.Sprintf("%d error(s), %d open warning(s), %d accepted", errs, warns, acc)
+	lines := issueLines(issues, 50)
+	if errs > 0 {
+		return nil, Errf(ExitInvalid, "invalid-timeline", "fix the errors (`cutroom timeline` shows each with its fix)", "%s — first: %s\n%s", summary, first, strings.Join(lines, "\n"))
+	}
+	verdict := "valid"
+	if warns > 0 {
+		verdict = "valid (warnings to decide: --apply or --accept)"
+	}
+	return &Result{Text: strings.Join(append([]string{verdict + ": " + summary}, lines...), "\n"), Data: map[string]any{"valid": true, "errors": 0, "warnings": warns, "accepted": acc, "issues": nzIssues(issues)},
+		Next: []string{"cutroom timeline"}}, nil
 }
 
 func truncLines(lines []string, all bool) []string {

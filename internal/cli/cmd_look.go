@@ -37,6 +37,7 @@ Examples:
   cutroom look 3 --source cam --crop 400,100,600,600     (full-resolution crop, e.g. to judge a face)
   cutroom look --cuts                    every cut: last frame before | first frame after, with the words
   cutroom look --output 0:03-0:06        OUTPUT times: frames of the edit, cuts marked in red
+  cutroom look --overlays                one frame per overlay, drawn as the render will
   cutroom look out/final.mp4 3.9        a frame of a rendered file (file time; same as --file)
 Times are source times unless you pass --output (edit time) or --file (that file's time).`,
 		Flags: []Flag{
@@ -46,6 +47,7 @@ Times are source times unless you pass --output (edit time) or --file (that file
 			{Name: "crop", Kind: "string", Help: "x,y,w,h in displayed source pixels; shown at full resolution"},
 			{Name: "output", Kind: "bool", Help: "Times are output (edit) times, mapped through the timeline"},
 			{Name: "cuts", Kind: "bool", Help: "Show every cut: frame before | frame after, 12 cuts per page"},
+			{Name: "overlays", Kind: "bool", Help: "One frame per overlay (mid-window), drawn as the render will"},
 			{Name: "page", Kind: "int", Default: "1", Help: "Page of --cuts"},
 			{Name: "file", Kind: "string", Help: "Look at this video file (e.g. a render); times are file times"},
 		},
@@ -154,7 +156,7 @@ func runLook(c *Ctx) (*Result, error) {
 		return nil, err
 	}
 	projectFromFile(c, c.Str("file"))
-	if c.Bool("cuts") || c.Bool("output") || c.Has("file") {
+	if c.Bool("cuts") || c.Bool("output") || c.Bool("overlays") || c.Has("file") {
 		return lookEdit(c)
 	}
 	if len(c.Args) == 0 {

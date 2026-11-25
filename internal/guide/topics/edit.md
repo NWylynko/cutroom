@@ -25,7 +25,11 @@ by your first edit as the whole first video source. Sources are never touched.
   continuous speech — listen to it.
 - `cutroom edit cut 16.9-17.4` cuts a source time range (for sounds, not words).
 - `cutroom edit keep --from "…" --to "…"` keeps only that span (e.g. to start a short).
-- Explicit cuts are pinned: a later `tighten` never moves them.
+- Explicit cuts are pinned: a later `tighten` never moves them. `cutroom edit pin s3 [--in|--out]`
+  pins edges you set some other way (`--unpin` releases them).
+- `cutroom edit split --text "Then install"` (or a source time: `edit split 12.4`) splits a segment
+  in two without removing anything — in the pause before those words. Then move, zoom or cut each
+  part on its own (e.g. zoom only the second half of a long take).
 - `cutroom edit audio <source>` takes the sound from another source (a recorder) once
   `cutroom sync <source>` has aligned it.
 - `cutroom edit zoom 1.15 --from "…" --to "…"` punches in on a span (zoom 1 undoes it).

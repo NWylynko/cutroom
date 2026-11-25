@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/cutroom/cutroom/internal/captions"
 	"github.com/cutroom/cutroom/internal/deps"
 	"github.com/cutroom/cutroom/internal/media"
 	"github.com/cutroom/cutroom/internal/project"
@@ -51,11 +52,18 @@ Examples:
   cutroom transcript --search "first thing you need"
   cutroom transcript --suspects
   cutroom transcript --words --from 0:06 --to 0:12
+  cutroom transcript --retakes                 every repeated take, which one the edit keeps
+  cutroom transcript --output                  the edit's words in output time ("|" marks a cut)
+  cutroom transcript --range 0:06-0:12         same as --from 0:06 --to 0:12
   cutroom transcript --file out/final.mp4     read the render's own words (to confirm sentences are whole)`,
 		Flags: []Flag{
 			{Name: "words", Kind: "bool", Help: "One line per word with start/end"},
 			{Name: "search", Kind: "string", Help: "Find a phrase (case/punctuation/fillers ignored); prints every occurrence"},
 			{Name: "suspects", Kind: "bool", Help: "List suspects: retakes, unworded sounds, long words, pass differences"},
+			{Name: "retakes", Kind: "bool", Help: "Only repeats: each take, and whether the edit keeps it"},
+			{Name: "output", Kind: "bool", Help: "The edit's words in output time, through the timeline (no render needed)"},
+			{Name: "phrases", Kind: "bool", Help: "One line per phrase (the default view)"},
+			{Name: "range", Kind: "string", Help: "Range start-end (e.g. 6-12 or 0:06-0:12); same as --from/--to"},
 			{Name: "from", Kind: "string", Help: "Start of range (time)"},
 			{Name: "to", Kind: "string", Help: "End of range (time)"},
 			{Name: "gap", Kind: "float", Default: "0.5", Help: "Pause length (s) that splits phrases"},
@@ -269,6 +277,9 @@ func runTranscript(c *Ctx) (*Result, error) {
 			id = ""
 		}
 	}
+	if c.Bool("output") {
+		return transcriptOutput(c)
+	}
 	var t *speech.Transcript
 	if c.Has("file") && !c.Has("project") {
 		projectFromFile(c, c.Str("file"))
@@ -284,6 +295,13 @@ func runTranscript(c *Ctx) (*Result, error) {
 		return nil, err
 	}
 	lo, hi := 0.0, 1e18
+	if c.Has("range") {
+		a, b, err := parseRange(c.Str("range"), timecode.Rate{Num: 30, Den: 1})
+		if err != nil {
+			return nil, Errf(ExitUsage, "bad-range", "--range 6-12 or --range 0:06-0:12", "%v", err)
+		}
+		c.vals["from"], c.vals["to"] = []string{fmt.Sprint(a)}, []string{fmt.Sprint(b)}
+	}
 	if c.Has("from") {
 		v, err := timecode.Parse(c.Str("from"), timecode.Rate{Num: 30, Den: 1})
 		if err != nil {
@@ -393,6 +411,72 @@ func runTranscript(c *Ctx) (*Result, error) {
 		return &Result{Text: head + "\n" + strings.Join(lines, "\n"), Data: map[string]any{"suspects": nzs(sel)},
 			Next: []string{"cutroom transcript " + t.Source + " --words --from <start> --to <end>   (look closer at one)"}}, nil
 
+	case c.Bool("retakes"):
+		type take struct {
+			At   float64 `json:"at"`
+			Kept *bool   `json:"kept,omitempty"`
+		}
+		type retake struct {
+			Start  float64 `json:"start"`
+			End    float64 `json:"end"`
+			Text   string  `json:"text"`
+			Takes  []take  `json:"takes"`
+			Status string  `json:"status"`
+		}
+		var rs []retake
+		open := 0
+		for _, s := range t.Suspects {
+			if s.Kind != "repeat" || !inRange(s.Start, s.End) {
+				continue
+			}
+			r := retake{Start: s.Start, End: s.End, Text: s.Text}
+			ats := append([]float64{}, s.Related...)
+			if len(ats) == 0 {
+				ats = []float64{s.Start}
+			}
+			kept := 0
+			var marks []string
+			for _, at := range ats {
+				tk := take{At: at}
+				m := clock(at)
+				if tl != nil {
+					k := tl.Kept(t.Source, at+0.05)
+					tk.Kept = &k
+					if k {
+						kept++
+						m += " kept"
+					} else {
+						m += " cut"
+					}
+				}
+				r.Takes = append(r.Takes, tk)
+				marks = append(marks, m)
+			}
+			switch {
+			case tl == nil:
+				r.Status = "no edit yet"
+			case kept <= 1:
+				r.Status = "resolved"
+			default:
+				r.Status = fmt.Sprintf("open: %d takes kept", kept)
+				open++
+			}
+			rs = append(rs, r)
+			lines = append(lines, fmt.Sprintf("%s–%s  %-20s takes: %s  — %s", clock(s.Start), clock(s.End), r.Status, strings.Join(marks, ", "), s.Detail))
+		}
+		if len(rs) == 0 {
+			lines = append(lines, "no retakes (no repeated phrase found)")
+		}
+		trunc("narrow with --from/--to")
+		next := []string{"cutroom transcript " + t.Source + " --words --from <start> --to <end>   (compare the takes)"}
+		if open > 0 {
+			next = append([]string{"cutroom edit cut --text \"<the take you drop>\" --near <its time>   (keep the best take, cut the others)"}, next...)
+		}
+		if rs == nil {
+			rs = []retake{}
+		}
+		return &Result{Text: head + "\n" + strings.Join(lines, "\n"), Data: map[string]any{"retakes": rs, "open": open}, Next: next}, nil
+
 	case c.Bool("words"):
 		var sel []speech.Word
 		for _, w := range t.Words {
@@ -485,4 +569,69 @@ func notChanged(p *project.Project, s *project.Source) error {
 		return Errf(ExitInvalid, "stale-source", "run `cutroom init` to re-inspect it", "source %q changed on disk since it was inspected", s.ID)
 	}
 	return nil
+}
+
+// transcriptOutput reads the edit as it plays: the kept words in output time, a line per sentence
+// (or pause ≥ --gap, default 0.15 s), "|" where a cut joins two pieces. No render is needed.
+func transcriptOutput(c *Ctx) (*Result, error) {
+	e, err := loadEditEnv(c, false)
+	if err != nil {
+		return nil, err
+	}
+	ows, missing := captions.OutputWords(e.tl, e.tr)
+	ws := make([]speech.Word, len(ows))
+	for i, w := range ows {
+		text := w.Text
+		if w.AfterCut {
+			text = "| " + text
+		}
+		ws[i] = speech.Word{I: i, Text: text, Start: w.Start, End: w.End}
+	}
+	gap := 0.15
+	if c.Has("gap") {
+		gap = c.Float("gap")
+	}
+	lo, hi := 0.0, 1e18
+	if c.Has("range") {
+		if lo, hi, err = parseRange(c.Str("range"), timecode.Rate{Num: 30, Den: 1}); err != nil {
+			return nil, Errf(ExitUsage, "bad-range", "--range 6-12 or --range 0:06-0:12 (output time)", "%v", err)
+		}
+	}
+	for k, v := range map[string]*float64{"from": &lo, "to": &hi} {
+		if c.Has(k) {
+			t, err := timecode.Parse(c.Str(k), timecode.Rate{Num: 30, Den: 1})
+			if err != nil {
+				return nil, Errf(ExitUsage, "bad-time", "times look like 12.5, 1:02.5 or f372", "--%s: %v", k, err)
+			}
+			*v = t.Float()
+		}
+	}
+	type phraseOut struct {
+		Start float64 `json:"start"`
+		End   float64 `json:"end"`
+		Text  string  `json:"text"`
+	}
+	var out []phraseOut
+	var lines []string
+	for _, x := range speech.Sentences(ws, gap) {
+		if x.End <= lo || x.Start >= hi {
+			continue
+		}
+		text := speech.Text(ws, x.First, x.Last)
+		lines = append(lines, fmt.Sprintf("%s–%s  %s", clock(x.Start), clock(x.End), text))
+		out = append(out, phraseOut{x.Start, x.End, text})
+	}
+	if !c.Bool("all") && len(lines) > maxLines {
+		n := len(lines) - maxLines
+		lines = append(lines[:maxLines], fmt.Sprintf("… %d more lines (narrow with --from/--to, or --all)", n))
+	}
+	head := fmt.Sprintf("the edit in output time — %d words, %s, %d segment(s); \"|\" marks a cut", len(ws), clock(e.tl.Duration()), len(e.tl.Segments))
+	if len(missing) > 0 {
+		head += fmt.Sprintf("\nno transcript for %s: its words are missing here (`cutroom transcribe %s`)", strings.Join(missing, ", "), missing[0])
+	}
+	if out == nil {
+		out = []phraseOut{}
+	}
+	return &Result{Text: head + "\n" + strings.Join(lines, "\n"), Data: map[string]any{"phrases": out, "duration": e.tl.Duration()},
+		Next: []string{"cutroom timeline --joins   (each cut, with the words either side)"}}, nil
 }

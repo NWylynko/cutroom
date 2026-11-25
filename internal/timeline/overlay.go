@@ -176,3 +176,24 @@ func (t *Timeline) IsAccepted(is Issue) (bool, string) {
 	}
 	return false, ""
 }
+
+// Split cuts the segment holding source time s into two at s (snapped to the frame grid); nothing
+// is removed. Both new edges are pinned, so tighten keeps the split where it is. Returns the ids of
+// the two halves, or ok=false when s isn't inside a segment.
+func (t *Timeline) Split(source string, s float64) (left, right string, ok bool) {
+	s = t.Snap(s)
+	for i, g := range t.Segments {
+		if g.Source != source || s <= g.In+0.5/t.fpsNum || s >= g.Out-0.5/t.fpsNum {
+			continue
+		}
+		a, b := g, g
+		a.Out, a.PinOut = s, true
+		b.ID, b.In, b.PinIn = t.newID(), s, true
+		segs := append([]Segment{}, t.Segments[:i]...)
+		segs = append(segs, a, b)
+		t.Segments = append(segs, t.Segments[i+1:]...)
+		t.Recompute()
+		return a.ID, b.ID, true
+	}
+	return "", "", false
+}
