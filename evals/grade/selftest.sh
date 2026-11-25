@@ -96,5 +96,46 @@ mkdir -p "$W/pick/out" && ffmpeg -v error -y -i $FIX/talk.mp4 -i $FIX/pickup.mp4
 want PASS pickup "$W/pick"
 want FAIL pickup "$W/good" "alt_used"
 
+# cards and captions: drawn with drawbox (no text filters needed), timed from the ground-truth lines
+eval "$(python3 - <<'PY'
+import json
+m=json.load(open("evals/work/fixtures/talk.json"))
+keep=[l for l in m["lines"] if l.get("tag") in ("keep","retake-good")]
+t=0.0; win=[]
+for l in keep:
+    a=t+0.10; b=a+(l["end"]-l["start"]); win.append((a,b,l["say"])); t+=(l["end"]+0.22)-(l["start"]-0.10)
+def en(ws): return "+".join(f"between(t,{a:.3f},{b:.3f})" for a,b,_ in ws)
+cards=[w for w in win if "home server" in w[2] or "install Linux" in w[2]]
+print(f"CARDS='{en(cards)}'")
+print(f"SPEECH='{en(win)}'")
+srt=[]; k=1
+for a,b,say in win:
+    ws=say.replace(",","").split(); n=len(ws); step=(b-a)/((n+3)//4)
+    for i in range(0,n,4):
+        ca=a+step*(i//4); cb=min(b,ca+step)
+        f=lambda x: f"{int(x//3600):02d}:{int(x%3600//60):02d}:{int(x%60):02d},{int(round(x%1*1000)):03d}"
+        srt.append(f"{k}\n{f(ca)} --> {f(cb)}\n{' '.join(ws[i:i+4])}\n"); k+=1
+open("/tmp/cutroom-selftest.srt","w").write("\n".join(srt))
+PY
+)"
+cut $FIX/talk.mp4 "$W/titles/out/final.mp4" "drawbox=x=300:y=280:w=680:h=110:color=black@0.8:t=fill:enable='$CARDS'"
+want PASS titles "$W/titles"
+want FAIL titles "$W/good" "card during: show you how"
+cut $FIX/talk.mp4 "$W/allcards/out/final.mp4" "drawbox=x=300:y=280:w=680:h=110:color=black@0.8:t=fill"
+want FAIL titles "$W/allcards" "no card during"
+cut $FIX/talk.mp4 "$W/social/out/final.mp4" "drawbox=x=360:y=600:w=560:h=70:color=black@0.7:t=fill:enable='$SPEECH'"
+cp /tmp/cutroom-selftest.srt "$W/social/out/final.srt"
+want PASS social "$W/social"
+mkdir -p "$W/nocc/out"; cp "$W/good/out/final.mp4" /tmp/cutroom-selftest.srt "$W/nocc/out/"; mv "$W/nocc/out/cutroom-selftest.srt" "$W/nocc/out/final.srt"
+want FAIL social "$W/nocc" "burned_captions"
+mkdir -p "$W/late-srt/out"; cp "$W/social/out/final.mp4" "$W/late-srt/out/"
+python3 -c 'import re,sys
+def sh(m):
+    h,mi,s,ms=map(int,m.groups()); t=h*3600+mi*60+s+ms/1000+1.5
+    return f"{int(t//3600):02d}:{int(t%3600//60):02d}:{int(t%60):02d},{int(round(t%1*1000)):03d}"
+print(re.sub(r"(\d+):(\d\d):(\d\d),(\d\d\d)",sh,open("/tmp/cutroom-selftest.srt").read()))' > "$W/late-srt/out/final.srt"
+want FAIL social "$W/late-srt" "srt: in sync"
+rm -f /tmp/cutroom-selftest.srt
+
 echo "selftest: $pass passed, $fail failed"
 [ $fail -eq 0 ]

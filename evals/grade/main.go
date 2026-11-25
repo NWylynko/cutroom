@@ -44,6 +44,14 @@ type spec struct {
 	// AltRef is a second source the output may also draw from (a pickup take). Frames and sync are
 	// judged against whichever reference a frame matches; `alt_used` requires it to appear.
 	AltRef string `json:"alt_ref,omitempty"`
+	// Cards: a card (text or image overlay) must cover the picture while each phrase's line is said;
+	// Clean: no card while these lines are said (burned captions in the bottom band excepted).
+	Cards []string `json:"cards,omitempty"`
+	Clean []string `json:"clean,omitempty"`
+	// BurnedCaptions: the bottom band carries captions while lines are said.
+	BurnedCaptions bool `json:"burned_captions,omitempty"`
+	// SRT: a caption file whose words and timing must match the output's speech.
+	SRT string `json:"srt,omitempty"`
 }
 
 type result struct {
@@ -137,7 +145,10 @@ func main() {
 			add(c, false, "unknown check")
 		}
 	}
-	if has(sp.Checks, "upright") || has(sp.Checks, "frames_from_source") || has(sp.Checks, "av_sync") || has(sp.Checks, "alt_used") {
+	if sp.SRT != "" {
+		srtCheck(filepath.Join(dir, sp.SRT), out, vd, add)
+	}
+	if has(sp.Checks, "upright") || has(sp.Checks, "frames_from_source") || has(sp.Checks, "av_sync") || has(sp.Checks, "alt_used") || len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions {
 		frameAndSync(out, sp, add)
 	}
 	res = append(res, result{"transcript", true, truncate(text, 400)})
@@ -188,6 +199,11 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 		refPaths = append(refPaths, filepath.Join(fixtures, sp.AltRef))
 	}
 	outFrames := greyFrames(out, "fps=30") // resample to a 30 fps grid in output time
+	// with cards or burned captions over the picture, match on the best 3/4 of the frame's tiles
+	errf := mse
+	if len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions {
+		errf = robust
+	}
 	if len(outFrames) == 0 || len(refFrames) == 0 {
 		add("frames", false, "could not decode frames")
 		return
@@ -195,6 +211,7 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 	type match struct {
 		outT, refT, err, flippedErr float64
 		ref                         int // which reference the frame came from
+		covered, bottom             int // tiles that differ from the reference (cards), of them in the bottom band
 	}
 	var ms []match
 	for i := 0; i < len(outFrames); i += 6 { // every 0.2 s
@@ -209,7 +226,7 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 					if i+d < 0 || i+d >= len(outFrames) || j+d < 0 || j+d >= len(refFrames) {
 						continue
 					}
-					t += mse(outFrames[i+d], refFrames[j+d])
+					t += errf(outFrames[i+d], refFrames[j+d])
 					n++
 				}
 				if n == 0 {
@@ -218,7 +235,7 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 				return t / float64(n)
 			}
 			for j, rf := range refFrames {
-				if mse(outFrames[i], rf) > 4*maxErr+1000 {
+				if errf(outFrames[i], rf) > 4*maxErr+1000 {
 					continue // cheap reject before scoring the run
 				}
 				if e := math.Min(run(j, -2, 0), run(j, 0, 2)); e < bestRun {
@@ -228,14 +245,15 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 		}
 		if math.IsInf(bestRun, 1) { // nothing close: fall back to the main reference's nearest frame
 			for j, rf := range refSets[0] {
-				if e := mse(outFrames[i], rf); e < bestRun {
+				if e := errf(outFrames[i], rf); e < bestRun {
 					bestRun, bi, br = e, j, 0
 				}
 			}
 		}
-		best := mse(outFrames[i], refSets[br][bi])
-		fl := mse(flip(outFrames[i]), refSets[br][bi])
-		ms = append(ms, match{float64(i) / refFPS, float64(bi) / refFPS, best, fl, br})
+		best := errf(outFrames[i], refSets[br][bi])
+		fl := errf(flip(outFrames[i]), refSets[br][bi])
+		cov, bot := covered(outFrames[i], refSets[br][bi])
+		ms = append(ms, match{float64(i) / refFPS, float64(bi) / refFPS, best, fl, br, cov, bot})
 	}
 	// upright: best match error small and much smaller than the flipped comparison
 	bad := 0
@@ -261,6 +279,47 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 			}
 		}
 		add("alt_used", n >= 5, "%d sampled frames (≈%.1f s) come from %s", n, float64(n)*0.2, sp.AltRef)
+	}
+	if len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions {
+		lines := fixtureLines(ref)
+		during := func(phrase string) (n, card, bottom int) {
+			for _, l := range lines {
+				if !strings.Contains(strings.Join(tokens(l.Say), " "), strings.Join(tokens(phrase), " ")) {
+					continue
+				}
+				for _, m := range ms {
+					if m.ref == 0 && m.refT > l.Start+0.3 && m.refT < l.End-0.3 {
+						n++
+						if m.covered-m.bottom >= 2 || (m.covered >= 3 && !sp.BurnedCaptions) {
+							card++
+						}
+						if m.bottom >= 1 {
+							bottom++
+						}
+					}
+				}
+			}
+			return
+		}
+		for _, ph := range sp.Cards {
+			n, c, _ := during(ph)
+			add("card during: "+ph, n > 0 && float64(c) >= 0.6*float64(n), "%d of %d sampled frames while it is said carry a card", c, n)
+		}
+		for _, ph := range sp.Clean {
+			n, c, _ := during(ph)
+			add("no card during: "+ph, n > 0 && float64(c) <= 0.2*float64(n), "%d of %d sampled frames while it is said carry a card", c, n)
+		}
+		if sp.BurnedCaptions {
+			n, b := 0, 0
+			for _, l := range lines {
+				if l.Say == "" {
+					continue
+				}
+				x, _, y := during(l.Say)
+				n, b = n+x, b+y
+			}
+			add("burned_captions", n > 0 && float64(b) >= 0.6*float64(n), "%d of %d sampled speech frames have something drawn in the bottom band", b, n)
+		}
 	}
 	if !has(checks, "av_sync") {
 		return
@@ -343,6 +402,76 @@ func mse(a, b []byte) float64 {
 		s += d * d
 	}
 	return s / float64(len(a))
+}
+
+// tileErrs: MSE of each of 8×6 tiles (20×15 px of the 160×90 grey frame).
+func tileErrs(a, b []byte) []float64 {
+	es := make([]float64, 48)
+	for ty := 0; ty < 6; ty++ {
+		for tx := 0; tx < 8; tx++ {
+			s := 0.0
+			for y := ty * 15; y < ty*15+15; y++ {
+				for x := tx * 20; x < tx*20+20; x++ {
+					d := float64(a[y*gw+x]) - float64(b[y*gw+x])
+					s += d * d
+				}
+			}
+			es[ty*8+tx] = s / 300
+		}
+	}
+	return es
+}
+
+// robust: mean error of the best 36 of 48 tiles — a card or caption over part of the frame
+// doesn't stop it matching its source frame.
+func robust(a, b []byte) float64 {
+	es := tileErrs(a, b)
+	sort.Float64s(es)
+	t := 0.0
+	for _, e := range es[:36] {
+		t += e
+	}
+	return t / 36
+}
+
+// covered counts tiles that clearly differ from the reference frame (something drawn over them),
+// and how many of those are in the bottom band (rows 5–6 of 6: where captions sit).
+func covered(a, b []byte) (n, bottom int) {
+	for i, e := range tileErrs(a, b) {
+		if e > 400 {
+			n++
+			if i >= 32 {
+				bottom++
+			}
+		}
+	}
+	return
+}
+
+type fixtureLine struct {
+	Say        string
+	Start, End float64
+}
+
+// fixtureLines reads the ground-truth line times of a reference fixture (<name>.json).
+func fixtureLines(ref string) []fixtureLine {
+	b, err := os.ReadFile(strings.TrimSuffix(ref, filepath.Ext(ref)) + ".json")
+	if err != nil {
+		return nil
+	}
+	var m struct {
+		Lines []struct {
+			Say   string  `json:"say"`
+			Start float64 `json:"start"`
+			End   float64 `json:"end"`
+		} `json:"lines"`
+	}
+	json.Unmarshal(b, &m)
+	var ls []fixtureLine
+	for _, l := range m.Lines {
+		ls = append(ls, fixtureLine{l.Say, l.Start, l.End})
+	}
+	return ls
 }
 
 func flip(a []byte) []byte {
@@ -618,4 +747,136 @@ func toneStats(p string, pre []string, vf string) (sat, rng float64) {
 		return t / float64(len(ms))
 	}
 	return mean(satRe), mean(highRe) - mean(lowRe)
+}
+
+// --- SRT ---------------------------------------------------------------------------------------
+
+type cue struct {
+	a, b float64
+	text string
+}
+
+var srtTime = regexp.MustCompile(`(\d+):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d+):(\d{2}):(\d{2})[,.](\d{3})`)
+
+func parseSRT(s string) []cue {
+	var cs []cue
+	for _, blk := range strings.Split(strings.ReplaceAll(s, "\r\n", "\n"), "\n\n") {
+		ls := strings.Split(strings.TrimSpace(blk), "\n")
+		for i, l := range ls {
+			m := srtTime.FindStringSubmatch(l)
+			if m == nil {
+				continue
+			}
+			t := func(h, mi, se, ms string) float64 {
+				a, _ := strconv.Atoi(h)
+				b, _ := strconv.Atoi(mi)
+				c, _ := strconv.Atoi(se)
+				d, _ := strconv.Atoi(ms)
+				return float64(a*3600+b*60+c) + float64(d)/1000
+			}
+			cs = append(cs, cue{t(m[1], m[2], m[3], m[4]), t(m[5], m[6], m[7], m[8]), strings.Join(ls[i+1:], " ")})
+			break
+		}
+	}
+	return cs
+}
+
+// srtCheck: the file's cues are in order, inside the video, carry the words the output says
+// (in order), and show each word while it is being said (±0.3 s).
+func srtCheck(path, out string, dur float64, add func(string, bool, string, ...any)) {
+	b, err := os.ReadFile(path)
+	if err != nil {
+		add("srt", false, "%s not found", filepath.Base(path))
+		return
+	}
+	cs := parseSRT(string(b))
+	if len(cs) == 0 {
+		add("srt", false, "no cues in %s", filepath.Base(path))
+		return
+	}
+	ordered := true
+	for i, c := range cs {
+		if c.b <= c.a || c.b > dur+0.05 || (i > 0 && c.a < cs[i-1].b-0.001) {
+			ordered = false
+		}
+	}
+	add("srt: timing", ordered, "%d cues, in order, no overlaps, inside the %.3f s video", len(cs), dur)
+	var cueWords []string
+	for _, c := range cs {
+		cueWords = append(cueWords, tokens(c.text)...)
+	}
+	ws := transcribeTimed(out)
+	var spoken []string
+	for _, w := range ws {
+		spoken = append(spoken, w.w)
+	}
+	l := lcs(spoken, cueWords)
+	ok := len(spoken) > 0 && float64(l) >= 0.85*float64(len(spoken)) && float64(l) >= 0.85*float64(len(cueWords))
+	add("srt: words", ok, "%d of %d spoken words in the file in order (file has %d)", l, len(spoken), len(cueWords))
+	hit := 0
+	for _, w := range ws {
+		mid := (w.a + w.b) / 2
+		for _, c := range cs {
+			if mid >= c.a-0.3 && mid <= c.b+0.3 && has(tokens(c.text), w.w) {
+				hit++
+				break
+			}
+		}
+	}
+	add("srt: in sync", len(ws) > 0 && float64(hit) >= 0.8*float64(len(ws)), "%d of %d spoken words are on screen (±0.3 s) while said", hit, len(ws))
+}
+
+type tword struct {
+	w    string
+	a, b float64
+}
+
+// transcribeTimed: one whisper segment per word (-ml 1) with its times.
+func transcribeTimed(p string) []tword {
+	tmp, _ := os.MkdirTemp("", "grade")
+	defer os.RemoveAll(tmp)
+	wav := filepath.Join(tmp, "a.wav")
+	if err := exec.Command("ffmpeg", "-v", "error", "-i", p, "-vn", "-ac", "1", "-ar", "16000", wav).Run(); err != nil {
+		return nil
+	}
+	model := os.Getenv("GRADE_WHISPER_MODEL")
+	if model == "" {
+		home, _ := os.UserHomeDir()
+		model = filepath.Join(home, ".cache/cutroom/models/ggml-base.en.bin")
+	}
+	if err := exec.Command("whisper-cli", "-m", model, "-f", wav, "-oj", "-ml", "1", "-sow", "-of", filepath.Join(tmp, "t"), "-np").Run(); err != nil {
+		return nil
+	}
+	b, _ := os.ReadFile(filepath.Join(tmp, "t.json"))
+	var d struct {
+		Transcription []struct {
+			Text    string
+			Offsets struct{ From, To int } `json:"offsets"`
+		} `json:"transcription"`
+	}
+	json.Unmarshal(b, &d)
+	var ws []tword
+	for _, s := range d.Transcription {
+		for _, t := range tokens(s.Text) {
+			ws = append(ws, tword{t, float64(s.Offsets.From) / 1000, float64(s.Offsets.To) / 1000})
+		}
+	}
+	return ws
+}
+
+func lcs(a, b []string) int {
+	dp := make([][]int, len(a)+1)
+	for i := range dp {
+		dp[i] = make([]int, len(b)+1)
+	}
+	for i := len(a) - 1; i >= 0; i-- {
+		for j := len(b) - 1; j >= 0; j-- {
+			if a[i] == b[j] {
+				dp[i][j] = dp[i+1][j+1] + 1
+			} else {
+				dp[i][j] = max(dp[i+1][j], dp[i][j+1])
+			}
+		}
+	}
+	return dp[0][0]
 }

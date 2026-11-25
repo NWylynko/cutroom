@@ -1,0 +1,10 @@
+{
+  "fixtures": ["talk.mp4"],
+  "output": "out/final.mp4",
+  "must_contain": ["show you how to set up a home server", "first thing you need is an old laptop", "install Linux on it", "open the terminal and run the update command", "your server is ready"],
+  "must_not_contain": ["um", "my cat"],
+  "duration": [13.0, 18.5],
+  "burned_captions": true,
+  "srt": "out/final.srt",
+  "checks": ["frames_from_source", "av_sync"]
+}
