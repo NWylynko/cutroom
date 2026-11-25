@@ -79,7 +79,7 @@ Did: T3 on the four real-footage excerpts (deploy, started, mps, sec): a sonnet 
 from transcripts, joins, contact sheets and `listen`. Verdicts: deploy ACCEPT, mps ACCEPT, sec ACCEPT,
 started REJECT — it ended on "Those are much better.", the first words of a sentence the recording
 cuts off, contradicting the line before it; its last segment also ran past the source's end
-(out-of-source error, yet check passed). Fixes (commit 01eae8c): segments are clamped to where the
+(out-of-source error, yet check passed). Fixes (commit 67e1c46): segments are clamped to where the
 source's picture and sound really end (INFO trimmed-to-source-end); new WARN ends-mid-speech /
 starts-mid-speech when the edit opens or closes within 0.3 s of the recording's edge with speech
 there, with a runnable fix (end on the sentence before); the L14 short-chunk error now says re-running
@@ -635,7 +635,7 @@ then M2 (`edit zoom`, `edit move`, multi-take render), and T3 prep on real foota
 
 ### 16 · 2026-11-24 · eval round 4
 Did: decisions recorded (name cutroom, Apache-2.0 LICENSE, sonnet gates T2, full v1 target; real
-footage for T3 indexed in evals/local, gitignored). Ran 5 tasks × sonnet/haiku at 3e8fe0e: **10/10
+footage for T3 indexed in evals/local, gitignored). Ran 5 tasks × sonnet/haiku at deafd74: **10/10
 grader passes, all tool-only, no medium friction**. Sonnet median 7 tool calls (round 3: 9), haiku 10
 (13). Five cutroom errors in total, each unstuck. Results: evals/results/2026-11-24-4.md.
 Surprises: haiku agents now re-read the render as text by habit and hit the one wrong fix line left.
