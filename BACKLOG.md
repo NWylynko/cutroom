@@ -7,8 +7,14 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
+- [friction r7] `captions --burn` also writes the sidecar SRT; guide shows `--output out/final.srt`
+  (social-sonnet: "assumed `captions` could write to out/final.srt directly").
+- [friction r7] `overlay set <id> --duration/--to/--at/--layout/--text` (titles-haiku).
+- [friction r7] audio-mixed: report speech level and room tone of each source so it's decidable (pickup ×2).
+- [friction r7] render/check state VFR → constant fps and the audio offset applied (vfr ×2, r5, r6).
+- [friction r7] init: next step `cutroom sync <id>` when an audio-only source is added (recorder-sonnet).
+- [friction r7] check words line names the re-transcription model (tighten-haiku).
 - M4: clip overlays (a video inset / B-roll over the speaker), anchored like text/image overlays.
-- Eval round 7 (due: iteration 31 was 5 after round 6's record): add overlay + captions tasks.
 - Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
   T3 review, doctor/README.
 ## M0 — leftovers
@@ -25,6 +31,12 @@ Move done items to the journal, not here.
   "a wrong isolated word looks as authoritative as a correct one").
 - [friction r6] `check`: per-segment sync values and the offset/VFR handling applied (vfr-sync-haiku).
 - [friction r6] timeline: show the words each cut removes (fix-edit-haiku).
+- [friction r7] Apply a suggested fix in one step (`cutroom timeline --apply retake-kept@4.09`), next to
+  acknowledging one (titles-sonnet, hdr-sonnet, phone-sonnet: "have tighten optionally apply the
+  suggested retake cut").
+- [friction r7] Inherited-edit diagnosis: per sentence kept whole / trimmed / retake / aside (fix-edit ×2).
+- [friction r7] HDR: `look --compare` raw vs tone-mapped (hdr-haiku); orientation evidence independent
+  of cutroom's own rotation handling (phone-haiku, r6 ×3).
 - [friction r5, r6] Acknowledge a warning you decided to keep (`cutroom timeline --accept retake-kept@4.09`
   or similar), so status/check show it as decided (recorder-haiku, phone-haiku; r6 recorder ×2: "make
   the retake decision an explicit choice").

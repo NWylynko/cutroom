@@ -1,0 +1,9 @@
+- **Outcome:** done. Previous editor had tightened and cut the cat aside. I cut the earlier "first thing you need is, UM" retake. out/final.mp4 passes check (0 failures, 0 warnings).
+- **Commands run:** 8: guide; ls; status; guide workflow; transcript --suspects; transcript; edit history; timeline; edit cut (fix line from the warning); timeline --joins; render --preview; render; check.
+- **Errors hit:** none.
+- **Guessed wrong:** nothing.
+- **Confusing output:** none. Only note: I did not listen to the joins myself, relying on check's words/stray-sound results.
+- **Missing:** nothing. A "resume" summary of what was done vs outstanding would be nice, but status plus the warning covered it.
+- **Not sure it's right:** the cut leaves "Hi, today... server." then "The first thing you need is an old laptop." (0.30 s pause). I did not re-read the final transcript with `transcript --file`; check's word match says all 44 expected words are present.
+- **Best part:** the retake-kept warning printed the exact fix command; status showed the next step.
+- **One change:** have `status` print the open warning's fix command inline.

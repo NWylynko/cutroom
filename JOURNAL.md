@@ -2,6 +2,17 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 33 · 2026-11-24 · eval round 7: sonnet 10/10, haiku 10/10 (titles + social tasks)
+Did: grader learned cards, burned captions and SRT (tile-robust frame matching only for tasks with
+overlays, so earlier tasks keep their tuned thresholds; ground-truth line times from the fixture
+manifest; timed whisper words for SRT sync); self-test 20/20 incl. 6 new cases. Two tasks (titles,
+social); 20 fresh agents; graded; results in `evals/results/2026-11-24-7.md`, friction → backlog.
+Measured: all 20 PASS, 1 cutroom error in 20 runs (a harmless `nothing-cut`), sonnet median 6 tool
+calls, haiku 13. Fifth clean sonnet round (3–7).
+Surprises: every agent found `overlay add` and `captions --burn` from the guide first try; the one
+gap was `captions --output` (one sonnet copied the file instead).
+Next: r7 friction (burn + SRT in one call, `overlay set`, audio-mixed numbers, VFR statement).
+
 ### 32 · 2026-11-24 · M4 burned-in captions: 1–3 word groups as one alpha clip per chunk (L48)
 Did: `captions.Groups`: per sentence (and pauses ≥ 1 s), a small DP picks group boundaries: ≤ 20
 chars, ≤ 3 words (a 4th only to avoid a weak ending), costs for weak endings (determiners/"to"
