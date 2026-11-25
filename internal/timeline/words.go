@@ -367,6 +367,7 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 			}
 		}
 	}
+	is = append(is, t.overlayIssues()...)
 	return is
 }
 

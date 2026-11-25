@@ -48,8 +48,11 @@ type Timeline struct {
 	Grid      float64           `json:"grid_origin"` // frame grid origin in source time (audio start)
 	Segments  []Segment         `json:"segments"`
 	NextID    int               `json:"next_id"`
-	Modified  time.Time         `json:"modified"`
-	fpsNum    float64
+	// Overlays: text cards and images over the edit, anchored to source words (overlay.go)
+	Overlays    []Overlay `json:"overlays,omitempty"`
+	NextOverlay int       `json:"next_overlay,omitempty"`
+	Modified    time.Time `json:"modified"`
+	fpsNum      float64
 }
 
 var ErrNone = errors.New("no timeline yet")

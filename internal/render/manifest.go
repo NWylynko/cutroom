@@ -28,6 +28,7 @@ type Manifest struct {
 	Duration     float64            `json:"duration"`
 	RangeStart   float64            `json:"range_start"`
 	Partial      bool               `json:"partial"`
+	Overlays     []Placement        `json:"overlays,omitempty"` // in file time
 	TimelineHash string             `json:"timeline_hash"`
 	RenderedAt   time.Time          `json:"rendered_at"`
 }
@@ -72,14 +73,25 @@ func TimelineHash(tl *timeline.Timeline) string {
 	for _, g := range tl.Segments {
 		segs = append(segs, []any{g.Source, g.In, g.Out, g.Zoom, g.AnchorX, g.AnchorY})
 	}
-	return hash([]any{tl.FPS, tl.Width, tl.Height, tl.Audio, tl.Grid, segs, tl.AudioFor})
+	parts := []any{tl.FPS, tl.Width, tl.Height, tl.Audio, tl.Grid, segs, tl.AudioFor}
+	if len(tl.Overlays) > 0 { // unchanged for edits without overlays
+		parts = append(parts, tl.Overlays)
+	}
+	return hash(parts)
+}
+
+// CutHash identifies the cut alone (what is said when): captions depend on it, not on overlays.
+func CutHash(tl *timeline.Timeline) string {
+	c := *tl
+	c.Overlays = nil
+	return TimelineHash(&c)
 }
 
 // writeManifest records chunks (planned on vtl) as rendered from the edit tl.
 func writeManifest(tl, vtl *timeline.Timeline, srcs map[string]Source, chunks []Chunk, res *Result, o Options) error {
 	m := Manifest{Version: Version, Output: res.Output, Preview: o.Preview, FPS: tl.FPS, Width: res.Width, Height: res.Height,
 		Audio: tl.Audio, Sources: map[string]MSource{}, Loudness: o.Loudness, TruePeak: o.TruePeak, Chain: o.Chain,
-		Frames: res.Frames, Duration: res.Duration, RangeStart: res.RangeStart, Partial: o.Range[1] > 0,
+		Frames: res.Frames, Duration: res.Duration, RangeStart: res.RangeStart, Partial: o.Range[1] > 0, Overlays: res.Overlays,
 		TimelineHash: TimelineHash(tl), RenderedAt: time.Now().UTC().Truncate(time.Second)}
 	for _, c := range chunks {
 		for _, k := range c.Segments {

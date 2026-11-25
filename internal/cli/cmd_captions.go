@@ -151,7 +151,7 @@ func runCaptions(c *Ctx) (*Result, error) {
 		if err := os.WriteFile(out, []byte(captions.Format(cues, strings.HasSuffix(strings.ToLower(out), ".vtt"))), 0o644); err != nil {
 			return nil, err
 		}
-		b, _ := json.MarshalIndent(captionsMeta{TimelineHash: render.TimelineHash(e.tl), Cues: len(cues), Words: len(ws), WrittenAt: time.Now().UTC().Truncate(time.Second)}, "", "  ")
+		b, _ := json.MarshalIndent(captionsMeta{TimelineHash: render.CutHash(e.tl), Cues: len(cues), Words: len(ws), WrittenAt: time.Now().UTC().Truncate(time.Second)}, "", "  ")
 		os.WriteFile(captionsMetaPath(out), b, 0o644)
 	}
 	next := []string{"cutroom status"}

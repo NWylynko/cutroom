@@ -18,7 +18,7 @@ type Topic struct {
 }
 
 // Order is the reading order; topics not listed sort after, alphabetically.
-var Order = []string{"start", "workflow", "perceive", "timeline", "edit", "render", "verify", "captions", "pitfalls"}
+var Order = []string{"start", "workflow", "perceive", "timeline", "edit", "overlays", "render", "verify", "captions", "pitfalls"}
 
 func All() []Topic {
 	ents, _ := files.ReadDir("topics")

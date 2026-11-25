@@ -47,18 +47,29 @@ type Options struct {
 	Chain    string
 	DryRun   bool
 	Progress func(string)
+	ProjDir  string      // overlay image paths are relative to it
+	Overlays []Placement // set by Render: overlays in the planned timeline's output time
 }
 
 type Chunk struct {
-	Index    int     `json:"index"`
-	Segments []int   `json:"segments"`
-	Start    float64 `json:"output_start"`
-	Duration float64 `json:"duration"`
-	Frames   int64   `json:"frames"`
-	Key      string  `json:"key"`
-	Cached   bool    `json:"cached"`
-	Seconds  float64 `json:"render_seconds,omitempty"`
+	Index    int            `json:"index"`
+	Segments []int          `json:"segments"`
+	Start    float64        `json:"output_start"`
+	Duration float64        `json:"duration"`
+	Frames   int64          `json:"frames"`
+	Key      string         `json:"key"`
+	Cached   bool           `json:"cached"`
+	Seconds  float64        `json:"render_seconds,omitempty"`
+	Overlays []ChunkOverlay `json:"overlays,omitempty"`
 	file     string
+}
+
+// ChunkOverlay is a placement's part inside one chunk, in chunk frames [From, To).
+type ChunkOverlay struct {
+	P        Placement `json:"placement"`
+	From, To int64
+	FadeIn   bool `json:"fade_in"`
+	FadeOut  bool `json:"fade_out"`
 }
 
 type Result struct {
@@ -75,6 +86,7 @@ type Result struct {
 	Preview    bool        `json:"preview"`
 	RangeStart float64     `json:"range_start"`
 	DryRun     bool        `json:"dry_run"`
+	Overlays   []Placement `json:"overlays,omitempty"` // in the file's time
 }
 
 // size returns output dimensions (even), preview at 540 p.
@@ -136,7 +148,24 @@ func Plan(tl *timeline.Timeline, srcs map[string]Source, o Options) []Chunk {
 			s := srcs[g.Source]
 			segs = append(segs, []any{g.Source, g.In, g.Out, g.Zoom, g.AnchorX, g.AnchorY, s.Size, s.ModTime.UnixNano(), s.AudioStart})
 		}
-		c.Key = hash([]any{Version, tl.FPS, w, h, o.Preview, encArgs(o.Preview), segs, tl.Grid})
+		// overlays over this chunk, in chunk frames
+		c0 := int64(math.Round(c.Start * tl.Rate()))
+		var ovs []any
+		for _, p := range o.Overlays {
+			pa, pb := int64(math.Round(p.Start*tl.Rate())), int64(math.Round(p.End*tl.Rate()))
+			from, to := max(pa, c0)-c0, min(pb, c0+c.Frames)-c0
+			if to <= from {
+				continue
+			}
+			co := ChunkOverlay{P: p, From: from, To: to, FadeIn: pa >= c0 && p.Fade > 0, FadeOut: pb <= c0+c.Frames && p.Fade > 0}
+			c.Overlays = append(c.Overlays, co)
+			ovs = append(ovs, []any{p.Key, from, to, co.FadeIn, co.FadeOut, p.Fade, pa - c0, pb - c0})
+		}
+		parts := []any{Version, tl.FPS, w, h, o.Preview, encArgs(o.Preview), segs, tl.Grid}
+		if len(ovs) > 0 { // keys of chunks without overlays are unchanged
+			parts = append(parts, ovs)
+		}
+		c.Key = hash(parts)
 		c.file = filepath.Join(o.CacheDir, "chunks", c.Key+".mp4")
 		if _, err := os.Stat(c.file); err == nil {
 			c.Cached = true
@@ -177,7 +206,35 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 		labels += fmt.Sprintf("[v%d]", n)
 	}
 	// restamp after concat so every frame sits exactly on the grid (L08)
-	fc = append(fc, fmt.Sprintf("%sconcat=n=%d:v=1:a=0,settb=AVTB,setpts=N/(FRAME_RATE*TB),setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv[out]", labels, len(c.Segments)))
+	base := "out"
+	if len(c.Overlays) > 0 {
+		base = "base0"
+	}
+	fc = append(fc, fmt.Sprintf("%sconcat=n=%d:v=1:a=0,settb=AVTB,setpts=N/(FRAME_RATE*TB),setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv[%s]", labels, len(c.Segments), base))
+	// overlays: each card is a looped still, shown by frame number (exact on the grid) and repeated
+	// rather than ended (L16); fades are alpha fades counted in frames
+	for k, co := range c.Overlays {
+		in := len(c.Segments) + k
+		args = append(args, "-loop", "1", "-framerate", fps, "-t", f6(float64(c.Frames+3)/tl.Rate()), "-i", co.P.PNG)
+		chain := fmt.Sprintf("[%d:v]format=rgba", in)
+		nf := int64(math.Max(1, math.Round(co.P.Fade*tl.Rate())))
+		if co.FadeIn {
+			chain += fmt.Sprintf(",fade=t=in:s=%d:n=%d:alpha=1", co.From, nf)
+		}
+		if co.FadeOut {
+			chain += fmt.Sprintf(",fade=t=out:s=%d:n=%d:alpha=1", co.To-nf, nf)
+		}
+		next := fmt.Sprintf("base%d", k+1)
+		if k == len(c.Overlays)-1 {
+			next = "ovl"
+		}
+		fc = append(fc, chain+fmt.Sprintf("[o%d]", k),
+			fmt.Sprintf("[base%d][o%d]overlay=0:0:eof_action=repeat:enable='between(n,%d,%d)'[%s]", k, k, co.From, co.To-1, next))
+	}
+	if len(c.Overlays) > 0 {
+		// the looped stills run a little longer than the chunk: end on the chunk's last frame (L14)
+		fc = append(fc, fmt.Sprintf("[ovl]trim=end_frame=%d,format=yuv420p,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv[out]", c.Frames))
+	}
 	args = append(args, "-filter_complex", strings.Join(fc, ";"), "-map", "[out]", "-an")
 	args = append(args, encArgs(preview)...)
 	args = append(args, "-pix_fmt", "yuv420p", "-r", fps, "-fps_mode", "cfr",
@@ -230,14 +287,28 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 	if say == nil {
 		say = func(string) {}
 	}
+	w, h := size(tl, o.Preview)
+	ps, err := Placements(tl, o.ProjDir, o.CacheDir, w, h)
+	if err != nil {
+		return nil, err
+	}
+	o.Overlays = ps
 	all := Plan(tl, srcs, o)
 	// a range renders exactly that part of the edit (whole frames): vtl is the trimmed edit
 	vtl, chunks := tl, all
-	w, h := size(tl, o.Preview)
-	res := &Result{Output: out, Width: w, Height: h, Preview: o.Preview, DryRun: o.DryRun}
+	res := &Result{Output: out, Width: w, Height: h, Preview: o.Preview, DryRun: o.DryRun, Overlays: ps}
 	if o.Range[1] > 0 {
 		vtl, res.RangeStart = tl.Trim(o.Range[0], o.Range[1])
-		chunks = Plan(vtl, srcs, o)
+		ro := o
+		ro.Overlays = nil
+		for _, p := range ps { // into the range file's time
+			p.Start, p.End = round6(math.Max(0, p.Start-res.RangeStart)), round6(math.Min(vtl.Duration(), p.End-res.RangeStart))
+			if p.End > p.Start {
+				ro.Overlays = append(ro.Overlays, p)
+			}
+		}
+		res.Overlays = ro.Overlays
+		chunks = Plan(vtl, srcs, ro)
 	}
 	for _, c := range chunks {
 		res.Expected += c.Duration

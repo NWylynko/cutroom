@@ -187,6 +187,12 @@ func lookEdit(c *Ctx) (*Result, error) {
 		}
 		prev := ""
 		var prevSeg *timeline.Segment
+		// overlays drawn as the render will (cards at the output size)
+		ps, err := render.Placements(tl, e.p.Dir, cacheDir(e.p), tl.Width, tl.Height)
+		if err != nil {
+			return nil, Errf(ExitInvalid, "overlay-failed", "`cutroom overlay list`; fix or remove the overlay", "%v", err)
+		}
+		shown := map[string]bool{}
 		for i := 0; i < n; i++ {
 			t := a
 			if n > 1 {
@@ -200,13 +206,30 @@ func lookEdit(c *Ctx) (*Result, error) {
 			if g.ZoomOf() > 1 {
 				label += fmt.Sprintf(" zoom %.2f×", g.ZoomOf())
 			}
-			cells = append(cells, perceive.Cell{Path: src(g.Source), T: st, Label: label,
+			var over []string
+			for _, p := range ps {
+				if t >= p.Start && t < p.End {
+					over = append(over, p.PNG)
+					label += " +" + p.ID
+					shown[p.ID] = true
+				}
+			}
+			cells = append(cells, perceive.Cell{Path: src(g.Source), T: st, Label: label, Over: over,
 				Say: srcWords(g.Source, st), VF: zoomVF(*g),
 				// a cut, not just a zoom change on continuous picture
 				Cut: prev != "" && prev != g.ID && !(prevSeg != nil && prevSeg.Source == g.Source && math.Abs(prevSeg.Out-g.In) < 1e-6)})
 			prev, prevSeg = g.ID, g
 		}
 		desc = fmt.Sprintf("%d frame(s) of the edit at output %s–%s; each labelled output time = source time; red bar = a cut happened before it", len(cells), clock(a), clock(b))
+		if len(shown) > 0 {
+			var ids []string
+			for _, p := range ps {
+				if shown[p.ID] {
+					ids = append(ids, p.ID)
+				}
+			}
+			desc += "; with overlay(s) " + strings.Join(ids, ", ") + " drawn as rendered (+oN in the label)"
+		}
 		name = fmt.Sprintf("output_%s-%s_x%d.png", stamp(a), stamp(b), n)
 	}
 	img, err := perceive.Cells(cells, cols)

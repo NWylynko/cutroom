@@ -251,7 +251,7 @@ func runStatus(c *Ctx) (*Result, error) {
 		if err != nil || json.Unmarshal(b, &m) != nil {
 			continue
 		}
-		cs := statusCaptions{Path: relToCwd(f), Current: d.Timeline != nil && m.TimelineHash == d.Timeline.Hash, Cues: m.Cues}
+		cs := statusCaptions{Path: relToCwd(f), Current: d.Timeline != nil && m.TimelineHash == render.CutHash(e.tl), Cues: m.Cues}
 		d.Captions = append(d.Captions, cs)
 		state := "current"
 		if !cs.Current {

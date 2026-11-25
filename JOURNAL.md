@@ -2,6 +2,32 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 31 · 2026-11-24 · M4 overlays: text cards and images anchored to words, checked frame-exactly
+Did: guide topic `overlays` first. Timeline gains `overlays` (id, kind text|image, anchor source +
+source time from `--at` words, `--to` words or `--duration`, layout, `--sub`, `--size`, `--fade`);
+`Window` derives the output span on the frame grid (anchor in a cut pad → first kept moment of the
+phrase); validate warns `overlay-orphaned` (anchor cut) and `overlay-overlap` (same layout, same
+time). `cutroom overlay add|list|rm` (with sub-help; undo-able through edit history). Cards are drawn
+by cutroom (Go fonts, L47): lower-third with accent bar, title/center, top, corner; images scaled
+with alpha. Card PNGs are cached by a key over the spec, output size and the referenced image's bytes
+(L19). Render: per chunk, each card is a looped still overlaid with `enable='between(n,a,b)'` (frame
+numbers, exact on the grid), `eof_action=repeat` (L16), alpha fades counted in frames, only at the
+part's own ends when it spans chunks; then `trim=end_frame` so the chunk keeps its frame count (L14);
+chunk keys change only for chunks an overlay touches. Range renders shift overlays into file time.
+Manifest records placements (file time + box). `look --output` composites cards as rendered (+oN).
+`check`: picture compares around the cards (masked MSE); new `overlay` check per card: box differs
+from the source picture inside its window (3 frames), matches it on the frame before and after.
+TimelineHash includes overlays (renders go stale); captions use a CutHash without them.
+Tests: TestL16_OverlayAcrossChunksIsFrameExact, TestL19_CardKeyFollowsImageBytes,
+TestCardsStayInFrame; e2e 163/163 (+16) incl. two planted faults (manifest window 0.5 s late →
+"still on screen"; render without the card → "not visible") and the orphaned-anchor warning.
+Measured: fixture with 2 overlays: preview render 1.0 s; card vs picture difference 2014 (lower
+third) and 5528 (title) inside, ≤ 60 outside; picture worst 0.3 around the cards.
+Surprises: the first overlay render had 416 frames for 413: the looped still (−t chunk + 3 spare
+frames) made `overlay` run past the base. A frame-count invariant (L14) caught it at once.
+Next: burned-in captions (one alpha clip, L48), then clip overlays; eval round 7 after that (adds
+overlay and captions tasks).
+
 ### 30 · 2026-11-24 · M4 `captions`: SRT/VTT of the edit, with reading and seam checks (L48, L49)
 Did: guide topic `captions` written first (example output, rules, checks), then `internal/captions`:
 OutputWords (the words the timeline keeps, in output time, clamped to segments; um/uh dropped with

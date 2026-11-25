@@ -108,6 +108,7 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 
 	// 2. picture: sampled render frames vs source frames (±3)
 	pictureCheck(file, m, fps, r)
+	overlayCheck(file, m, fps, r)
 	toneCheck(file, m, fps, r)
 
 	// 3. sync per segment + 4. words + 5. edges — all need audio
@@ -245,8 +246,9 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 			}
 			errs := make([]float64, len(burst))
 			best := math.Inf(1)
+			boxes := overlayBoxes(m, s.f, fps) // overlays aren't in the source: compare around them
 			for j, b := range burst {
-				errs[j] = mse(frames[s.f], b)
+				errs[j] = mseMasked(frames[s.f], b, boxes, false)
 				best = math.Min(best, errs[j])
 			}
 			// the frame that should be on screen: the one whose display interval [pts_j, pts_j+1)
@@ -984,4 +986,133 @@ func (r *Report) has(check string) bool {
 		}
 	}
 	return false
+}
+
+// --- overlays (L16, L20) -----------------------------------------------------------------------
+
+// overlayBoxes: the areas (in gw×gh pixels, padded) covered by overlays at render frame f.
+func overlayBoxes(m *render.Manifest, f int, fps float64) [][4]int {
+	var bs [][4]int
+	for _, p := range m.Overlays {
+		if f >= int(math.Round(p.Start*fps)) && f < int(math.Round(p.End*fps)) {
+			bs = append(bs, boxPx(p))
+		}
+	}
+	return bs
+}
+
+func boxPx(p render.Placement) [4]int {
+	return [4]int{int(math.Floor(p.Box[0]*gw)) - 1, int(math.Floor(p.Box[1]*gh)) - 1, int(math.Ceil(p.Box[2]*gw)) + 1, int(math.Ceil(p.Box[3]*gh)) + 1}
+}
+
+func inBox(x, y int, b [4]int) bool { return x >= b[0] && x < b[2] && y >= b[1] && y < b[3] }
+
+// mseMasked compares grey frames outside the boxes (inside = false) or only inside them (true).
+func mseMasked(a, b []byte, boxes [][4]int, inside bool) float64 {
+	if len(boxes) == 0 && !inside {
+		return mse(a, b)
+	}
+	s, n := 0.0, 0
+	for y := 0; y < gh; y++ {
+		for x := 0; x < gw; x++ {
+			in := false
+			for _, bx := range boxes {
+				in = in || inBox(x, y, bx)
+			}
+			if in != inside {
+				continue
+			}
+			d := float64(a[y*gw+x]) - float64(b[y*gw+x])
+			s += d * d
+			n++
+		}
+	}
+	if n == 0 {
+		return 0
+	}
+	return s / float64(n)
+}
+
+// overlayCheck: each overlay is visible inside its window and gone on the frame before it starts
+// and the frame after it ends — a frame-exact check against the source picture under the card.
+func overlayCheck(file string, m *render.Manifest, fps float64, r *Report) {
+	if len(m.Overlays) == 0 {
+		return
+	}
+	frames := grey(file, "", 0, 0)
+	// diffIn: the box's difference from the source frame shown there (found by matching around it)
+	diffIn := func(f int, box [4]int) (float64, bool) {
+		if f < 0 || f >= len(frames) {
+			return 0, false
+		}
+		var seg *render.MSeg
+		for i := range m.Segments {
+			g := &m.Segments[i]
+			a := int(math.Round(g.OutStart * fps))
+			if f >= a && f < a+int(g.Frames) {
+				seg = g
+			}
+		}
+		if seg == nil {
+			return 0, false
+		}
+		srcT := seg.In + (float64(f)-math.Round(seg.OutStart*fps))/fps
+		crop := ""
+		if seg.Zoom > 1.001 {
+			ax, ay := seg.Anchor()
+			crop = render.ZoomCrop(seg.Zoom, ax, ay)
+		}
+		burst, _ := greyBurst(m.Sources[seg.Source].Path, crop, srcT-2/fps, 5)
+		if len(burst) == 0 {
+			return 0, false
+		}
+		bj, be := 0, math.Inf(1)
+		for j, b := range burst {
+			if e := mseMasked(frames[f], b, [][4]int{box}, false); e < be {
+				bj, be = j, e
+			}
+		}
+		return mseMasked(frames[f], burst[bj], [][4]int{box}, true), true
+	}
+	for _, p := range m.Overlays {
+		box := boxPx(p)
+		fa, fb := int(math.Round(p.Start*fps)), int(math.Round(p.End*fps))
+		nf := int(math.Round(p.Fade * fps))
+		var bad []string
+		in := []int{fa + nf, (fa + fb) / 2, fb - 1 - nf}
+		if nf == 0 {
+			in[0], in[2] = fa, fb-1
+		}
+		minIn := math.Inf(1)
+		for _, f := range in {
+			if d, ok := diffIn(f, box); ok {
+				minIn = math.Min(minIn, d)
+				if d < 150 {
+					bad = append(bad, fmt.Sprintf("not visible at %.3f (frame %d, difference %.0f)", float64(f)/fps, f, d))
+				}
+			}
+		}
+		edge := ""
+		for _, f := range []int{fa - 1, fb} {
+			d, ok := diffIn(f, box)
+			if !ok {
+				continue
+			}
+			if d > 60 {
+				bad = append(bad, fmt.Sprintf("still on screen at %.3f (frame %d, outside its window, difference %.0f)", float64(f)/fps, f, d))
+			} else {
+				edge = "; gone on the frame before and after"
+			}
+		}
+		it := Item{Check: "overlay", At: round3(p.Start)}
+		if len(bad) > 0 {
+			it.Status = "fail"
+			it.Detail = fmt.Sprintf("%s %q (%.3f–%.3f): %s", p.ID, p.Name, p.Start, p.End, strings.Join(bad, "; "))
+			it.Fix = "`cutroom look --file " + m.Output + " " + strconv.FormatFloat(p.Start, 'f', 2, 64) + "` to see it; re-render (`cutroom render`); if it repeats, this is a cutroom bug"
+		} else {
+			it.Status = "pass"
+			it.Detail = fmt.Sprintf("%s %q visible over frames %d–%d (%.3f–%.3f, card differs from the picture by %.0f)%s", p.ID, p.Name, fa, fb-1, p.Start, p.End, minIn, edge)
+		}
+		r.add(it)
+	}
 }

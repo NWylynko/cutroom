@@ -66,12 +66,13 @@ type SheetFrame struct {
 
 // Cell is one frame on a sheet: which file, which time, how to label it.
 type Cell struct {
-	Path  string  `json:"path"`
-	T     float64 `json:"time"`  // time in Path
-	Label string  `json:"label"` // first line (white)
-	Say   string  `json:"saying,omitempty"`
-	Cut   bool    `json:"cut_before,omitempty"` // draw a cut marker on the left edge
-	VF    string  `json:"-"`                    // filter applied to the frame first (e.g. a punch-in crop)
+	Path  string   `json:"path"`
+	T     float64  `json:"time"`  // time in Path
+	Label string   `json:"label"` // first line (white)
+	Say   string   `json:"saying,omitempty"`
+	Cut   bool     `json:"cut_before,omitempty"` // draw a cut marker on the left edge
+	VF    string   `json:"-"`                    // filter applied to the frame first (e.g. a punch-in crop)
+	Over  []string `json:"overlays,omitempty"`   // full-frame RGBA PNGs drawn over it (overlays)
 }
 
 // Sheet builds a labelled contact sheet of n frames evenly spaced over [a, b] of one file.
@@ -149,6 +150,11 @@ func Cells(cells []Cell, cols int) (image.Image, error) {
 		y := pad + (i/cols)*(th+labelH+pad)
 		r := image.Rect(x, y, x+thumbW, y+th)
 		xdraw.CatmullRom.Scale(sheet, r, im, im.Bounds(), draw.Src, nil)
+		for _, p := range c.Over {
+			if ov, err := raster.LoadPNG(p); err == nil {
+				xdraw.CatmullRom.Scale(sheet, r, ov, ov.Bounds(), draw.Over, nil)
+			}
+		}
 		if c.Cut {
 			raster.Fill(sheet, image.Rect(x-pad+1, y, x-1, y+th), raster.Red)
 		}

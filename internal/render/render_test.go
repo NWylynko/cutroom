@@ -2,6 +2,7 @@ package render
 
 import (
 	"encoding/binary"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -160,5 +161,42 @@ func TestAudioForMultiTake(t *testing.T) {
 	tl.AudioFor, tl.Audio = nil, "loose"
 	if _, _, err := AudioFor(tl, srcs, "cam1"); err == nil {
 		t.Error("a hand-set recorder synced to nothing must be refused (L05)")
+	}
+}
+
+// L16: an overlay is a looped still shown by frame number and repeated, never ended with
+// eof_action=pass (which drops its last frame); across chunks each part fades only at its own ends,
+// and chunks without overlays keep their cache keys.
+func TestL16_OverlayAcrossChunksIsFrameExact(t *testing.T) {
+	tl := timeline.New("30", 1280, 720, "cam", "cam", 0, 200)
+	for s := 10.0; s < 190; s += 10 {
+		tl.Cut("cam", s, s+1, "x", true)
+	}
+	o := Options{Target: 45, CacheDir: t.TempDir()}
+	plain := Plan(tl, srcs(), o)
+	b := plain[0].Start + plain[0].Duration // first chunk boundary
+	o.Overlays = []Placement{{ID: "o1", PNG: "/x/o1.png", Key: "k1", Start: b - 2, End: b + 3, Fade: 0.2}}
+	cs := Plan(tl, srcs(), o)
+	if len(cs[0].Overlays) != 1 || len(cs[1].Overlays) != 1 {
+		t.Fatalf("overlay should be in chunks 1 and 2: %+v / %+v", cs[0].Overlays, cs[1].Overlays)
+	}
+	a, c := cs[0].Overlays[0], cs[1].Overlays[0]
+	if a.To != cs[0].Frames || a.From != cs[0].Frames-60 || !a.FadeIn || a.FadeOut {
+		t.Errorf("first part: %+v (chunk %d frames)", a, cs[0].Frames)
+	}
+	if c.From != 0 || c.To != 90 || c.FadeIn || !c.FadeOut {
+		t.Errorf("second part: %+v", c)
+	}
+	if cs[2].Key != plain[2].Key || cs[0].Key == plain[0].Key {
+		t.Errorf("keys: chunks with the overlay must change, others not")
+	}
+	args := strings.Join(chunkCmd(tl, srcs(), cs[0], false, "out.mp4"), " ")
+	for _, want := range []string{"-loop 1", "eof_action=repeat", fmt.Sprintf("between(n,%d,%d)", a.From, a.To-1), "fade=t=in", fmt.Sprintf("trim=end_frame=%d", cs[0].Frames)} {
+		if !strings.Contains(args, want) {
+			t.Errorf("chunk command lacks %q: %s", want, args)
+		}
+	}
+	if strings.Contains(args, "eof_action=pass") || strings.Contains(args, "fade=t=out") {
+		t.Errorf("L16 / wrong fade in first part: %s", args)
 	}
 }

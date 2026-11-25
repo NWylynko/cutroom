@@ -249,5 +249,35 @@ expect "check HDR render: tone"      'ok   tone +HDR \(HLG\) source tone-mapped'
 expect "render says HDR tone-mapped"  'is HDR \(HLG\): tone-mapped to SDR bt709' cutroom render --preview
 popd >/dev/null
 
+# overlays: text and image cards anchored to words; rendered, looked at and checked frame-exactly
+O="$W/overlay"; mkdir -p "$O"; cp $FIX/talk.mp4 "$O/"; pushd "$O" >/dev/null
+cutroom init talk.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+cutroom edit cut --from "By the way" --to "keyboard." >/dev/null
+ffmpeg -v error -y -f lavfi -i color=c=orange:s=240x120 -frames:v 1 logo.png
+expect "overlay add text"          'added o1: text "Install Linux", lower-third, output' cutroom overlay add text "Install Linux" --sub "Ubuntu Server" --at "Then install" --duration 2
+expect "overlay add image"         'added o2: image "logo.png", corner'  cutroom overlay add image logo.png --at "Finally" --to "update command." --fade 0
+expect "overlay add needs --at"    'overlay add needs --at'              cutroom overlay add text "x"
+expect "overlay bad layout"        'layouts: lower-third'                cutroom overlay add text "x" --at "Finally" --layout side
+expect "overlay list"              'o2 +image "logo.png" +corner'        cutroom overlay list
+expect "overlay sub-help"          'cutroom overlay add'                 sh -c 'cutroom overlay add --help | head -1'
+t1=$(cutroom overlay list --json | python3 -c 'import json,sys;o=json.load(sys.stdin)["result"]["overlays"][0];print(round((o["output_start"]+o["output_end"])/2,2))')
+expect "look --output shows overlay" 'with overlay\(s\) o1 drawn as rendered' cutroom look --output $t1
+expect "render with overlays"      '^wrote out/final\.mp4'               cutroom render
+expect "check: overlay text"       'ok   overlay +o1 "Install Linux" visible over frames .*gone on the frame before and after' cutroom check
+expect "check: overlay image"      'ok   overlay +o2 "logo.png" visible'  cutroom check
+expect "check: picture around cards" 'ok   picture'                       cutroom check
+# planted faults: the manifest says the card shows 0.5 s later than the render does / a render without it
+python3 -c 'import json;m=json.load(open("out/final.mp4.cutroom.json"));m["overlays"][0]["start"]+=0.5;m["overlays"][0]["end"]+=0.5;json.dump(m,open("out/late.mp4.cutroom.json","w"))'; cp out/final.mp4 out/late.mp4
+expect "check: overlay window wrong" 'FAIL overlay +o1 .*still on screen'  cutroom check out/late.mp4
+cutroom overlay rm o1 >/dev/null; cutroom overlay rm o2 >/dev/null; cutroom render out/bare.mp4 >/dev/null 2>&1
+python3 -c 'import json;m=json.load(open("out/final.mp4.cutroom.json"));m["output"]="out/bare.mp4";json.dump(m,open("out/bare.mp4.cutroom.json","w"))'
+expect "check: overlay missing"    'FAIL overlay +o1 .*not visible'      cutroom check out/bare.mp4
+cutroom edit undo >/dev/null; cutroom edit undo >/dev/null
+expect "overlay back after undo"   'o1 +text'                            cutroom overlay list
+cutroom edit cut --text "Then install Linux on it." >/dev/null
+expect "orphaned overlay warned"   'overlay-orphaned.*o1'                cutroom timeline
+expect "list says not shown"       'NOT SHOWN: its anchor "Then install"' cutroom overlay list
+popd >/dev/null
+
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

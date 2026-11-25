@@ -750,6 +750,17 @@ func runTimeline(c *Ctx) (*Result, error) {
 		lines = append(lines, fmt.Sprintf("%s  %-4s %s %s–%s  %s%s", clock(g.OutStart), g.ID, g.Source, clock(g.In), clock(g.Out), ellipsize(orNone(text), 90), zt))
 	}
 	lines = truncLines(lines, c.Bool("all"))
+	if n := len(tl.Overlays); n > 0 {
+		var ids []string
+		for _, o := range tl.Overlays {
+			if a, _, ok, _ := tl.Window(o); ok {
+				ids = append(ids, fmt.Sprintf("%s at %s", o.ID, clock(a)))
+			} else {
+				ids = append(ids, o.ID+" (not shown)")
+			}
+		}
+		lines = append(lines, fmt.Sprintf("overlays: %s — `cutroom overlay list`", strings.Join(truncList(ids, 6), ", ")))
+	}
 	if len(issues) == 0 {
 		lines = append(lines, "no problems found")
 	}

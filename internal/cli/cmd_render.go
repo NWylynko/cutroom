@@ -79,7 +79,7 @@ func runRender(c *Ctx) (*Result, error) {
 	}
 	o := render.Options{Preview: c.Bool("preview"), Jobs: c.Int("jobs"), Target: 45, CacheDir: cacheDir(e.p),
 		Loudness: c.Float("loudness"), TruePeak: c.Float("true-peak"), Chain: chain, DryRun: c.Bool("dry-run"),
-		Progress: func(s string) { fmt.Fprintln(c.ErrW, s) }}
+		Progress: func(s string) { fmt.Fprintln(c.ErrW, s) }, ProjDir: e.p.Dir}
 	if c.Has("range") {
 		a, b, err := parseRange(c.Str("range"), timecode.Rate{Num: 30, Den: 1})
 		if err != nil {

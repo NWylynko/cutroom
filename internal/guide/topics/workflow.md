@@ -15,9 +15,11 @@ every render (current or stale, checked or not) and the next step.
    `cutroom guide perceive`. `cutroom look` shows frames; `cutroom listen` settles doubts about audio.
 4. **Edit the timeline.** `cutroom edit tighten`, then `cutroom edit cut --from "…" --to "…"` for
    retakes and asides; check `cutroom timeline` and `cutroom timeline --joins`. See `cutroom guide edit`.
+   Text cards and images: `cutroom overlay add …` (see `cutroom guide overlays`).
 5. **Render.** `cutroom render --preview`, check it, then `cutroom render`. See `cutroom guide render`.
 6. **Verify.** `cutroom check` measures the render: frames, sync, every word, stray sounds,
    loudness. Fix what fails, re-render, check again. See `cutroom guide verify`.
+7. **Captions** (optional): `cutroom captions` writes out/captions.srt. See `cutroom guide captions`.
 
 ## Separate audio recorder (a mic recorded apart from the camera)
 1. `cutroom init talk.mp4 --source mic=recorder.wav` — add both.

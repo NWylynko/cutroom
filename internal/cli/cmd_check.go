@@ -89,7 +89,7 @@ func runCheck(c *Ctx) (*Result, error) {
 		mark := map[string]string{"pass": "ok  ", "warn": "WARN", "fail": "FAIL"}[it.Status]
 		where := ""
 		if it.At > 0 || it.Segment != "" {
-			where = fmt.Sprintf(" [%s %s]", clock(it.At), it.Segment)
+			where = " [" + strings.TrimSpace(clock(it.At)+" "+it.Segment) + "]"
 		}
 		l := fmt.Sprintf("%s %-11s %s%s", mark, it.Check, it.Detail, where)
 		if it.Fix != "" && it.Status != "pass" {
