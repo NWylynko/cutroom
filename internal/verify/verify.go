@@ -1211,7 +1211,9 @@ func clipFrames(file string, m *render.Manifest, p render.Placement, fps float64
 	bw, bh := evenInt(p.Box[2]*W-float64(bx)), evenInt(p.Box[3]*H-float64(by))
 	sw := 64
 	sh := max(8, int(math.Round(float64(sw)*float64(bh)/float64(bw))))
-	small := fmt.Sprintf("scale=%d:%d,format=gray", sw, sh)
+	// luma planes as stored: no colour-matrix conversion on either side (a tagged render and an
+	// untagged clip would otherwise be converted differently and hide or fake a colour shift)
+	small := fmt.Sprintf("scale=%d:%d,format=yuv420p,extractplanes=y", sw, sh)
 	fa, fb := int(math.Round(p.Start*fps)), int(math.Round(p.End*fps))
 	worst, n := 0.0, 0
 	for _, f := range []int{fa + (fb-fa)/4, (fa + fb) / 2, fa + 3*(fb-fa)/4} {
@@ -1235,8 +1237,8 @@ func clipFrames(file string, m *render.Manifest, p render.Placement, fps float64
 		}
 		n++
 		worst = math.Max(worst, best)
-		if best > 150 {
-			problem = fmt.Sprintf("the box at %.3f doesn't show the clip's frame at %.2f s (difference %.0f): wrong clip, --clip-in or placement", float64(f)/fps, t, best)
+		if best > 60 {
+			problem = fmt.Sprintf("the box at %.3f doesn't show the clip's frame at %.2f s (difference %.0f): wrong clip, --clip-in, placement or colours", float64(f)/fps, t, best)
 		}
 	}
 	if n > 0 && problem == "" {

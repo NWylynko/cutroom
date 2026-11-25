@@ -2,6 +2,26 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 38 · 2026-11-24 · eval round 8 (sonnet 11/12): a clip colour bug found and fixed
+Did: B-roll fixture terminal.mp4 (mandelbrot, unique frames, a 6 kHz tone as its sound); grader:
+vertical-crop search (21 anchors), `alt_during` (timed whisper → frames from the clip while the
+phrase is said), `speaker elsewhere`, `safe_bottom`, `no_tone=`, `vertical_9x16`; self-test 26/26.
+Tasks short + broll; 24 fresh agents; results in `evals/results/2026-11-24-8.md`.
+Round: sonnet 11/12, haiku 11/12 — both broll runs failed on the same cutroom bug: clip frames were
+colour-shifted (luma mean 144.2 → 138.5). ffmpeg's overlay now negotiates colour spaces: the base is
+labelled bt709, so the untagged clip was converted from bt601. Fix: the clip chain relabels bt709
+(setparams, as sources are) and stays YUV (yuva420p); CardVersion 3 so cached chunks re-render.
+cutroom's clip check had passed it (difference 14) because it compared through `format=gray`
+(an RGB-matrix path) with a 150 limit; it now compares stored luma planes, limit 60: the agents'
+render fails at 117, the fixed one scores 0. Re-rendered broll-sonnet's own project: grader PASS
+(frames 69/69 worst 0.2, cutaway 11/11, 6 kHz tone −62 dB vs speech −29 dB).
+Tests: TestClipKeepsColours; e2e 209/209.
+Surprises: the agents looked at the frames and saw the clip; a 5-level luma shift is invisible on a
+fractal but would tint real B-roll. The independent grader's strict frame match (30) is what caught
+it — the reason it shares no code with cutroom.
+Next: r8 friction (paths with --project, retake range, offset wording, look/transcript conveniences,
+short output), then round 9.
+
 ### 37 · 2026-11-24 · M5 shorts: vertical sub-projects, fill framing, safe zones (L41)
 Did: `cutroom short --from … --to … --name x` makes shorts/x/: a project of its own (same sources —
 paths rewritten for the folder — and the parent's transcripts copied), so every command works on it

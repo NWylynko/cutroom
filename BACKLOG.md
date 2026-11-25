@@ -7,7 +7,16 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- Eval round 8 (due after M5): add a `short` task (vertical, safe zones, an aside to drop) and a B-roll task.
+- [friction r8] Paths on the command line resolve against the shell's folder, with or without
+  --project (short-haiku); `no-timeline` mentions --project and existing shorts.
+- [friction r8] retake-kept shows the range its cut removes (pads included) (broll-haiku, hdr-haiku).
+- [friction r8] inspect: an audio start offset is when the camera started recording sound, not a
+  lip-sync error — say so (vfr-haiku).
+- [friction r8] `look <source-id> <time>`; `look --file x` with no time → a sheet of the whole file.
+- [friction r8] `transcript --file` prints phrases with pauses like a source transcript (resume-haiku).
+- [friction r8] short: `--output`, re-size an existing short (`edit frame --size`?), flag asides in
+  the span (short-sonnet).
+- Eval round 9 (after the r8 fixes): all 12 tasks; rounds 9 and 10 must be 100% sonnet (golden 3).
 - M6: `export --otio --edl`, README + install, `doctor` on a clean PATH.
 - Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
   T3 review, doctor/README.

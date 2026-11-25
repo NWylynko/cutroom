@@ -24,7 +24,7 @@ import (
 )
 
 // CardVersion changes whenever card drawing changes, so cached cards are redrawn.
-const CardVersion = 1
+const CardVersion = 3 // 3: clips relabelled bt709 like sources (newer ffmpeg converted untagged clips from bt601)
 
 // Placement is one overlay as rendered: a full-frame RGBA PNG shown over output [Start, End),
 // fading in and out over Fade seconds. Box is the drawn area as fractions of the frame

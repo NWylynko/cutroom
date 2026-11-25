@@ -243,3 +243,17 @@ func TestL48_CaptionsOneClipPerChunk(t *testing.T) {
 		t.Errorf("concat list: %s", list)
 	}
 }
+
+// A clip overlay is relabelled bt709 like the sources and kept in YUV: newer ffmpeg otherwise
+// converts an untagged clip from bt601 to the base's bt709 and shifts its colours (round 8).
+func TestClipKeepsColours(t *testing.T) {
+	tl := timeline.New("30", 1280, 720, "cam", "cam", 0, 30)
+	o := Options{Target: 45, CacheDir: t.TempDir(), Overlays: []Placement{{ID: "o1", Kind: "clip", Clip: "/x/b.mp4", Start: 2, End: 4, Full: true, Box: [4]float64{0, 0, 1, 1}, Key: "k"}}}
+	c := Plan(tl, srcs(), o)[0]
+	args := strings.Join(chunkCmd(tl, srcs(), c, false, "out.mp4"), " ")
+	i := strings.Index(args, "-i /x/b.mp4")
+	chain := args[strings.Index(args, "[1:v]"):]
+	if i < 0 || !strings.Contains(chain, "setparams=colorspace=bt709") || !strings.Contains(chain, "format=yuva420p") || strings.Contains(chain[:strings.Index(chain, "[o0]")], "rgba") {
+		t.Fatalf("clip chain must relabel bt709 and stay YUV: %s", chain)
+	}
+}

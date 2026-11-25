@@ -307,7 +307,7 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 			args = append(args, "-i", co.P.Clip)
 			// a clip shorter than its window holds its last frame (tpad clone); then it is shifted to
 			// start on chunk frame From (transparent before it)
-			chain = fmt.Sprintf("[%d:v]", in) + sdr.Chain(fmt.Sprintf("fps=fps=%s:round=near,scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d,setsar=1,format=rgba,tpad=stop=-1:stop_mode=clone,trim=end_frame=%d,setpts=PTS-STARTPTS,tpad=start=%d:start_mode=add:color=black@0",
+			chain = fmt.Sprintf("[%d:v]", in) + sdr.Chain(fmt.Sprintf("fps=fps=%s:round=near,scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d,setsar=1,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,format=yuva420p,tpad=stop=-1:stop_mode=clone,trim=end_frame=%d,setpts=PTS-STARTPTS,tpad=start=%d:start_mode=add:color=black@0",
 				fps, bw, bh, bw, bh, n, co.From))
 		} else {
 			args = append(args, "-loop", "1", "-framerate", fps, "-t", f6(float64(c.Frames+3)/tl.Rate()), "-i", co.P.PNG)
