@@ -7,8 +7,14 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- Eval round 6 (7 tasks; consider a multi-take task and a real-speech retake task).
-- Golden criterion 3 met in rounds 3+4; the remaining gap is spec coverage (M2–M6), T3, doctor/README.
+- [friction r6] `render --range` rendered the whole timeline into `preview-range.mp4` (resume-haiku:
+  "either cut to the requested range or refuse with a clear message").
+- [friction r6] `transcript` with several sources showed only the first (pickup-sonnet: "the first call
+  looked like the whole answer").
+- [friction r6] `edit undo --help` / `edit cut --help` print the whole `edit` usage; `edit reset` is not
+  in the workflow guide (fix-edit-haiku).
+- Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
+  T3 review, doctor/README.
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
 
@@ -16,8 +22,16 @@ Move done items to the journal, not here.
 - `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
 
 ## NEXT
-- [friction r5] Acknowledge a warning you decided to keep (`cutroom timeline --accept retake-kept@4.09`
-  or similar), so status/check show it as decided (recorder-haiku, phone-haiku).
+- [friction r6] Orientation/HDR evidence: "print one explicit 'upright: yes' line backed by an image
+  path I can look at" (phone-footage-sonnet; also phone-footage-haiku, hdr-phone-haiku).
+- [friction r6] Off-topic aside suspect ("By the way …") (tighten-sonnet, fix-edit-sonnet).
+- [friction r6] `listen`: mark low-confidence words in the isolated re-transcription (tighten-haiku:
+  "a wrong isolated word looks as authoritative as a correct one").
+- [friction r6] `check`: per-segment sync values and the offset/VFR handling applied (vfr-sync-haiku).
+- [friction r6] timeline: show the words each cut removes (fix-edit-haiku).
+- [friction r5, r6] Acknowledge a warning you decided to keep (`cutroom timeline --accept retake-kept@4.09`
+  or similar), so status/check show it as decided (recorder-haiku, phone-haiku; r6 recorder ×2: "make
+  the retake decision an explicit choice").
 - [friction r5] `edit cut --phrase N` using `cutroom transcript` phrase numbers (tighten-haiku).
 - [friction r5] tighten: say which removed suspect sounds were never listened to (vfr-haiku).
 - Fixture: add a per-frame marker (frame number box) to talk.mp4 so graders can place frames exactly

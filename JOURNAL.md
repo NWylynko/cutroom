@@ -2,6 +2,16 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 28 · 2026-11-24 · eval round 6 recorded: sonnet 8/8, haiku 8/8
+Did: graded the 16 kept round-6 runs with the independent grader (they had friction reports but no
+grades), wrote `evals/results/2026-11-24-6.md`, moved the friction into the backlog.
+Measured: all PASS, 0 cutroom errors, no medium friction; fourth clean sonnet round (3–6). pickup:
+≈1.8 s of pickup.mp4 frames in both outputs, the line said once.
+Surprises: the loop had stopped between writing the friction reports and grading — iteration 27's
+commit included the reports but the round was never recorded. Grading after the fact works because
+run dirs are kept until recorded (LOOP step 4).
+Next: r6 friction (`render --range`, multi-source `transcript`, subcommand help), then M4 captions.
+
 ### 27 · 2026-11-24 · retakes: one warning per retake, cut at sentence boundaries
 Did: repeat suspects whose attempts interleave (each first take before the other's last take) are one
 retake: one `retake-kept` warning ("… and N more phrase(s) are said again later"), one suggested cut.
