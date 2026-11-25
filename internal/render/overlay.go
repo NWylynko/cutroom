@@ -17,6 +17,8 @@ import (
 	"golang.org/x/image/font"
 
 	"github.com/cutroom/cutroom/internal/captions"
+	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/cutroom/cutroom/internal/media"
 	"github.com/cutroom/cutroom/internal/raster"
 	"github.com/cutroom/cutroom/internal/timeline"
 )
@@ -39,6 +41,11 @@ type Placement struct {
 	Name  string     `json:"name"`
 	// Groups: burned-in captions, each a card shown over [Start, End)
 	Groups []CapGroup `json:"groups,omitempty"`
+	// clip: the video (absolute path) and where in it the overlay starts
+	Clip    string  `json:"clip,omitempty"`
+	ClipIn  float64 `json:"clip_in,omitempty"`
+	ClipDur float64 `json:"clip_duration,omitempty"`
+	Full    bool    `json:"full,omitempty"` // covers the whole frame
 }
 
 // CapGroup is one burned-in caption group as rendered.
@@ -67,6 +74,18 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 				return nil, err
 			}
 			ps = append(ps, p)
+			continue
+		}
+		if o.Kind == "clip" {
+			abs := absIn(projDir, o.Path)
+			st, err := os.Stat(abs)
+			if err != nil {
+				return nil, fmt.Errorf("overlay %s: %w", o.ID, err)
+			}
+			r := clipBox(o, w, h)
+			ps = append(ps, Placement{ID: o.ID, Kind: "clip", Start: a, End: b, Fade: o.Fade, Name: o.Path, Clip: abs, ClipIn: o.ClipIn, ClipDur: o.ClipDur, Full: o.Layout == "full",
+				Key: hash([]any{CardVersion, "clip", abs, st.Size(), st.ModTime().UnixNano(), o.ClipIn, o.Layout, o.Size, w, h}),
+				Box: [4]float64{float64(r.Min.X) / float64(w), float64(r.Min.Y) / float64(h), float64(r.Max.X) / float64(w), float64(r.Max.Y) / float64(h)}})
 			continue
 		}
 		if burned && (o.Layout == "lower-third" || o.Layout == "") && o.Kind != "captions" {
@@ -350,4 +369,58 @@ func blankPNG(cacheDir string, w, h int) (string, error) {
 		return "", err
 	}
 	return p, raster.SavePNG(p, image.NewNRGBA(image.Rect(0, 0, w, h)))
+}
+
+// clipBox is where a clip overlay sits: the whole frame (full), or a box of --size × the frame
+// width (default 0.35) with the clip's aspect, placed by layout. Sizes are even (yuv420).
+func clipBox(o timeline.Overlay, w, h int) image.Rectangle {
+	if o.Layout == "full" {
+		return image.Rect(0, 0, w, h)
+	}
+	size := o.Size
+	if size <= 0 {
+		size = 0.35
+	}
+	bw := even(size * float64(w))
+	bh := even(float64(bw) * float64(max(1, o.ClipH)) / float64(max(1, o.ClipW)))
+	margin := int(0.06 * float64(w))
+	if bh > h-2*margin {
+		bh = even(float64(h - 2*margin))
+		bw = even(float64(bh) * float64(max(1, o.ClipW)) / float64(max(1, o.ClipH)))
+	}
+	x, y := place(o.Layout, w, h, bw, bh, margin)
+	return image.Rect(x, y, x+bw, y+bh)
+}
+
+// ClipCard draws the frame a clip overlay shows at output time t into a transparent w×h image (for
+// `look --output`), cached in cacheDir.
+func ClipCard(p Placement, t float64, cacheDir string, w, h int) (string, error) {
+	ct := p.ClipIn + (t - p.Start)
+	if p.ClipDur > 0 { // past its end the render holds the last frame
+		ct = math.Min(ct, p.ClipDur-0.1)
+	}
+	png := filepath.Join(cacheDir, "overlays", hash([]any{p.Key, round3(ct), w, h})+".png")
+	if _, err := os.Stat(png); err == nil {
+		return png, nil
+	}
+	bx, by := int(math.Round(p.Box[0]*float64(w))), int(math.Round(p.Box[1]*float64(h)))
+	bw, bh := even(p.Box[2]*float64(w)-float64(bx)), even(p.Box[3]*float64(h)-float64(by))
+	sdr := media.ReadSDR(p.Clip, 0, 0)
+	frame := png + ".frame.png"
+	args := append([]string{"-hide_banner", "-loglevel", "error", "-y", "-ss", f6(math.Max(0, ct))}, sdr.Pre...)
+	args = append(args, "-i", p.Clip, "-vf", sdr.Chain(fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d", bw, bh, bw, bh)), "-frames:v", "1", frame)
+	if err := ensureDir(png); err != nil {
+		return "", err
+	}
+	if _, err := deps.Run("ffmpeg", args...); err != nil {
+		return "", err
+	}
+	defer os.Remove(frame)
+	src, err := raster.LoadPNG(frame)
+	if err != nil {
+		return "", err
+	}
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	draw.Draw(img, image.Rect(bx, by, bx+bw, by+bh), src, src.Bounds().Min, draw.Src)
+	return png, raster.SavePNG(png, img)
 }

@@ -2,10 +2,12 @@ package cli
 
 import (
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/cutroom/cutroom/internal/media"
 	"github.com/cutroom/cutroom/internal/render"
 	"github.com/cutroom/cutroom/internal/timeline"
 )
@@ -23,10 +25,14 @@ words). It is anchored to the words, not to a time, so later cuts never move it 
   overlay add text "Install Linux" --at "Then install" --duration 3
   overlay add text "Nick Wylie" --sub "Builds personal software" --at "Hi, today" --to "home server."
   overlay add image logo.png --at "Finally" --duration 4 --layout corner --size 0.2
+  overlay add clip terminal.mp4 --at "open the terminal" --to "update command." [--clip-in 2.5]
+                                  B-roll: the clip covers the frame (--layout full, default) or sits
+                                  in a corner (--layout corner --size 0.35); muted — the voice goes on
   overlay set o2 --duration 2.2   change one in place (also --to, --at, --layout, --text, --sub, --fade, --size)
   overlay list                    every overlay with its output time, or why it won't show
   overlay rm o2
-Layouts: lower-third (default for text), title, top, corner (default for images), center.
+Layouts: lower-third (default for text), title, top, corner (default for images), center;
+full (clips only, their default).
 Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rendering:
 ` + "`cutroom look --output <time>`" + ` shows the edit with its overlays.`,
 		Flags: []Flag{
@@ -41,6 +47,7 @@ Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rend
 			{Name: "occurrence", Kind: "int", Help: "Pick the Nth --at match when words repeat"},
 			{Name: "source", Kind: "string", Help: "Only match words in this source"},
 			{Name: "text", Kind: "string", Help: "set: new text for a text overlay"},
+			{Name: "clip-in", Kind: "float", Default: "0", Help: "clip: where in the clip to start (s)"},
 			{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"},
 		},
 		Subs: map[string]Sub{
@@ -49,10 +56,11 @@ Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rend
   overlay set o2 --at "Then install"   move it to other words
   overlay set o2 --layout top --text "Step 2" --sub "…" --fade 0
 Changes only what you give; the id stays.`,
-				Flags: []string{"duration", "to", "at", "near", "occurrence", "source", "layout", "text", "sub", "fade", "size", "dry-run"}},
+				Flags: []string{"duration", "to", "at", "near", "occurrence", "source", "layout", "text", "sub", "fade", "size", "clip-in", "dry-run"}},
 			"add": {Usage: `  overlay add text "Install Linux" --at "Then install" [--duration 3 | --to "on it."] [--sub "…"]
-  overlay add image logo.png --at "Finally" --duration 4 [--layout corner] [--size 0.2]`,
-				Flags: []string{"at", "to", "duration", "sub", "layout", "size", "fade", "near", "occurrence", "source", "dry-run"}},
+  overlay add image logo.png --at "Finally" --duration 4 [--layout corner] [--size 0.2]
+  overlay add clip broll.mp4 --at "open the terminal" [--to "…" | --duration 3] [--clip-in 2.5] [--layout full|corner] [--size 0.35]`,
+				Flags: []string{"at", "to", "duration", "sub", "layout", "size", "fade", "clip-in", "near", "occurrence", "source", "dry-run"}},
 			"list": {Usage: `  overlay list   every overlay: id, kind, output time, layout, anchor words`},
 			"rm":   {Usage: `  overlay rm o2  remove an overlay (undo-able with ` + "`cutroom edit undo`" + `)`, Flags: []string{"dry-run"}},
 		},
@@ -160,7 +168,7 @@ func ovDesc(o timeline.Overlay) string {
 	if o.Kind == "captions" {
 		return "burned-in captions (the whole edit)"
 	}
-	if o.Kind == "image" {
+	if o.Kind == "image" || o.Kind == "clip" {
 		return o.Path
 	}
 	return o.Text
@@ -180,7 +188,7 @@ func (e *editEnv) overlayFromFlags(c *Ctx) (timeline.Overlay, error) {
 		if o.Layout == "" {
 			o.Layout = "lower-third"
 		}
-	case "image":
+	case "image", "clip":
 		p := c.Args[2]
 		abs := p
 		if !filepath.IsAbs(abs) {
@@ -195,17 +203,40 @@ func (e *editEnv) overlayFromFlags(c *Ctx) (timeline.Overlay, error) {
 			p = abs
 		}
 		o.Path = p
+		if o.Sub != "" {
+			return o, Errf(ExitUsage, "bad-flag", "--sub is for text overlays", "%s overlays have no --sub", o.Kind)
+		}
 		if o.Layout == "" {
 			o.Layout = "corner"
 		}
-		if o.Sub != "" {
-			return o, Errf(ExitUsage, "bad-flag", "--sub is for text overlays", "image overlays have no --sub")
+		if o.Kind == "clip" {
+			f, err := media.Probe(abs, media.Options{})
+			if err != nil || f.Video == nil {
+				return o, Errf(ExitUsage, "not-a-video", "give a video file (mp4, mov, …) for a clip overlay", "%s has no video stream", p)
+			}
+			o.ClipDur, o.ClipW, o.ClipH = f.Video.Duration, f.Video.Width, f.Video.Height
+			if o.ClipDur <= 0 {
+				o.ClipDur = f.Duration
+			}
+			o.ClipIn = c.Float("clip-in")
+			if o.ClipIn < 0 || o.ClipIn >= o.ClipDur {
+				return o, Errf(ExitUsage, "bad-flag-value", fmt.Sprintf("--clip-in is a time inside the clip (0–%.2f s)", o.ClipDur), "--clip-in %.2f is outside the clip", o.ClipIn)
+			}
+			if !c.Has("layout") {
+				o.Layout = "full" // a cutaway over the whole frame
+			}
+			if !c.Has("fade") {
+				o.Fade = 0 // B-roll cuts in and out
+			}
+			if !c.Has("duration") && !c.Has("to") {
+				o.Duration = math.Min(4, o.ClipDur-o.ClipIn)
+			}
 		}
 	default:
-		return o, Errf(ExitUsage, "bad-kind", "overlay add text \"…\" or overlay add image <file>", "no overlay kind %q (text or image)", o.Kind)
+		return o, Errf(ExitUsage, "bad-kind", "overlay add text \"…\", overlay add image <file> or overlay add clip <video>", "no overlay kind %q (text, image or clip)", o.Kind)
 	}
-	if !contains(render.Layouts, o.Layout) {
-		return o, Errf(ExitUsage, "bad-layout", "layouts: "+strings.Join(render.Layouts, ", "), "no layout %q", o.Layout)
+	if !contains(render.Layouts, o.Layout) && !(o.Kind == "clip" && o.Layout == "full") {
+		return o, Errf(ExitUsage, "bad-layout", "layouts: "+strings.Join(render.Layouts, ", ")+" (clips also: full)", "no layout %q", o.Layout)
 	}
 	if o.Fade < 0 || o.Fade > 2 {
 		return o, Errf(ExitUsage, "bad-flag-value", "--fade 0–2 seconds", "--fade %.2f out of range", o.Fade)
@@ -312,7 +343,7 @@ func (e *editEnv) overlaySet(c *Ctx, o timeline.Overlay) (timeline.Overlay, []st
 		ch = append(ch, fmt.Sprintf("--duration %g", o.Duration))
 	}
 	if c.Has("layout") {
-		if !contains(render.Layouts, c.Str("layout")) {
+		if !contains(render.Layouts, c.Str("layout")) && !(o.Kind == "clip" && c.Str("layout") == "full") {
 			return o, nil, Errf(ExitUsage, "bad-layout", "layouts: "+strings.Join(render.Layouts, ", "), "no layout %q", c.Str("layout"))
 		}
 		o.Layout = c.Str("layout")
@@ -341,9 +372,19 @@ func (e *editEnv) overlaySet(c *Ctx, o timeline.Overlay) (timeline.Overlay, []st
 		o.Fade = c.Float("fade")
 		ch = append(ch, fmt.Sprintf("--fade %g", o.Fade))
 	}
+	if c.Has("clip-in") {
+		if o.Kind != "clip" {
+			return o, nil, Errf(ExitUsage, "bad-flag", "--clip-in is for clip overlays", "%s is a %s overlay", o.ID, o.Kind)
+		}
+		if v := c.Float("clip-in"); v < 0 || v >= o.ClipDur {
+			return o, nil, Errf(ExitUsage, "bad-flag-value", fmt.Sprintf("--clip-in is a time inside the clip (0–%.2f s)", o.ClipDur), "--clip-in %.2f is outside the clip", v)
+		}
+		o.ClipIn = c.Float("clip-in")
+		ch = append(ch, fmt.Sprintf("--clip-in %g", o.ClipIn))
+	}
 	if c.Has("size") {
-		if o.Kind != "image" {
-			return o, nil, Errf(ExitUsage, "bad-flag", "--size is for image overlays", "%s is a text overlay", o.ID)
+		if o.Kind == "text" {
+			return o, nil, Errf(ExitUsage, "bad-flag", "--size is for image and clip overlays", "%s is a text overlay", o.ID)
 		}
 		o.Size = c.Float("size")
 		ch = append(ch, fmt.Sprintf("--size %g", o.Size))

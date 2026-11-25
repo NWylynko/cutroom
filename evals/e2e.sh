@@ -320,5 +320,21 @@ expect "apply runs the fix"         'applying the retake-kept fix: cutroom edit 
 expect "after apply: no retake"     'no problems found'                  cutroom timeline
 popd >/dev/null
 
+# clip overlays (B-roll): full-frame cutaway and a corner inset from an HDR, rotated phone clip
+B="$W/broll"; mkdir -p "$B"; cp $FIX/talk.mp4 $FIX/talk-hdr.mov "$B/"; pushd "$B" >/dev/null
+ffmpeg -v error -y -f lavfi -i "mandelbrot=s=640x360:rate=30" -t 3 -pix_fmt yuv420p broll.mp4
+cutroom init talk.mp4 >/dev/null; cutroom transcribe talk --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+expect "clip add: full by default"  'added o1: clip "broll.mp4", full, output .*\(3\.000 s\)' cutroom overlay add clip broll.mp4 --at "Finally" --duration 3
+expect "clip add: HDR inset"        'added o2: clip "talk-hdr.mov", corner'  cutroom overlay add clip talk-hdr.mov --at "Hi, today" --layout corner --size 0.3 --duration 2 --clip-in 1
+expect "clip-short warned"          'clip-short.*o1.*last frame is held' sh -c 'cutroom overlay set o1 --duration 4 >/dev/null; cutroom timeline'
+expect "clip: bad clip-in"          'outside the clip'                   cutroom overlay add clip broll.mp4 --at "Finally" --clip-in 9
+expect "look shows the clip"        'with overlay\(s\) o2 drawn'          cutroom look --output 1
+expect "render with clips"          '^wrote out/final\.mp4'               cutroom render
+expect "check: clip frames (full)"  'ok   overlay +o1 .*shows the clip.s own frames from 0\.00 s' cutroom check
+expect "check: clip frames (HDR inset)" 'ok   overlay +o2 .*shows the clip.s own frames from 1\.00 s' cutroom check
+python3 -c 'import json;m=json.load(open("out/final.mp4.cutroom.json"));[o.update(clip_in=0) for o in m["overlays"] if o["id"]=="o2"];json.dump(m,open("out/wrongin.mp4.cutroom.json","w"))'; cp out/final.mp4 out/wrongin.mp4
+expect "check: wrong clip-in caught" 'FAIL overlay +o2 .*doesn.t show the clip.s frame' cutroom check out/wrongin.mp4
+popd >/dev/null
+
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

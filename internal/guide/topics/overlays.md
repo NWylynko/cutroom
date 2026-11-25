@@ -15,7 +15,16 @@ look at it: `cutroom look --output 7.75`
   `top`, `corner` (top right; image default). `--sub` adds a smaller second line to text.
 - `cutroom overlay add image logo.png --at "Finally" --duration 4 [--size 0.2]` — PNG or JPEG (alpha
   kept); `--size` is its width as a fraction of the frame.
-- `--fade 0.2` (default) fades in and out; `--fade 0` cuts in and out on exact frames.
+- `cutroom overlay add clip terminal.mp4 --at "open the terminal" --to "update command." [--clip-in 2.5]`
+  — B-roll: by default the clip covers the whole frame (`--layout full`) as a cutaway; `--layout
+  corner --size 0.35` makes it an inset. Clips are muted (the voice goes on), start at `--clip-in`
+  seconds into the clip, and hold their last frame if the window is longer (`clip-short` warns).
+  HDR and rotated phone clips are converted like sources. `check` compares the box with the clip's
+  own frames at the right moment.
+- `cutroom overlay set o1 --duration 3` changes one in place (also `--to`, `--at`, `--layout`,
+  `--text`, `--sub`, `--fade`, `--size`, `--clip-in`); a text card too short to read warns
+  `overlay-short` with the duration it needs.
+- `--fade 0.2` (default for text and images; clips cut in and out) fades in and out; `--fade 0` cuts in and out on exact frames.
 - `cutroom overlay list` shows each overlay's output time, or `NOT SHOWN` and why (its anchor words
   were cut — `cutroom timeline` warns `overlay-orphaned`). Two overlays in the same layout at the same
   time warn `overlay-overlap`. `cutroom overlay rm o1` removes one; `cutroom edit undo` brings it back.

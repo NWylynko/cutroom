@@ -2,6 +2,29 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 36 · 2026-11-24 · M4 clip overlays (B-roll): cutaways and insets, checked against the clip's frames
+Did: `overlay add clip <video> --at … [--to|--duration] [--clip-in s] [--layout full|corner|… --size]`
+(clip probed on add: duration, displayed size; full by default, no fade, muted). Render: per chunk
+the clip is read from ClipIn + the part's offset through the same SDR/rotation path as sources,
+scaled to fill its box (increase + crop), `tpad=stop=-1:stop_mode=clone` holds its last frame when the
+window outlasts it (`clip-short` warns with the duration that fits), `tpad=start=From` places it on
+the chunk's frame grid, overlay `enable=between(n,…)` at the box position. Chunk keys include the
+clip's size+mtime. `look --output` draws the clip frame for that moment (ClipCard, clamped to its end).
+`check`: the window check matches on the whole frame when the box covers most of it (a full cutaway
+leaves nothing around it), and a new clip-frame comparison crops the box at the render's own pixels
+and compares it at 64 px wide with the clip at ClipIn + offset (5-frame burst).
+`overlay set` gains --clip-in; --size works for clips.
+Tests: TestClipBoxes; e2e 198/198 (+9) incl. an HDR, 180°-rotated phone clip as an inset, the
+clip-short warning, and a manifest with the wrong clip-in → FAIL "doesn't show the clip's frame".
+Measured: clip frames vs render: worst difference 15 (full) and 18 (inset); wrong --clip-in: 925.
+Surprises: (1) the first clip-frame check compared at the 160×90 grey size: an inset is ~48×28 px
+there and rounding its edges gave differences of 300–1400 on a correct render; measuring the render
+frame by frame against the clip showed the render was right to the frame. (2) a full-frame box left
+no picture to locate the source frame by, so the "gone after" probe compared against a neighbour
+frame and reported the clip still on screen.
+Next: M4 is complete (text, image, clip overlays, captions SRT + burned). M5: `short` preset and
+safe zones (L41).
+
 ### 35 · 2026-11-24 · deciding warnings: `timeline --apply` and `--accept`
 Did: every WARN can now be decided in one step. `cutroom timeline --apply <code>[@<output time>]` runs
 the warning's own suggested edit (the backticked `cutroom edit|overlay …` in its fix; refused with

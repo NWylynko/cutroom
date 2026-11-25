@@ -7,7 +7,7 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- M4: clip overlays (a video inset / B-roll over the speaker), anchored like text/image overlays.
+- M5: `short` preset (vertical timeline between two phrases, short-form defaults) + safe-zone check (L41).
 - Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
   T3 review, doctor/README.
 ## M0 — leftovers
@@ -52,7 +52,6 @@ Move done items to the journal, not here.
   split ("authentication and | authorization checks"); word-level highlight (karaoke) is not v1.
 - captions: line breaks can split an adjective from its noun ("fully | working" on deploy); a
   part-of-speech-free fix would be a small list of common adjective/noun pairs — low priority.
-- Clip overlays (video B-roll/insets), anchored like text/image overlays. [L16]
 
 ## M5 — multi-source & shorts
 - Multi-take timelines (segments from several video sources; sync per take). HDR tone-map path. [L23 L24 L25]

@@ -291,8 +291,25 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 			fc = append(fc, fmt.Sprintf("[base%d][o%d]overlay=0:0:eof_action=repeat[%s]", k, k, next))
 			continue
 		}
-		args = append(args, "-loop", "1", "-framerate", fps, "-t", f6(float64(c.Frames+3)/tl.Rate()), "-i", co.P.PNG)
-		chain = fmt.Sprintf("[%d:v]format=rgba", in)
+		x0, y0 := 0, 0
+		if co.P.Kind == "clip" { // B-roll: its frames from the right moment, scaled into its box, muted
+			bx, by := int(math.Round(co.P.Box[0]*float64(w))), int(math.Round(co.P.Box[1]*float64(h)))
+			bw, bh := even(co.P.Box[2]*float64(w)-float64(bx)), even(co.P.Box[3]*float64(h)-float64(by))
+			x0, y0 = bx, by
+			n := co.To - co.From
+			seek := co.P.ClipIn + (c.Start + float64(co.From)/tl.Rate() - co.P.Start)
+			sdr := media.ReadSDR(co.P.Clip, 0, 0) // HDR clips tone-mapped, rotation applied, like sources
+			args = append(args, "-ss", f6(math.Max(0, seek)), "-t", f6(float64(n+3)/tl.Rate()))
+			args = append(args, sdr.Pre...)
+			args = append(args, "-i", co.P.Clip)
+			// a clip shorter than its window holds its last frame (tpad clone); then it is shifted to
+			// start on chunk frame From (transparent before it)
+			chain = fmt.Sprintf("[%d:v]", in) + sdr.Chain(fmt.Sprintf("fps=fps=%s:round=near,scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d,setsar=1,format=rgba,tpad=stop=-1:stop_mode=clone,trim=end_frame=%d,setpts=PTS-STARTPTS,tpad=start=%d:start_mode=add:color=black@0",
+				fps, bw, bh, bw, bh, n, co.From))
+		} else {
+			args = append(args, "-loop", "1", "-framerate", fps, "-t", f6(float64(c.Frames+3)/tl.Rate()), "-i", co.P.PNG)
+			chain = fmt.Sprintf("[%d:v]format=rgba", in)
+		}
 		nf := int64(math.Max(1, math.Round(co.P.Fade*tl.Rate())))
 		if co.FadeIn {
 			chain += fmt.Sprintf(",fade=t=in:s=%d:n=%d:alpha=1", co.From, nf)
@@ -305,7 +322,7 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 			next = "ovl"
 		}
 		fc = append(fc, chain+fmt.Sprintf("[o%d]", k),
-			fmt.Sprintf("[base%d][o%d]overlay=0:0:eof_action=repeat:enable='between(n,%d,%d)'[%s]", k, k, co.From, co.To-1, next))
+			fmt.Sprintf("[base%d][o%d]overlay=%d:%d:eof_action=repeat:enable='between(n,%d,%d)'[%s]", k, k, x0, y0, co.From, co.To-1, next))
 	}
 	if len(c.Overlays) > 0 {
 		// the looped stills run a little longer than the chunk: end on the chunk's last frame (L14)

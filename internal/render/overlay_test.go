@@ -65,3 +65,23 @@ func TestCardsStayInFrame(t *testing.T) {
 		}
 	}
 }
+
+func TestClipBoxes(t *testing.T) {
+	o := timeline.Overlay{Kind: "clip", ClipW: 1920, ClipH: 1080, Layout: "full"}
+	if r := clipBox(o, 1280, 720); r != image.Rect(0, 0, 1280, 720) {
+		t.Fatalf("full: %v", r)
+	}
+	for _, l := range Layouts {
+		for _, sz := range []float64{0, 0.2, 0.9} {
+			o.Layout, o.Size = l, sz
+			r := clipBox(o, 1280, 720)
+			if !r.In(image.Rect(0, 0, 1280, 720)) || r.Dx()%2 != 0 || r.Dy()%2 != 0 || r.Empty() {
+				t.Errorf("%s size %.1f: box %v (must be inside, even)", l, sz, r)
+			}
+		}
+	}
+	o.ClipW, o.ClipH, o.Layout, o.Size = 1080, 1920, "corner", 0.5 // a vertical clip is capped by height
+	if r := clipBox(o, 1280, 720); r.Dy() > 720 {
+		t.Errorf("vertical clip overflows: %v", r)
+	}
+}

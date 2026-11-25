@@ -1083,9 +1083,15 @@ func overlayCheck(file string, m *render.Manifest, fps float64, r *Report) {
 		if len(burst) == 0 {
 			return 0, false
 		}
+		// find the source frame shown there by the picture around the box; a box over most of the
+		// frame (a full-frame clip) leaves too little around it, so match on the whole frame
+		mask := [][4]int{box}
+		if (box[2]-box[0])*(box[3]-box[1]) > gw*gh/2 {
+			mask = nil
+		}
 		bj, be := 0, math.Inf(1)
 		for j, b := range burst {
-			if e := mseMasked(frames[f], b, [][4]int{box}, false); e < be {
+			if e := mseMasked(frames[f], b, mask, false); e < be {
 				bj, be = j, e
 			}
 		}
@@ -1125,6 +1131,14 @@ func overlayCheck(file string, m *render.Manifest, fps float64, r *Report) {
 				edge = "; gone on the frame before and after"
 			}
 		}
+		clipNote := ""
+		if p.Kind == "clip" {
+			note, problem := clipFrames(file, m, p, fps)
+			if problem != "" {
+				bad = append(bad, problem)
+			}
+			clipNote = note
+		}
 		it := Item{Check: "overlay", At: round3(p.Start)}
 		if len(bad) > 0 {
 			it.Status = "fail"
@@ -1132,7 +1146,7 @@ func overlayCheck(file string, m *render.Manifest, fps float64, r *Report) {
 			it.Fix = "`cutroom look --file " + m.Output + " " + strconv.FormatFloat(p.Start, 'f', 2, 64) + "` to see it; re-render (`cutroom render`); if it repeats, this is a cutroom bug"
 		} else {
 			it.Status = "pass"
-			it.Detail = fmt.Sprintf("%s %q visible over frames %d–%d (%.3f–%.3f, card differs from the picture by %.0f)%s", p.ID, p.Name, fa, fb-1, p.Start, p.End, minIn, edge)
+			it.Detail = fmt.Sprintf("%s %q visible over frames %d–%d (%.3f–%.3f, card differs from the picture by %.0f)%s%s", p.ID, p.Name, fa, fb-1, p.Start, p.End, minIn, edge, clipNote)
 		}
 		r.add(it)
 	}
@@ -1196,3 +1210,48 @@ func captionCheck(p render.Placement, fps float64, diffIn func(int, [4]int) (flo
 	}
 	r.add(it)
 }
+
+// clipFrames: a clip overlay shows the clip's own frames, at the moment --clip-in says, inside its
+// box. Three render frames in the window are cropped to the box at the render's own pixels (as the
+// render placed it) and compared, at 64 px wide, with the clip scaled the same way.
+func clipFrames(file string, m *render.Manifest, p render.Placement, fps float64) (note, problem string) {
+	W, H := float64(m.Width), float64(m.Height)
+	bx, by := int(math.Round(p.Box[0]*W)), int(math.Round(p.Box[1]*H))
+	bw, bh := evenInt(p.Box[2]*W-float64(bx)), evenInt(p.Box[3]*H-float64(by))
+	sw := 64
+	sh := max(8, int(math.Round(float64(sw)*float64(bh)/float64(bw))))
+	small := fmt.Sprintf("scale=%d:%d,format=gray", sw, sh)
+	fa, fb := int(math.Round(p.Start*fps)), int(math.Round(p.End*fps))
+	worst, n := 0.0, 0
+	for _, f := range []int{fa + (fb-fa)/4, (fa + fb) / 2, fa + 3*(fb-fa)/4} {
+		r, err := deps.Run("ffmpeg", "-v", "error", "-ss", strconv.FormatFloat((float64(f)-0.5)/fps, 'f', 5, 64), "-i", file,
+			"-vf", fmt.Sprintf("crop=%d:%d:%d:%d,%s", bw, bh, bx, by, small), "-frames:v", "1", "-f", "rawvideo", "-")
+		if err != nil || len(r) < sw*sh {
+			continue
+		}
+		t := p.ClipIn + float64(f-fa)/fps
+		sdr := media.ReadSDR(p.Clip, 0, 0)
+		args := append([]string{"-v", "error", "-ss", strconv.FormatFloat(math.Max(0, t-2/fps), 'f', 5, 64)}, sdr.Pre...)
+		args = append(args, "-i", p.Clip, "-vf", sdr.Chain(fmt.Sprintf("fps=%g,scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,%s", fps, bw, bh, bw, bh, small)),
+			"-frames:v", "5", "-f", "rawvideo", "-")
+		b, err := deps.Run("ffmpeg", args...)
+		if err != nil || len(b) < sw*sh {
+			continue // past the clip's end: its last frame is held (clip-short warns)
+		}
+		best := math.Inf(1)
+		for k := 0; (k+1)*sw*sh <= len(b); k++ {
+			best = math.Min(best, mse(r[:sw*sh], b[k*sw*sh:(k+1)*sw*sh]))
+		}
+		n++
+		worst = math.Max(worst, best)
+		if best > 150 {
+			problem = fmt.Sprintf("the box at %.3f doesn't show the clip's frame at %.2f s (difference %.0f): wrong clip, --clip-in or placement", float64(f)/fps, t, best)
+		}
+	}
+	if n > 0 && problem == "" {
+		note = fmt.Sprintf("; shows the clip's own frames from %.2f s (worst difference %.0f)", p.ClipIn, worst)
+	}
+	return note, problem
+}
+
+func evenInt(x float64) int { return int(math.Round(x/2)) * 2 }

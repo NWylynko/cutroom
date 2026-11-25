@@ -218,6 +218,16 @@ func lookEdit(c *Ctx) (*Result, error) {
 					}
 					continue
 				}
+				if p.Kind == "clip" && t >= p.Start && t < p.End {
+					cc, err := render.ClipCard(p, t, cacheDir(e.p), tl.Width, tl.Height)
+					if err != nil {
+						return nil, Errf(ExitExternal, "frame-failed", "check the clip is readable: `cutroom overlay list`", "overlay %s: %v", p.ID, err)
+					}
+					over = append(over, cc)
+					label += " +" + p.ID
+					shown[p.ID] = true
+					continue
+				}
 				if t >= p.Start && t < p.End {
 					over = append(over, p.PNG)
 					label += " +" + p.ID

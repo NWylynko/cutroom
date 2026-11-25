@@ -12,7 +12,7 @@ import (
 // words; its output window is derived (Window).
 type Overlay struct {
 	ID     string  `json:"id"`
-	Kind   string  `json:"kind"`   // text | image | captions (burned in, the whole edit)
+	Kind   string  `json:"kind"`   // text | image | clip | captions (burned in, the whole edit)
 	Source string  `json:"source"` // anchor source
 	At     float64 `json:"at"`     // anchor: source time where it appears
 	Until  float64 `json:"until,omitempty"`
@@ -25,6 +25,12 @@ type Overlay struct {
 	Layout     string  `json:"layout"`                // lower-third | title | top | corner | center
 	Size       float64 `json:"size,omitempty"`        // image: width as a fraction of the frame
 	Fade       float64 `json:"fade"`                  // s, in and out
+	// clip: a video shown over the edit (muted; the speaker's sound continues). ClipIn is where in the
+	// clip it starts; ClipDur, ClipW×ClipH (as displayed) are probed when it is added.
+	ClipIn  float64 `json:"clip_in,omitempty"`
+	ClipDur float64 `json:"clip_duration,omitempty"`
+	ClipW   int     `json:"clip_w,omitempty"`
+	ClipH   int     `json:"clip_h,omitempty"`
 }
 
 // Window is the overlay's output time span, on the frame grid. ok is false (with why) when its
@@ -96,6 +102,11 @@ func (t *Timeline) overlayIssues() []Issue {
 			is = append(is, Issue{Level: "warn", Code: "overlay-orphaned", Message: fmt.Sprintf("overlay %s (%s %q) won't show: %s", o.ID, o.Kind, ovName(o), why),
 				Fix: fmt.Sprintf("anchor it to words the edit keeps: `cutroom overlay rm %s` then `cutroom overlay add …`", o.ID)})
 			continue
+		}
+		if o.Kind == "clip" && o.ClipDur > 0 && o.ClipIn+(b-a) > o.ClipDur+0.02 {
+			is = append(is, Issue{Level: "warn", Code: "clip-short", At: round6(a + o.ClipDur - o.ClipIn),
+				Message: fmt.Sprintf("overlay %s (%s) runs %.2f s but the clip has only %.2f s after --clip-in %.2f: its last frame is held for %.2f s", o.ID, o.Path, b-a, o.ClipDur-o.ClipIn, o.ClipIn, o.ClipIn+(b-a)-o.ClipDur),
+				Fix:     fmt.Sprintf("`cutroom overlay set %s --duration %.2f` (or an earlier --clip-in)", o.ID, math.Floor((o.ClipDur-o.ClipIn)*100)/100)})
 		}
 		if o.Kind == "text" {
 			words := len(strings.Fields(o.Text + " " + o.Sub))
