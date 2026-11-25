@@ -7,12 +7,7 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- [friction r6] `render --range` rendered the whole timeline into `preview-range.mp4` (resume-haiku:
-  "either cut to the requested range or refuse with a clear message").
-- [friction r6] `transcript` with several sources showed only the first (pickup-sonnet: "the first call
-  looked like the whole answer").
-- [friction r6] `edit undo --help` / `edit cut --help` print the whole `edit` usage; `edit reset` is not
-  in the workflow guide (fix-edit-haiku).
+- M4: captions (SRT) with seam checks, then the text rasteriser for overlays.
 - Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
   T3 review, doctor/README.
 ## M0 — leftovers

@@ -26,13 +26,13 @@ Cuts land on whole frames and audio samples; sources are decoded once and the vi
 Examples:
   cutroom render --dry-run              (what would run and how long it should take)
   cutroom render --preview              (540p, fast: check the edit)
-  cutroom render --preview --range 0:20-0:40   (only the ~45 s chunks covering that output range;
-                                               a short timeline is one chunk, so it renders all of it)
+  cutroom render --preview --range 0:20-0:40   (just that OUTPUT range, to whole frames, into
+                                               out/preview-range.mp4; loudness as in the full render)
   cutroom render                        (final quality)`,
 		Flags: []Flag{
 			{Name: "preview", Kind: "bool", Help: "540p, fast encode"},
 			{Name: "output", Kind: "string", Help: "Output path (same as the positional [output.mp4])"},
-			{Name: "range", Kind: "string", Help: "Only chunks covering this OUTPUT time range (start-end)"},
+			{Name: "range", Kind: "string", Help: "Render only this OUTPUT time range (start-end), to whole frames"},
 			{Name: "dry-run", Kind: "bool", Help: "Print the plan and time estimate; render nothing"},
 			{Name: "jobs", Kind: "int", Default: "4", Help: "Chunks rendered in parallel"},
 			{Name: "loudness", Kind: "float", Default: "-16", Help: "Integrated loudness target (LUFS)"},
@@ -131,14 +131,9 @@ func runRender(c *Ctx) (*Result, error) {
 		mode = "preview"
 	}
 	rangeNote := ""
-	if c.Has("range") && len(res.Chunks) > 0 {
-		first, last := res.Chunks[0], res.Chunks[len(res.Chunks)-1]
-		a, b := first.Start, last.Start+last.Duration
-		rangeNote = fmt.Sprintf("  range %s–%s: renders the whole chunk(s) covering it, output %s–%s (%s)",
-			clock(o.Range[0]), clock(math.Min(o.Range[1], e.tl.Duration())), clock(a), clock(b), secs(b-a))
-		if a <= 0 && b >= e.tl.Duration()-0.001 {
-			rangeNote += " = the whole timeline (it fits in one chunk)"
-		}
+	if c.Has("range") {
+		rangeNote = fmt.Sprintf("  range: output %s–%s of the %s edit (file time 0 = output %s)",
+			clock(res.RangeStart), clock(res.RangeStart+res.Expected), secs(e.tl.Duration()), clock(res.RangeStart))
 	}
 	if res.DryRun {
 		lines = append(lines, fmt.Sprintf("dry run → %s (%s, %dx%d): %d chunk(s), %d cached, %s of video", relToCwd(out), mode, res.Width, res.Height, len(res.Chunks), cached, secs(res.Expected)))
@@ -182,7 +177,7 @@ func runRender(c *Ctx) (*Result, error) {
 	a := res.Audio
 	lines = append(lines, fmt.Sprintf("  audio: %.1f LUFS (target %.0f), peak %.1f dBTP, gain %+.1f dB", a.LUFS, a.Target, a.TruePeak, a.GainDB))
 	if c.Has("range") {
-		lines = append(lines, rangeNote, fmt.Sprintf("  file time 0 = output %s", clock(res.RangeStart)))
+		lines = append(lines, rangeNote)
 	}
 	next := []string{"cutroom check " + relToCwd(res.Output)}
 	return &Result{Text: strings.Join(lines, "\n"), Data: res, Next: next}, nil

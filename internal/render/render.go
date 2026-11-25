@@ -231,25 +231,19 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 		say = func(string) {}
 	}
 	all := Plan(tl, srcs, o)
-	chunks := all
-	if o.Range[1] > 0 {
-		chunks = nil
-		for _, c := range all {
-			if c.Start < o.Range[1] && c.Start+c.Duration > o.Range[0] {
-				chunks = append(chunks, c)
-			}
-		}
-	}
+	// a range renders exactly that part of the edit (whole frames): vtl is the trimmed edit
+	vtl, chunks := tl, all
 	w, h := size(tl, o.Preview)
 	res := &Result{Output: out, Width: w, Height: h, Preview: o.Preview, DryRun: o.DryRun}
+	if o.Range[1] > 0 {
+		vtl, res.RangeStart = tl.Trim(o.Range[0], o.Range[1])
+		chunks = Plan(vtl, srcs, o)
+	}
 	for _, c := range chunks {
 		res.Expected += c.Duration
 		res.Frames += c.Frames
 	}
 	res.Expected = round6(res.Expected)
-	if len(chunks) > 0 {
-		res.RangeStart = chunks[0].Start
-	}
 	res.Estimate = estimate(o, chunks, w*h)
 	res.Chunks = chunks
 	if o.DryRun {
@@ -259,7 +253,7 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 	// audio (whole timeline measured once; L17)
 	audioDone := make(chan error, 1)
 	go func() {
-		ar, err := renderAudio(tl, srcs, chunks, all, o)
+		ar, err := renderAudio(tl, vtl, srcs, chunks, all, o)
 		res.Audio = ar
 		audioDone <- err
 	}()
@@ -279,7 +273,7 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 			defer wg.Done()
 			sem <- struct{}{}
 			defer func() { <-sem }()
-			errs[i] = renderChunk(tl, srcs, &chunks[i], o.Preview)
+			errs[i] = renderChunk(vtl, srcs, &chunks[i], o.Preview)
 			mu.Lock()
 			done++
 			say(fmt.Sprintf("chunk %d/%d rendered (%.1f s of video in %.1f s)", chunks[i].Index+1, len(all), chunks[i].Duration, chunks[i].Seconds))
@@ -324,7 +318,7 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 	res.Frames = n
 	res.Duration = round6(float64(n) / tl.Rate())
 	res.Seconds = round3(time.Since(t0).Seconds())
-	if err := writeManifest(tl, srcs, chunks, res, o); err != nil {
+	if err := writeManifest(tl, vtl, srcs, chunks, res, o); err != nil {
 		return nil, err
 	}
 	return res, nil
@@ -368,7 +362,9 @@ func AudioFor(tl *timeline.Timeline, srcs map[string]Source, video string) (audi
 	return "", false, fmt.Errorf("%q has no sound of its own and no recorder mapped to it: `cutroom edit audio <recorder> --for %s`", video, video)
 }
 
-func renderAudio(tl *timeline.Timeline, srcs map[string]Source, chunks, all []Chunk, o Options) (AudioResult, error) {
+// renderAudio assembles the sound for chunks (planned on vtl: tl itself, or tl trimmed to a range);
+// loudness is always measured on the whole of tl (L17).
+func renderAudio(tl, vtl *timeline.Timeline, srcs map[string]Source, chunks, all []Chunk, o Options) (AudioResult, error) {
 	if tl.Audio == "" {
 		return AudioResult{}, fmt.Errorf("the timeline has no audio source")
 	}
@@ -407,7 +403,7 @@ func renderAudio(tl *timeline.Timeline, srcs map[string]Source, chunks, all []Ch
 		}
 		idx[id] = i
 	}
-	pieces := func(cs []Chunk) []Piece {
+	pieces := func(tl *timeline.Timeline, cs []Chunk) []Piece {
 		var ps []Piece
 		for _, c := range cs {
 			for _, k := range c.Segments {
@@ -438,10 +434,10 @@ func renderAudio(tl *timeline.Timeline, srcs map[string]Source, chunks, all []Ch
 	for _, id := range ids {
 		syncs = append(syncs, srcs[id].Sync)
 	}
-	key := hash([]any{Version, files, pieces(all), o.Chain, o.Loudness, o.TruePeak, syncs})
+	key := hash([]any{Version, files, pieces(tl, all), o.Chain, o.Loudness, o.TruePeak, syncs})
 	allWav := filepath.Join(cache, "timeline-"+key+".wav")
 	if _, err := os.Stat(allWav); err != nil {
-		if _, err := Assemble(files, allWav, pieces(all), 20); err != nil {
+		if _, err := Assemble(files, allWav, pieces(tl, all), 20); err != nil {
 			return AudioResult{}, err
 		}
 	}
@@ -459,9 +455,9 @@ func renderAudio(tl *timeline.Timeline, srcs map[string]Source, chunks, all []Ch
 		}
 	}
 	in := allWav
-	if len(chunks) != len(all) {
+	if vtl != tl {
 		in = filepath.Join(cache, "range-"+rkey+".wav")
-		if _, err := Assemble(files, in, pieces(chunks), 20); err != nil {
+		if _, err := Assemble(files, in, pieces(vtl, chunks), 20); err != nil {
 			return AudioResult{}, err
 		}
 	}

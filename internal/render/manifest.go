@@ -43,6 +43,9 @@ type MSeg struct {
 	AnchorX  float64 `json:"anchor_x,omitempty"`
 	AnchorY  float64 `json:"anchor_y,omitempty"`
 	Audio    string  `json:"audio,omitempty"` // audio source this segment's sound came from (multi-take)
+	// RangeIn/RangeOut: this edge is where a --range render starts/ends, not a cut in the edit
+	RangeIn  bool `json:"range_in,omitempty"`
+	RangeOut bool `json:"range_out,omitempty"`
 }
 
 // AudioOf is the audio source a segment's sound came from.
@@ -72,17 +75,22 @@ func TimelineHash(tl *timeline.Timeline) string {
 	return hash([]any{tl.FPS, tl.Width, tl.Height, tl.Audio, tl.Grid, segs, tl.AudioFor})
 }
 
-func writeManifest(tl *timeline.Timeline, srcs map[string]Source, chunks []Chunk, res *Result, o Options) error {
+// writeManifest records chunks (planned on vtl) as rendered from the edit tl.
+func writeManifest(tl, vtl *timeline.Timeline, srcs map[string]Source, chunks []Chunk, res *Result, o Options) error {
 	m := Manifest{Version: Version, Output: res.Output, Preview: o.Preview, FPS: tl.FPS, Width: res.Width, Height: res.Height,
 		Audio: tl.Audio, Sources: map[string]MSource{}, Loudness: o.Loudness, TruePeak: o.TruePeak, Chain: o.Chain,
 		Frames: res.Frames, Duration: res.Duration, RangeStart: res.RangeStart, Partial: o.Range[1] > 0,
 		TimelineHash: TimelineHash(tl), RenderedAt: time.Now().UTC().Truncate(time.Second)}
 	for _, c := range chunks {
 		for _, k := range c.Segments {
-			g := tl.Segments[k]
+			g := vtl.Segments[k]
 			a, _, _ := AudioFor(tl, srcs, g.Source)
-			m.Segments = append(m.Segments, MSeg{ID: g.ID, Source: g.Source, In: g.In, Out: g.Out,
-				OutStart: round6(g.OutStart - res.RangeStart), Frames: tl.Frames(g), Zoom: g.Zoom, AnchorX: g.AnchorX, AnchorY: g.AnchorY, Audio: a})
+			ms := MSeg{ID: g.ID, Source: g.Source, In: g.In, Out: g.Out,
+				OutStart: g.OutStart, Frames: tl.Frames(g), Zoom: g.Zoom, AnchorX: g.AnchorX, AnchorY: g.AnchorY, Audio: a}
+			if full := tl.Find(g.ID); full != nil && vtl != tl {
+				ms.RangeIn, ms.RangeOut = g.In > full.In, g.Out < full.Out
+			}
+			m.Segments = append(m.Segments, ms)
 			for _, id := range []string{g.Source, a} {
 				if s, ok := srcs[id]; ok {
 					m.Sources[id] = MSource{s.Path, s.Size, s.ModTime, s.AudioStart, s.Sync}

@@ -2,6 +2,27 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 29 · 2026-11-24 · r6 friction: exact `render --range`, multi-source `transcript`, sub-help
+Did: (1) `render --range a-b` renders exactly that output range to whole frames (Timeline.Trim: clip
+segments, output restarts at 0), into out/<name>-range.mp4; loudness is still measured on the whole
+edit (L17). It used to render the whole ~45 s chunk(s) covering the range — on a short edit, the whole
+thing, which the agent read as the flag being ignored. The manifest marks segment edges that are range
+edges (`range_in/range_out`); `check` skips clipped-word warnings there and doesn't count word
+differences within 0.5 s of them. (2) `transcript` with no source shows the edit's main video (else
+the longest), with "also transcribed: pickup — `cutroom transcript pickup`"; before, the alphabetically
+first source (a 2.6 s pickup) looked like the whole answer. (3) `cutroom edit <sub> --help` prints that
+subcommand's usage and flags only (Command.Subs); guide edit mentions `edit reset` and sub-help.
+Every usage line in the sub-help was run through the CLI before keeping it.
+Tests: TestL01_TrimIsFrameExact; e2e 140/140 (range dry run, range render 2.000 s / 60 frames, check
+PASS on a range, transcript default, sub-help).
+Measured: ranges 0-3, 2-4, 3.5-8.2, 5-11, 17-25 (past end) on the tightened fixture: all frame-exact,
+all `check` PASS with 0 warnings; 2–4 renders in 0.4 s.
+Surprises: the first range check flagged "show" as clipped and "need" as misheard — the recogniser
+at a file's very edge is unreliable, so word differences there can't be blamed on the edit.
+A words-check `at` before the segment start printed "output -0.09 s is in segment " (empty id); the
+expected-word time is now clamped to the segment start.
+Next: M4 captions.
+
 ### 28 · 2026-11-24 · eval round 6 recorded: sonnet 8/8, haiku 8/8
 Did: graded the 16 kept round-6 runs with the independent grader (they had friction reports but no
 grades), wrote `evals/results/2026-11-24-6.md`, moved the friction into the backlog.

@@ -560,10 +560,15 @@ func wordCheck(renderWav, tmp string, m *render.Manifest, o Options, r *Report) 
 		}
 		for _, w := range tr.Words {
 			mid := (w.Start + w.End) / 2
-			if mid >= g.In && mid < g.Out {
-				if n := speech.Norm(w.Text); n != "" {
-					exp = append(exp, ew{n, g.OutStart + w.Start - g.In})
-				}
+			if mid < g.In || mid >= g.Out {
+				continue
+			}
+			// a --range render's own edges aren't cuts: a word they cross isn't expected whole
+			if (g.RangeIn && w.Start < g.In) || (g.RangeOut && w.End > g.Out) {
+				continue
+			}
+			if n := speech.Norm(w.Text); n != "" {
+				exp = append(exp, ew{n, g.OutStart + math.Max(w.Start, g.In) - g.In})
 			}
 		}
 	}
@@ -620,11 +625,30 @@ func wordCheck(renderWav, tmp string, m *render.Manifest, o Options, r *Report) 
 	}
 	flush()
 	matched := int(dp[0][0])
+	// a --range render starts/ends mid-speech: words at its own edges are heard in part or misheard
+	edgeNote := ""
+	if lo, hi, ok := rangeEdges(m); ok {
+		kept := gaps[:0]
+		for _, g := range gaps {
+			if (lo >= 0 && g.at < lo+0.5) || (hi >= 0 && g.at > hi-0.5) {
+				continue
+			}
+			kept = append(kept, g)
+		}
+		if d := len(gaps) - len(kept); d > 0 {
+			edgeNote = fmt.Sprintf("; %d difference(s) within 0.5 s of the range's own start/end not counted (words cut by the range, not by the edit)", d)
+		}
+		gaps = kept
+	}
 	if len(gaps) == 0 {
-		r.add(Item{Check: "words", Status: "pass", Detail: fmt.Sprintf("all %d expected words heard in order in the render", n)})
+		d := fmt.Sprintf("all %d expected words heard in order in the render", n)
+		if edgeNote != "" {
+			d = fmt.Sprintf("%d of %d expected words heard in order%s", matched, n, edgeNote)
+		}
+		r.add(Item{Check: "words", Status: "pass", Detail: d})
 		return
 	}
-	r.add(Item{Check: "words", Status: "pass", Detail: fmt.Sprintf("%d of %d expected words heard in order; %d difference(s) listed below", matched, n, len(gaps))})
+	r.add(Item{Check: "words", Status: "pass", Detail: fmt.Sprintf("%d of %d expected words heard in order; %d difference(s) listed below%s", matched, n, len(gaps), edgeNote)})
 	for _, g := range gaps {
 		st := "warn"
 		var d string
@@ -643,6 +667,21 @@ func wordCheck(renderWav, tmp string, m *render.Manifest, o Options, r *Report) 
 		r.add(Item{Check: "words", Status: st, Detail: d, At: round3(g.at), Segment: seg,
 			Fix: fmt.Sprintf("`cutroom listen` the source around it (output %.2f s is in segment %s)", g.at, seg)})
 	}
+}
+
+// rangeEdges gives the file times where a --range render starts/ends mid-segment (-1: a real edge).
+func rangeEdges(m *render.Manifest) (lo, hi float64, ok bool) {
+	if !m.Partial || len(m.Segments) == 0 {
+		return 0, 0, false
+	}
+	lo, hi = -1, -1
+	if m.Segments[0].RangeIn {
+		lo = 0
+	}
+	if last := m.Segments[len(m.Segments)-1]; last.RangeOut {
+		hi = last.OutStart + float64(last.Frames)/rate(m.FPS)
+	}
+	return lo, hi, lo >= 0 || hi >= 0
 }
 
 func segAt(m *render.Manifest, t float64) string {
@@ -714,8 +753,9 @@ func cutThroughWords(tr *speech.Transcript, id string, m *render.Manifest, r *Re
 				t    float64
 				side string
 				out  float64
-			}{{g.In, "start", g.OutStart}, {g.Out, "end", g.OutStart + float64(g.Frames)/fps}} {
-				if e.t > w.Start+0.04 && e.t < w.End-0.04 {
+				rng  bool
+			}{{g.In, "start", g.OutStart, g.RangeIn}, {g.Out, "end", g.OutStart + float64(g.Frames)/fps, g.RangeOut}} {
+				if !e.rng && e.t > w.Start+0.04 && e.t < w.End-0.04 {
 					r.add(Item{Check: "clipped-word", Status: "warn", At: round3(e.out), Segment: g.ID,
 						Detail: fmt.Sprintf("segment %s %ss inside the word %q (source %.2f–%.2f): it is cut off in the render", g.ID, e.side, w.Text, w.Start, w.End),
 						Fix:    fmt.Sprintf("cut by words instead (`cutroom edit cut --text ...`), or `cutroom listen %.2f-%.2f`", w.Start-0.5, w.End+0.5)})

@@ -231,3 +231,24 @@ func TestL36_RetakeCutAtSentences(t *testing.T) {
 		t.Fatalf("cut must not remove words only the next attempt has: %s", f)
 	}
 }
+
+func TestL01_TrimIsFrameExact(t *testing.T) {
+	tl := New("30", 1280, 720, "v", "v", 0, 10)
+	tl.Cut("v", 2, 4, "x", true) // segments 0–2 and 4–10 → output 0–2 | 2–8
+	tl.Recompute()
+	c, start := tl.Trim(1.01, 3.0)
+	if !near(start, 1.0) {
+		t.Fatalf("start %v, want 1.0 (floored to the frame)", start)
+	}
+	if len(c.Segments) != 2 || !near(c.Segments[0].In, 1.0) || !near(c.Segments[0].Out, 2) ||
+		!near(c.Segments[1].In, 4) || !near(c.Segments[1].Out, 5) {
+		t.Fatalf("segments %+v", c.Segments)
+	}
+	if !near(c.Duration(), 2.0) || c.Segments[1].OutStart != 1 {
+		t.Fatalf("duration %v, second out_start %v", c.Duration(), c.Segments[1].OutStart)
+	}
+	// past the end: clamps; fully inside one segment: one piece
+	if c, _ := tl.Trim(7, 99); len(c.Segments) != 1 || !near(c.Duration(), 1) {
+		t.Fatalf("past end: %+v", c.Segments)
+	}
+}

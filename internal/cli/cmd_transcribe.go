@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"time"
 
@@ -203,7 +204,7 @@ func loadTranscript(p *project.Project, id string) (*speech.Transcript, error) {
 		if len(have) == 0 {
 			return nil, Errf(ExitInvalid, "no-transcript", "run `cutroom transcribe`", "nothing has been transcribed yet")
 		}
-		id = have[0]
+		id = defaultTranscript(p, have)
 	}
 	s, err := sourceByID(p, id)
 	if err != nil {
@@ -217,6 +218,32 @@ func loadTranscript(p *project.Project, id string) (*speech.Transcript, error) {
 		return nil, Errf(ExitInvalid, "stale-transcript", "run `cutroom init` then `cutroom transcribe "+s.ID+"`", "source %q changed since it was transcribed", s.ID)
 	}
 	return t, nil
+}
+
+// defaultTranscript picks the transcript `transcript` shows with no source named: the edit's main
+// video, else the longest source (a short pickup sorting first must not hide the main take).
+func defaultTranscript(p *project.Project, have []string) string {
+	if tl, err := timeline.Load(p.Dir); err == nil && slices.Contains(have, tl.Video) {
+		return tl.Video
+	}
+	best, bestD := have[0], -1.0
+	for _, id := range have {
+		if f := p.Sources[id].Facts; f != nil && f.Duration > bestD {
+			best, bestD = id, f.Duration
+		}
+	}
+	return best
+}
+
+// otherTranscripts lists the other transcribed sources, for a header line.
+func otherTranscripts(p *project.Project, shown string) []string {
+	var o []string
+	for _, id := range p.IDs() {
+		if _, err := speech.Load(cacheDir(p), id); err == nil && id != shown {
+			o = append(o, id)
+		}
+	}
+	return o
 }
 
 func runTranscript(c *Ctx) (*Result, error) {
@@ -287,6 +314,11 @@ func runTranscript(c *Ctx) (*Result, error) {
 		}
 	}
 	head := fmt.Sprintf("%s — %d words, %s  (%s, %d pass(es))", t.Source, len(t.Words), clock(t.Duration), t.Model, t.Passes)
+	if id == "" && !c.Has("file") {
+		if o := otherTranscripts(p, t.Source); len(o) > 0 {
+			head += fmt.Sprintf("\nalso transcribed: %s — `cutroom transcript %s` (this is %s; times are each source's own)", strings.Join(o, ", "), o[0], t.Source)
+		}
+	}
 
 	switch {
 	case c.Has("search"):

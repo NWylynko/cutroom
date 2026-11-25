@@ -45,6 +45,7 @@ Every edit is checked afterwards and problems are printed. Use --dry-run to prev
   edit audio mic2 --for take2                    multi-take: segments from take2 use recorder mic2
                                                  (unmapped takes use their own sound; timeline warns)
   edit undo | edit history | edit reset [--source id]
+  edit <sub> --help                              just one subcommand and its flags
 
 Words are matched ignoring case, punctuation and um/uh. --from must match once (add --near <time>
 or --occurrence N if it repeats); --to matches the first occurrence after --from.
@@ -66,6 +67,45 @@ never moves them.`,
 			{Name: "after", Kind: "string", Help: "add/move: put it after this segment id (or \"start\")"},
 			{Name: "before", Kind: "string", Help: "add/move: put it before this segment id (default for add: at the end)"},
 			{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"},
+		},
+		Subs: map[string]Sub{
+			"cut": {Usage: `  edit cut --text "um, so"                       remove exactly these words (cut lands in the pauses)
+  edit cut --from "By the way" --to "keyboard."  remove from the first words through the last words
+  edit cut 16.9-17.4 [--source id]               remove a source time range (seconds or m:ss.mmm)
+Words ignore case, punctuation and um/uh; --from must match once (--near/--occurrence if it repeats).
+A cut by words leaves 0.22 s after the last kept word and 0.10 s before the next. Its edges are pinned.`,
+				Flags: []string{"text", "from", "to", "near", "occurrence", "source", "reason", "dry-run"}},
+			"keep": {Usage: `  edit keep --from "Hi, today" --to "server is ready."   keep only this span (e.g. for a short)
+  edit keep 0:12-0:58 [--source id]                      keep only a source time range`,
+				Flags: []string{"text", "from", "to", "near", "occurrence", "source", "reason", "dry-run"}},
+			"add": {Usage: `  edit add --source take2 --from "So the" --to "works." [--after s3 | --before s1 | --after start]
+  edit add 3.2-9.8 --source take2
+Puts a span of another take (or source) into the edit; default at the end. Its edges are pinned.
+Warns when it duplicates words already kept (to swap a line, use edit replace).`,
+				Flags: []string{"source", "text", "from", "to", "near", "occurrence", "after", "before", "reason", "dry-run"}},
+			"replace": {Usage: `  edit replace --text "Then install Linux on it." --with pickup
+  edit replace --from "Then install" --to "on it." --with pickup
+Cuts the edit's version of the words and puts --with's version in the same place, in one step.`,
+				Flags: []string{"with", "text", "from", "to", "near", "occurrence", "source", "reason", "dry-run"}},
+			"move": {Usage: `  edit move s5 --after s2 | --before s1 | --after start      reorder a segment (ids: cutroom timeline)`,
+				Flags: []string{"after", "before", "dry-run"}},
+			"zoom": {Usage: `  edit zoom 1.15 --from "Then install" --to "on it."   punch in on a span
+  edit zoom 1.15 12.0-15.5 [--source id]               ... or a source time range
+  edit zoom 1 --from ... --to ...                      zoom back out
+Above 1.2× upscaling looks soft (a 1080p source at 1.3×); 4K sources can go to 2× for 1080p.`,
+				Flags: []string{"anchor", "text", "from", "to", "near", "occurrence", "source", "dry-run"}},
+			"tighten": {Usage: `  edit tighten [--min-cut 0.4]   shorten every pause longer than the pads + min-cut
+Never moves pinned edges (your explicit cuts). Prints the sounds inside removed pauses.`,
+				Flags: []string{"min-cut", "dry-run"}},
+			"audio": {Usage: `  edit audio mic                take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
+  edit audio mic2 --for take2   multi-take: segments from take2 use recorder mic2`,
+				Flags: []string{"for", "dry-run"}},
+			"undo": {Usage: `  edit undo      put the timeline back as it was before the last edit (repeat to go further back)
+See what each step did first with ` + "`cutroom edit history`" + `.`},
+			"history": {Usage: `  edit history   every edit in order, newest last (what edit undo would undo next)`},
+			"reset": {Usage: `  edit reset [--source id]   start over: the timeline becomes the whole video source again
+(undo-able: edit undo brings the old timeline back)`,
+				Flags: []string{"source"}},
 		},
 		Run: runEdit,
 	})

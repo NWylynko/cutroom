@@ -494,3 +494,29 @@ func rate(s string) float64 {
 }
 
 func round6(f float64) float64 { return math.Round(f*1e6) / 1e6 }
+
+// Trim returns a copy of the edit holding only output time [a, b), widened to whole frames: segments
+// outside are dropped, the ones crossing an edge are clipped, and output time restarts at 0. start is
+// the output time (in t) of the copy's first frame.
+func (t *Timeline) Trim(a, b float64) (c *Timeline, start float64) {
+	fa := int64(math.Floor(a*t.fpsNum + 1e-6))
+	fb := int64(math.Ceil(b*t.fpsNum - 1e-6))
+	cp := *t
+	cp.Segments = nil
+	var n int64
+	for _, g := range t.Segments {
+		f := t.Frames(g)
+		s0 := n
+		n += f
+		lo, hi := max(s0, fa), min(s0+f, fb)
+		if hi <= lo {
+			continue
+		}
+		h := g
+		h.In = round6(g.In + float64(lo-s0)/t.fpsNum)
+		h.Out = round6(g.In + float64(hi-s0)/t.fpsNum)
+		cp.Segments = append(cp.Segments, h)
+	}
+	cp.Recompute()
+	return &cp, round6(float64(fa) / t.fpsNum)
+}

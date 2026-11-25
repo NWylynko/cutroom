@@ -33,7 +33,9 @@ by your first edit as the whole first video source. Sources are never touched.
   frame. Keep the upscale ≤ 1.2× (a 1080p source at 1.3× looks soft; 4K sources can go 2× for a
   1080p output) — edit warns above it. Check the framing with `cutroom look --output <time>`;
   `timeline` shows `[zoom …]` on zoomed segments and `--joins` marks zoom changes (not cuts).
-- `--dry-run` previews; `cutroom edit undo` reverts the last edit; `cutroom edit history` lists them.
+- `--dry-run` previews; `cutroom edit undo` reverts the last edit; `cutroom edit history` lists them;
+  `cutroom edit reset` starts over from the whole video (itself undo-able) — the quickest fix when an
+  inherited edit is wrong in several places. `cutroom edit <sub> --help` shows one subcommand.
 
 Times in `edit` are **source** times (what `transcript` prints). Times in `timeline` output
 columns are **output** times (where it lands in the video), followed by the source range.

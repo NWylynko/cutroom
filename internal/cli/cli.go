@@ -70,6 +70,15 @@ type Command struct {
 	Run      func(ctx *Ctx) (*Result, error)
 	Hidden   bool
 	Category string
+	// Subs: help for each subcommand (first positional argument), so `cutroom edit undo --help`
+	// shows only what undo does and the flags it takes.
+	Subs map[string]Sub
+}
+
+// Sub is one subcommand's help: usage lines and the names of the flags it takes.
+type Sub struct {
+	Usage string
+	Flags []string
 }
 
 // Ctx is passed to Run.
@@ -239,6 +248,11 @@ func dispatch(argv []string, stdout, stderr io.Writer, stdin io.Reader, jsonMode
 		return nil, err
 	}
 	if ctx.Bool("help") {
+		if len(ctx.Args) > 0 {
+			if sub, ok := cmd.Subs[ctx.Args[0]]; ok {
+				return &Result{Text: subHelp(cmd, ctx.Args[0], sub)}, nil
+			}
+		}
 		return &Result{Text: commandHelp(cmd)}, nil
 	}
 	ctx.Dir = ctx.Str("project")
@@ -441,6 +455,38 @@ func commandHelp(c *Command) string {
 		}
 	}
 	b.WriteString("\nglobal: --json (full result as JSON), --project <dir>")
+	return b.String()
+}
+
+func subHelp(c *Command, name string, sub Sub) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "cutroom %s %s\n\n%s\n", c.Name, name, strings.TrimRight(sub.Usage, "\n"))
+	if len(sub.Flags) > 0 {
+		b.WriteString("\nflags:\n")
+		for _, n := range sub.Flags {
+			for _, f := range c.Flags {
+				if f.Name != n {
+					continue
+				}
+				arg, def := "", ""
+				if f.Kind != "bool" {
+					arg = " <" + f.Kind + ">"
+				}
+				if f.Default != "" && f.Kind != "bool" {
+					def = " (default " + f.Default + ")"
+				}
+				fmt.Fprintf(&b, "  --%s%s  %s%s\n", f.Name, arg, f.Help, def)
+			}
+		}
+	}
+	var others []string
+	for k := range c.Subs {
+		if k != name {
+			others = append(others, k)
+		}
+	}
+	sort.Strings(others)
+	fmt.Fprintf(&b, "\nother subcommands: %s (`cutroom %s <sub> --help`; `cutroom %s --help` for all)", strings.Join(others, ", "), c.Name, c.Name)
 	return b.String()
 }
 

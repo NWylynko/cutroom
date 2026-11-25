@@ -92,7 +92,9 @@ expect "look --file"                'of out/final.mp4 at 0:03\.900 \(file time\)
 expect "look <file> <time>"         'of out/final.mp4 at 0:03\.900 \(file time\)' cutroom look out/final.mp4 3.9
 expect "listen <file> needs range"  'cutroom listen out/final.mp4 3-5' cutroom listen out/final.mp4
 expect "render --output works"     "out/x\.mp4"                       cutroom render --output out/x.mp4 --dry-run
-expect "range says whole chunk"     'whole timeline \(it fits in one chunk\)' cutroom render --dry-run --range 0:02-0:04
+expect "range dry run is the range" 'range: output 0:02\.000–0:04\.000' cutroom render --dry-run --range 0:02-0:04
+expect "range renders the range"   '2\.000 s, 60 frames'             cutroom render --preview --range 0:02-0:04
+expect "check passes a range"      '^PASS out/preview-range\.mp4'      cutroom check out/preview-range.mp4
 expect "check passes a good render" '^PASS out/final.mp4'              cutroom check
 # planted faults: each must be caught by the right check
 M=out/final.mp4.cutroom.json
@@ -203,6 +205,8 @@ popd >/dev/null
 # pickup: replace a line with the re-recorded version in one command, in the original's place
 K="$W/pickup"; mkdir -p "$K"; cp $FIX/talk.mp4 $FIX/pickup.mp4 "$K/"; pushd "$K" >/dev/null
 cutroom init talk.mp4 pickup.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+expect "transcript defaults to the main take" 'also transcribed: pickup' cutroom transcript
+expect "edit sub --help is focused"  'cutroom edit undo'              sh -c 'cutroom edit undo --help | head -1'
 expect "replace with pickup"       'in its place: pickup .*"Then install Linux on it\."' cutroom edit replace --text "Then install Linux on it." --with pickup
 expect "pickup sits where the line was" 'laptop\.\n?.*' sh -c 'cutroom timeline | grep -A1 "old laptop" | tail -1 | grep -q "pickup .*Then install Linux" && echo laptop.'
 expect "look --output takes no value" '--output is a switch' cutroom look 2 --output 0:02
