@@ -22,7 +22,7 @@ Install the latest release (macOS and Linux, Apple silicon / arm64 and x86-64):
 curl -fsSL https://raw.githubusercontent.com/NWylynko/cutroom/main/install.sh | sh
 ```
 
-It puts `cutroom` in `~/.local/bin` (set `CUTROOM_INSTALL_DIR` to change that, `CUTROOM_VERSION=v0.1.0`
+It puts `cutroom` in `~/.local/bin` (set `CUTROOM_INSTALL_DIR` to change that, `CUTROOM_VERSION=v1.0.0`
 for a specific release) and checks the download against the release's checksums. You can also
 download an archive yourself from [Releases](https://github.com/NWylynko/cutroom/releases).
 

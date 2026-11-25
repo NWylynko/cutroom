@@ -3,7 +3,7 @@
 cutroom is video editing for AI agents: it turns footage into text and images an agent can reason
 over (transcripts, contact sheets, spectrograms), turns the agent's text decisions into a
 frame-exact render, and then checks the render the same way. Perceive → decide → act → verify.
-Apache-2.0. Not published: publishing is the maintainer's call.
+Apache-2.0.
 
 ## What's in v1
 

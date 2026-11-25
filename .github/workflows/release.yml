@@ -1,7 +1,7 @@
 name: release
 
 # Push a version tag to build cutroom for macOS and Linux and publish a GitHub release:
-#   git tag v0.1.0 && git push origin v0.1.0
+#   git tag v1.1.0 && git push origin v1.1.0 (update RELEASE_NOTES.md first: it is the release body)
 # install.sh downloads from the latest release, so the asset names below must not change.
 
 on:
@@ -50,5 +50,6 @@ jobs:
         run: |
           gh release create "$TAG" dist/* \
             --title "cutroom $TAG" \
+            --notes-file RELEASE_NOTES.md \
             --generate-notes \
             --verify-tag

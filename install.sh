@@ -4,7 +4,7 @@
 #   curl -fsSL https://raw.githubusercontent.com/NWylynko/cutroom/main/install.sh | sh
 #
 # Environment:
-#   CUTROOM_VERSION      a release tag to install instead of the latest (e.g. v0.1.0)
+#   CUTROOM_VERSION      a release tag to install instead of the latest (e.g. v1.0.0)
 #   CUTROOM_INSTALL_DIR  where to put the binary (default: ~/.local/bin)
 set -eu
 
