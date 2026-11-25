@@ -13,7 +13,22 @@ modified, cuts land on whole frames and audio samples, and video is encoded once
 
 ## Install
 
-You need Go 1.27 or newer, ffmpeg, whisper.cpp and a whisper speech model.
+cutroom needs ffmpeg, whisper.cpp and a whisper speech model; `cutroom doctor` (below) walks you
+through them.
+
+Install the latest release (macOS and Linux, Apple silicon / arm64 and x86-64):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/NWylynko/cutroom/main/install.sh | sh
+```
+
+It puts `cutroom` in `~/.local/bin` (set `CUTROOM_INSTALL_DIR` to change that, `CUTROOM_VERSION=v0.1.0`
+for a specific release) and checks the download against the release's checksums. You can also
+download an archive yourself from [Releases](https://github.com/NWylynko/cutroom/releases).
+
+### From source
+
+You need Go 1.27 or newer.
 
 ```bash
 go install github.com/NWylynko/cutroom/cmd/cutroom@latest
@@ -28,7 +43,11 @@ go install ./cmd/cutroom
 
 `go install` fetches two Go modules (golang.org/x/image, x/text) the first time, so it needs the
 network once. It puts the binary in `$(go env GOPATH)/bin` (usually `~/go/bin`); make sure that folder
-is on your `PATH`. Then let cutroom check the rest:
+is on your `PATH`.
+
+### Dependencies
+
+However you installed it, let cutroom check the rest:
 
 ```bash
 cutroom doctor
