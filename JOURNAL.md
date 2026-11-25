@@ -2,6 +2,30 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 30 · 2026-11-24 · M4 `captions`: SRT/VTT of the edit, with reading and seam checks (L48, L49)
+Did: guide topic `captions` written first (example output, rules, checks), then `internal/captions`:
+OutputWords (the words the timeline keeps, in output time, clamped to segments; um/uh dropped with
+their punctuation moved to the word before; first word after a real cut marked — zoom splits aren't
+cuts); Build (≤ 2 × 42 chars, ≤ 7 s; a sentence end or a ≥ 0.7 s pause starts a new cue; a forced
+break moves back to a comma in the cue's second half, never strands a 1–2 word sentence tail, never
+ends on a function word or a subject pronoun after a conjunction; lines balanced, preferring
+punctuation; cue = first word … last word + 0.3 s, ≥ 1 s when there's room, 40 ms gaps); SRT/VTT
+Format/Parse; Check: reading (chars/line, lines, chars/s), timing (order, overlap, inside the video),
+words (LCS vs the edit; ≥ 10% missing or ≥ 3 extra = FAIL: a stale file), seams (L49: a sentence that
+stops at a cut, a sentence whose start was cut, a cue opening on a stranded tail). `cutroom captions`
+[--vtt] [--check file] [--dry-run]; a sidecar records the timeline hash so `status` says current/STALE.
+Fixed on the way: `status`/`check` treated any `*.cutroom.json` in out/ as a render manifest (the
+captions sidecar showed up as a render); now only .mp4 ones.
+Tests: TestL48_CuesReadLikeAPersonMadeThem, TestL49_NoStrandedSentenceTail, TestL49_SeamsAtCuts,
+SRT/VTT round trip + stale file, OutputWords fillers/cuts; e2e 147/147 (+7).
+Measured: fixture full edit: 5 cues, all 40 words, 0 warnings; with "an old laptop." and "Finally,"
+cut, both seams are flagged at the right output times. Real speech (T3 deploy 44 s, sec 40 s): all
+153/123 words, 0 seam warnings, 1–2 reading-speed warnings on genuinely fast speech (20–22 chars/s).
+Surprises: the first real-speech pass broke "personal | software", ended a line on "if you" and a
+cue on "how". Preferring a comma in the cue's second half for forced breaks fixed most; subject
+pronouns are weak only after a conjunction or punctuation (object "you" at a line end reads fine).
+Next: text rasteriser + `overlay add` (M4), then burned-in captions.
+
 ### 29 · 2026-11-24 · r6 friction: exact `render --range`, multi-source `transcript`, sub-help
 Did: (1) `render --range a-b` renders exactly that output range to whole frames (Timeline.Trim: clip
 segments, output restarts at 0), into out/<name>-range.mp4; loudness is still measured on the whole

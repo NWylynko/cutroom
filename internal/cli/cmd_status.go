@@ -62,10 +62,29 @@ type statusRender struct {
 }
 
 type statusData struct {
-	Project  string          `json:"project"`
-	Sources  []statusSource  `json:"sources"`
-	Timeline *statusTimeline `json:"timeline,omitempty"`
-	Renders  []statusRender  `json:"renders"`
+	Project  string           `json:"project"`
+	Sources  []statusSource   `json:"sources"`
+	Timeline *statusTimeline  `json:"timeline,omitempty"`
+	Renders  []statusRender   `json:"renders"`
+	Captions []statusCaptions `json:"captions,omitempty"`
+}
+
+type statusCaptions struct {
+	Path    string `json:"path"`
+	Current bool   `json:"current"`
+	Cues    int    `json:"cues"`
+}
+
+// captionFilesIn lists .srt/.vtt files in dir.
+func captionFilesIn(dir string) []string {
+	var out []string
+	ents, _ := os.ReadDir(dir)
+	for _, e := range ents {
+		if n := strings.ToLower(e.Name()); strings.HasSuffix(n, ".srt") || strings.HasSuffix(n, ".vtt") {
+			out = append(out, filepath.Join(dir, e.Name()))
+		}
+	}
+	return out
 }
 
 func runStatus(c *Ctx) (*Result, error) {
@@ -223,6 +242,22 @@ func runStatus(c *Ctx) (*Result, error) {
 			}
 			lines = append(lines, fmt.Sprintf("  %-22s %-16s %s, %s", r.Path, kind, state, ck))
 		}
+	}
+
+	// caption files: current when written from this timeline
+	for _, f := range captionFilesIn(filepath.Join(p.Dir, "out")) {
+		b, err := os.ReadFile(captionsMetaPath(f))
+		var m captionsMeta
+		if err != nil || json.Unmarshal(b, &m) != nil {
+			continue
+		}
+		cs := statusCaptions{Path: relToCwd(f), Current: d.Timeline != nil && m.TimelineHash == d.Timeline.Hash, Cues: m.Cues}
+		d.Captions = append(d.Captions, cs)
+		state := "current"
+		if !cs.Current {
+			state = "STALE (timeline changed since): `cutroom captions` writes it again"
+		}
+		lines = append(lines, fmt.Sprintf("captions: %s (%d cues) %s", cs.Path, cs.Cues, state))
 	}
 
 	// next step: the first thing not done yet

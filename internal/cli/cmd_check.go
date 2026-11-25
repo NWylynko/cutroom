@@ -116,6 +116,9 @@ func rendersIn(dir string) []string {
 	var out []string
 	for _, m := range ms {
 		f := strings.TrimSuffix(m, ".cutroom.json")
+		if !strings.HasSuffix(strings.ToLower(f), ".mp4") {
+			continue // captions' sidecars
+		}
 		if _, err := os.Stat(f); err == nil {
 			out = append(out, relToCwd(f))
 		}

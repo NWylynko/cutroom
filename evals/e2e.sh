@@ -96,6 +96,14 @@ expect "range dry run is the range" 'range: output 0:02\.000–0:04\.000' cutroo
 expect "range renders the range"   '2\.000 s, 60 frames'             cutroom render --preview --range 0:02-0:04
 expect "check passes a range"      '^PASS out/preview-range\.mp4'      cutroom check out/preview-range.mp4
 expect "check passes a good render" '^PASS out/final.mp4'              cutroom check
+expect "captions written"          'wrote out/captions\.srt: [0-9]+ cues'  cutroom captions
+expect "captions words match"      'ok   words +all [0-9]+ words of the edit' cutroom captions --dry-run
+expect "captions --check passes"   'ok   seams'                      cutroom captions --check out/captions.srt
+expect "captions vtt"              '^WEBVTT'                         sh -c 'cutroom captions --vtt >/dev/null && head -1 out/captions.vtt'
+expect "status lists captions"     'captions: out/captions\.srt \([0-9]+ cues\) current' cutroom status
+expect "captions not a render"     '^renders \([0-9]+\):'           sh -c 'cutroom status | grep -v "captions" | grep -c "out/captions" | grep -q "^0$" && cutroom status | grep "^renders"'
+printf '1\n00:00:00,000 --> 00:00:02,000\nBy the way, my cat just walked across\n\n2\n00:00:02,100 --> 00:00:30,000\nthe keyboard.\n' > out/stale.srt
+expect "captions --check fails stale" 'FAIL words .*in the file but not the edit' cutroom captions --check out/stale.srt
 # planted faults: each must be caught by the right check
 M=out/final.mp4.cutroom.json
 ffmpeg -v error -y -i out/final.mp4 -itsoffset 0.1 -i out/final.mp4 -map 0:v -map 1:a -c copy -t 13.767 out/late.mp4; cp $M out/late.mp4.cutroom.json
