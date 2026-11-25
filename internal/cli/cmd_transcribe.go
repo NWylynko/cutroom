@@ -397,6 +397,13 @@ func runTranscript(c *Ctx) (*Result, error) {
 
 	// default: phrases
 	ph := speech.Phrases(t.Words, c.Float("gap"))
+	if c.Has("file") { // a render: tight pauses (~0.2 s), so a line per sentence or per pause ≥ 0.15 s
+		gap := 0.15
+		if c.Has("gap") {
+			gap = c.Float("gap")
+		}
+		ph = speech.Sentences(t.Words, gap)
+	}
 	type phraseOut struct {
 		Start      float64  `json:"start"`
 		End        float64  `json:"end"`

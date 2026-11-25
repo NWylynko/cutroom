@@ -213,3 +213,15 @@ func TestL28_BreathIsNotASoundSuspect(t *testing.T) {
 		}
 	}
 }
+
+func TestSentencesSplitTightEdits(t *testing.T) {
+	ws := []Word{{Text: "Hi.", Start: 0, End: 0.3}, {Text: "Then", Start: 0.32, End: 0.5}, {Text: "go,", Start: 0.5, End: 0.8},
+		{Text: "finally", Start: 1.0, End: 1.3}, {Text: "done.", Start: 1.3, End: 1.6}}
+	if n := len(Phrases(ws, 0.5)); n != 1 {
+		t.Fatalf("phrases at 0.5 s: %d, want 1 (tight edit)", n)
+	}
+	ps := Sentences(ws, 0.15)
+	if len(ps) != 3 || ps[0].Last != 0 || ps[1].Last != 2 || ps[1].PauseAfter != 0.2 {
+		t.Fatalf("sentences: %+v", ps)
+	}
+}

@@ -82,9 +82,7 @@ func runCaptions(c *Ctx) (*Result, error) {
 	out := ""
 	if c.Has("check") {
 		out = c.Str("check")
-		if !filepath.IsAbs(out) {
-			out = filepath.Join(e.p.Dir, out)
-		}
+		out = userPath(out)
 		b, err := os.ReadFile(out)
 		if err != nil {
 			return nil, Errf(ExitUsage, "no-file", "`cutroom captions` writes out/captions.srt", "can't read %s", relToCwd(out))
@@ -226,11 +224,7 @@ func writeCaptionFile(e *editEnv, out string, cues []captions.Cue, words int) er
 // captionPath: --output, else out/captions.srt (.vtt with --vtt).
 func captionPath(c *Ctx, e *editEnv) string {
 	if c.Has("output") {
-		if out := c.Str("output"); filepath.IsAbs(out) {
-			return out
-		} else {
-			return filepath.Join(e.p.Dir, out)
-		}
+		return userPath(c.Str("output"))
 	}
 	ext := ".srt"
 	if c.Bool("vtt") {

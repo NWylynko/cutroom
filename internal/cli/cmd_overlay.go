@@ -190,12 +190,9 @@ func (e *editEnv) overlayFromFlags(c *Ctx) (timeline.Overlay, error) {
 		}
 	case "image", "clip":
 		p := c.Args[2]
-		abs := p
-		if !filepath.IsAbs(abs) {
-			abs = filepath.Join(e.p.Dir, p)
-		}
+		abs := userPath(p)
 		if _, err := os.Stat(abs); err != nil {
-			return o, Errf(ExitUsage, "file-not-found", "give a PNG or JPEG path (relative to the project)", "%s not found", p)
+			return o, Errf(ExitUsage, "file-not-found", "give the file's path (relative to your current folder, like any path)", "%s not found", p)
 		}
 		if rel, err := filepath.Rel(e.p.Dir, abs); err == nil && !strings.HasPrefix(rel, "..") {
 			p = rel

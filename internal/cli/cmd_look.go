@@ -367,6 +367,18 @@ func fileArg(c *Ctx) error {
 	if !c.Has("file") {
 		takeFileArg(c)
 	}
+	// `look talk-rot 3.0`: a source id first means --source
+	if len(c.Args) == 2 && !c.Has("source") && !isNumberish(c.Args[0]) {
+		for _, f := range c.Cmd.Flags {
+			if f.Name != "source" {
+				continue
+			}
+			if p, err := project.Load(orDot(c.Str("project"))); err == nil && p.Sources[c.Args[0]] != nil {
+				c.vals["source"] = []string{c.Args[0]}
+				c.Args = c.Args[1:]
+			}
+		}
+	}
 	if len(c.Args) > 1 && c.Bool("output") {
 		return Errf(ExitUsage, "bad-args", fmt.Sprintf("--output is a switch, the time follows it once: `cutroom %s --output %s`", c.Cmd.Name, c.Args[len(c.Args)-1]),
 			"two times given (%s); --output takes no value", strings.Join(c.Args, ", "))
@@ -389,4 +401,24 @@ func takeFileArg(c *Ctx) {
 			return
 		}
 	}
+}
+
+// userPath resolves a path given on the command line the way any CLI does: relative to the shell's
+// current folder (also when --project points elsewhere).
+func userPath(p string) string {
+	if filepath.IsAbs(p) {
+		return p
+	}
+	a, err := filepath.Abs(p)
+	if err != nil {
+		return p
+	}
+	return a
+}
+
+func orDot(s string) string {
+	if s == "" {
+		return "."
+	}
+	return s
 }

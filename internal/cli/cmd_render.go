@@ -99,8 +99,8 @@ func runRender(c *Ctx) (*Result, error) {
 	} else if len(c.Args) == 1 {
 		out = c.Args[0]
 	}
-	if out != "" && !filepath.IsAbs(out) {
-		out = filepath.Join(e.p.Dir, out)
+	if out != "" {
+		out = userPath(out) // like any CLI: relative to the shell's folder, --project or not
 	}
 	if out == "" {
 		name := "final.mp4"

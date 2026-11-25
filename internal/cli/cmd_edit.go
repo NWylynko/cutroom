@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -69,13 +70,15 @@ never moves them.`,
 			{Name: "before", Kind: "string", Help: "add/move: put it before this segment id (default for add: at the end)"},
 			{Name: "fill", Kind: "bool", Help: "frame: scale the picture to fill the output frame (crop the rest)"},
 			{Name: "fit", Kind: "bool", Help: "frame: fit the whole picture (bars where shapes differ)"},
+			{Name: "size", Kind: "string", Help: "frame: output size WxH (e.g. 720x1280)"},
 			{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"},
 		},
 		Subs: map[string]Sub{
 			"frame": {Usage: `  edit frame --anchor 0.4,0.5   a filled frame (a vertical short) is cropped around this point of the
                                 source (0–1 across, down): move it onto the speaker
   edit frame --fill | --fit     fill the output frame (crop) or fit the whole picture (bars)
-Look at the result with ` + "`cutroom look --output <time>`" + `.`, Flags: []string{"anchor", "fill", "fit", "dry-run"}},
+  edit frame --size 720x1280    change the output size (overlays and captions follow)
+Look at the result with ` + "`cutroom look --output <time>`" + `.`, Flags: []string{"anchor", "fill", "fit", "size", "dry-run"}},
 			"cut": {Usage: `  edit cut --text "um, so"                       remove exactly these words (cut lands in the pauses)
   edit cut --from "By the way" --to "keyboard."  remove from the first words through the last words
   edit cut 16.9-17.4 [--source id]               remove a source time range (seconds or m:ss.mmm)
@@ -172,7 +175,15 @@ func loadEditEnv(c *Ctx, create bool) (*editEnv, error) {
 	e.tl, err = timeline.Load(p.Dir)
 	if errors.Is(err, timeline.ErrNone) {
 		if !create {
-			return nil, Errf(ExitInvalid, "no-timeline", "make the first edit (e.g. `cutroom edit tighten`), which creates it", "no timeline yet")
+			fix := "make the first edit (e.g. `cutroom edit tighten`), which creates it"
+			if ms, _ := filepath.Glob(filepath.Join(p.Dir, "shorts", "*", timeline.File)); len(ms) > 0 {
+				var ds []string
+				for _, m := range ms {
+					ds = append(ds, "--project "+relToCwd(filepath.Dir(m)))
+				}
+				fix += "; or work on a short: " + strings.Join(ds, ", ")
+			}
+			return nil, Errf(ExitInvalid, "no-timeline", fix, "no timeline yet in %s", relToCwd(p.Dir))
 		}
 		s, err := defaultVideo(p, c.Str("source"))
 		if err != nil {
@@ -387,8 +398,15 @@ func runEdit(c *Ctx) (*Result, error) {
 		label = desc
 		lines = append(lines, res...)
 	case "frame":
-		if !c.Has("anchor") && !c.Bool("fill") && !c.Bool("fit") {
-			return nil, Errf(ExitUsage, "missing-flag", "`cutroom edit frame --anchor 0.4,0.5` (where to crop a filled frame), --fill or --fit", "edit frame needs --anchor, --fill or --fit")
+		if !c.Has("anchor") && !c.Bool("fill") && !c.Bool("fit") && !c.Has("size") {
+			return nil, Errf(ExitUsage, "missing-flag", "`cutroom edit frame --anchor 0.4,0.5` (where to crop a filled frame), --fill, --fit or --size 720x1280", "edit frame needs --anchor, --fill, --fit or --size")
+		}
+		if c.Has("size") {
+			var w, h int
+			if _, err := fmt.Sscanf(c.Str("size"), "%dx%d", &w, &h); err != nil || w < 64 || h < 64 || w%2+h%2 != 0 {
+				return nil, Errf(ExitUsage, "bad-flag-value", "--size WxH with even numbers, e.g. 720x1280", "bad --size %q", c.Str("size"))
+			}
+			e.tl.Width, e.tl.Height = w, h
 		}
 		if c.Bool("fill") && c.Bool("fit") {
 			return nil, Errf(ExitUsage, "bad-flags", "give --fill or --fit, not both", "--fill and --fit both given")
@@ -406,7 +424,7 @@ func runEdit(c *Ctx) (*Result, error) {
 			}
 			e.tl.FillX, e.tl.FillY = ax, ay
 		}
-		label = fmt.Sprintf("edit frame fill=%v anchor %.2f,%.2f", e.tl.Fill, e.tl.FillX, e.tl.FillY)
+		label = fmt.Sprintf("edit frame %dx%d fill=%v anchor %.2f,%.2f", e.tl.Width, e.tl.Height, e.tl.Fill, e.tl.FillX, e.tl.FillY)
 		if e.tl.Fill {
 			lines = append(lines, fmt.Sprintf("frame: the picture fills %dx%d, cropped around %.2f,%.2f (0–1 across, down) — check it with `cutroom look --output <time>`", e.tl.Width, e.tl.Height, e.tl.FillX, e.tl.FillY))
 		} else {

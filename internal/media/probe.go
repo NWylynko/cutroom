@@ -302,7 +302,7 @@ func warnings(f *Facts) []Warning {
 	if a := f.Audio; a != nil {
 		if f.Video != nil && math.Abs(f.AVOffset) >= 0.001 {
 			w = append(w, Warning{Code: "av-offset", Lesson: "L02", Handled: true,
-				Message: fmt.Sprintf("audio starts %+.3f s relative to video", f.AVOffset),
+				Message: fmt.Sprintf("the sound track starts %.3f s %s the picture track (when the device began recording each); cutroom keeps that offset, so sound and picture stay as recorded — not a lip-sync error", math.Abs(f.AVOffset), map[bool]string{true: "after", false: "before"}[f.AVOffset > 0]),
 				Fix:     "nothing to do: cuts are placed on the audio timeline and video is aligned by timestamps"})
 		}
 		if a.Streams > 1 {

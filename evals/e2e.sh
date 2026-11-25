@@ -347,11 +347,22 @@ expect "one-token flag split"       'segment'                            cutroom
 expect "edit frame"                 'fills 1080x1920, cropped around 0\.60,0\.50' cutroom edit frame --anchor 0.6,0.5 --project shorts/steps
 expect "short: title in safe width" 'added o1: text'                     cutroom overlay add text "3 steps" --layout title --at "The first thing" --duration 3 --project shorts/steps
 ffmpeg -v error -y -f lavfi -i color=c=orange:s=300x150 -frames:v 1 shorts/steps/logo.png
-expect "unsafe overlay warned"      'overlay-unsafe.*o2.*reaches right'   sh -c 'cutroom overlay add image logo.png --at "Finally" --duration 1 --size 0.9 --layout lower-third --project shorts/steps >/dev/null; cutroom timeline --project shorts/steps'
+expect "unsafe overlay warned"      'overlay-unsafe.*o2.*reaches right'   sh -c 'cutroom overlay add image shorts/steps/logo.png --at "Finally" --duration 1 --size 0.9 --layout lower-third --project shorts/steps >/dev/null; cutroom timeline --project shorts/steps'
 cutroom overlay rm o2 --project shorts/steps >/dev/null; cutroom captions --burn --project shorts/steps >/dev/null
 expect "short renders vertical"     '1080x1920'                          cutroom render --project shorts/steps
 expect "short check: picture"       'ok   picture'                       cutroom check shorts/steps/out/final.mp4 --project shorts/steps
 expect "short check: safe zones"    'ok   safe-zones +[0-9]+ overlay box\(es\) inside the vertical safe zones \(y 260–1490, x ≤ 960\)' cutroom check shorts/steps/out/final.mp4 --project shorts/steps
+
+# r8 friction: paths with --project, the retake range, render transcripts by sentence, look conveniences
+expect "render path is cwd-relative"  'wrote out/short\.mp4'             cutroom render out/short.mp4 --project shorts/steps
+expect "file really in cwd"           'short\.mp4'                       ls out
+expect "check cwd path + project"     '^PASS out/short\.mp4'             cutroom check out/short.mp4 --project shorts/steps
+expect "frame --size"                 'fills 720x1280'                   cutroom edit frame --size 720x1280 --project shorts/steps
+expect "no-timeline names shorts"     'work on a short: --project shorts/' cutroom timeline
+expect "retake range = its cut"       'removes the earlier take, source 0:06\.200–0:09\.433' sh -c 'cutroom edit tighten >/dev/null; cutroom timeline'
+expect "look <source-id> <time>"      'frame 90 of talk at 0:03\.000'    cutroom look talk 3.0
+expect "look a render whole"          '12 frame\(s\) of out/short\.mp4 at 0:00\.000–'  cutroom look --file out/short.mp4 --project shorts/steps
+expect "render transcript by sentence" '^0:0[0-9.]+–0:0[0-9.]+  [Tt]hen install Linux on it' cutroom transcript --file out/short.mp4 --project shorts/steps
 popd >/dev/null
 
 echo "e2e: $pass passed, $fail failed"

@@ -3,7 +3,9 @@
 
 `cutroom short --from "first words" --to "last words." --name laptop` makes a vertical short of that
 span in `shorts/laptop/`: a project of its own with the same sources and transcripts. Every command
-works on it with `--project shorts/laptop` (render writes `shorts/laptop/out/final.mp4`).
+works on it with `--project shorts/laptop` (render writes `shorts/laptop/out/final.mp4`; paths you
+give are relative to your current folder, so `cutroom render out/short.mp4 --project shorts/laptop`
+writes `./out/short.mp4`).
 
 ```
 $ cutroom short --from "The first thing you need is an" --to "update command." --name steps
@@ -13,12 +15,14 @@ made shorts/steps: talk 0:10.250–0:25.990 "The first thing you need is" … "a
 ```
 
 Short-form defaults (L41):
-- 1080×1920 (`--size 720x1280` for a 720p source: it enlarges less). The landscape picture is scaled
+- 1080×1920 (`--size 720x1280` for a 720p source: it enlarges less; change it later with
+  `cutroom edit frame --size 720x1280 --project …`). The landscape picture is scaled
   to fill the frame and cropped; `cutroom edit frame --anchor 0.4,0.5 --project …` moves the crop
   onto the speaker (0–1 across, down) — look with `cutroom look --output <time> --project …`.
   `edit frame --fit` keeps the whole picture with bars instead.
 - Pads at cuts 0.06 s before / 0.16 s after; every pause tightened to ~0.2 s.
-- Open on the claim and drop every aside: cut them in the short as in any edit (`edit cut`).
+- Open on the claim and drop every aside: `short` keeps everything between --from and --to, so read
+  `cutroom timeline --project …` sentence by sentence and cut asides as in any edit (`edit cut`).
   It warns above 60 s.
 - Safe zones: on a vertical frame the app's title bar, buttons and caption area cover the top
   (above y 260 of 1920), the bottom (below y 1490) and the right 120 px. Title, lower-third and

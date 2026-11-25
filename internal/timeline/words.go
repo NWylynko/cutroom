@@ -539,8 +539,16 @@ func (t *Timeline) retakeCut(tx *speech.Transcript, src string, group []speech.S
 				continue
 			}
 			if m.Last == j && len(strings.Fields(phrase)) >= 2 || m.Last == j && n == j-from {
+				// say what the cut will really remove (pads included), as its --dry-run will
+				c := *t
+				c.Segments = append([]Segment(nil), t.Segments...)
+				r := c.CutWords(src, ws, from, j, "")
+				a, b := ws[from].Start, ws[j].End
+				if r.To > r.From {
+					a, b = r.From, r.To
+				}
 				return fmt.Sprintf("cutroom edit cut --from %q --near %.2f --to %q", fromText, ws[from].Start, phrase),
-					fmt.Sprintf("source %s–%s %q", mss(ws[from].Start), mss(ws[j].End), speech.Text(ws, from, j))
+					fmt.Sprintf("source %s–%s %q", mss(a), mss(b), speech.Text(ws, from, j))
 			}
 			break // first match after --from is the wrong one: use more words
 		}

@@ -395,10 +395,21 @@ type Phrase struct {
 }
 
 // Phrases splits at pauses ≥ minGap.
-func Phrases(words []Word, minGap float64) []Phrase {
+func Phrases(words []Word, minGap float64) []Phrase { return phrases(words, minGap, false) }
+
+// Sentences is Phrases that also splits after every sentence end — for reading a tight edit, where
+// the pauses are too short to split on.
+func Sentences(words []Word, minGap float64) []Phrase { return phrases(words, minGap, true) }
+
+func phrases(words []Word, minGap float64, atSentences bool) []Phrase {
 	var ps []Phrase
 	for i, w := range words {
-		if i == 0 || w.Start-words[i-1].End >= minGap {
+		ends := false
+		if atSentences && i > 0 {
+			t := strings.TrimRight(words[i-1].Text, `"')`)
+			ends = strings.HasSuffix(t, ".") || strings.HasSuffix(t, "?") || strings.HasSuffix(t, "!")
+		}
+		if i == 0 || w.Start-words[i-1].End >= minGap || ends {
 			if len(ps) > 0 {
 				ps[len(ps)-1].PauseAfter = round3(w.Start - words[i-1].End)
 			}

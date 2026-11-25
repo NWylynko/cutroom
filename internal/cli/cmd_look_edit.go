@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/cutroom/cutroom/internal/media"
 	"github.com/cutroom/cutroom/internal/perceive"
 	"github.com/cutroom/cutroom/internal/raster"
 	"github.com/cutroom/cutroom/internal/render"
@@ -132,16 +133,23 @@ func lookEdit(c *Ctx) (*Result, error) {
 		if _, err := os.Stat(f); err != nil {
 			return nil, Errf(ExitUsage, "file-not-found", "check the path", "%s not found", f)
 		}
-		if len(c.Args) == 0 {
-			return nil, Errf(ExitUsage, "bad-args", "give a time or range in the file, e.g. `cutroom look 3.9 --file out/final.mp4`", "look --file needs a time")
-		}
 		var words []speech.Word
 		if m, err := render.LoadManifest(f); err == nil {
 			words, _ = manifestWords(m, e.tr)
 		}
-		a, b, isRange, err := timeOrRange(c.Args[0])
-		if err != nil {
-			return nil, err
+		var a, b float64
+		isRange := true
+		if len(c.Args) == 0 { // the whole file as a contact sheet
+			fx, err := media.Probe(f, media.Options{})
+			if err != nil || fx.Video == nil {
+				return nil, Errf(ExitUsage, "not-a-video", "give a video file", "%s has no picture", f)
+			}
+			a, b = 0, math.Max(0, fx.Duration-0.5/fps)
+		} else {
+			a, b, isRange, err = timeOrRange(c.Args[0])
+			if err != nil {
+				return nil, err
+			}
 		}
 		if !isRange {
 			b = a

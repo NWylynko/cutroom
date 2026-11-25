@@ -2,6 +2,24 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 39 · 2026-11-24 · r8 friction: paths relative to the shell, retake range, render transcripts by sentence
+Did: (1) every path typed on the command line resolves against the shell's folder, --project or
+not (render output, captions --output/--check, overlay add image/clip; check/init/look already did);
+guide start says so. `render out/short.mp4 --project shorts/x` writes ./out/short.mp4 (short's next
+step says so). (2) `no-timeline` names the folder it looked in and lists `--project shorts/…`.
+(3) retake-kept quotes the range its suggested cut really removes (it runs CutWords on a copy:
+6.200–9.433, as the dry-run shows; was the words' 6.31–9.22). (4) the av-offset note says the sound
+track starts N s after/before the picture track — when the device began recording each — and is
+kept, "not a lip-sync error". (5) `look <source-id> <time>` (a source id first means --source);
+`look --file x` with no time → a 12-frame sheet of the whole file. (6) `transcript --file` (renders)
+splits at sentence ends and at pauses ≥ 0.15 s (`speech.Sentences`): a tight edit's ~0.2 s pauses
+made the whole render one line, and whisper may punctuate a render with commas only. (7) `edit frame
+--size WxH` resizes an existing short; short's next steps say to read every sentence for asides.
+Tests: TestSentencesSplitTightEdits; e2e 218/218 (+9).
+Surprises: the first sentence split did nothing on the short's render — whisper wrote it as one
+comma-joined sentence; the pause at a cut was exactly 0.20 s, so the split threshold is 0.15 s.
+Next: eval round 9 (all 12 tasks; rounds 9 and 10 must both be 100% sonnet).
+
 ### 38 · 2026-11-24 · eval round 8 (sonnet 11/12): a clip colour bug found and fixed
 Did: B-roll fixture terminal.mp4 (mandelbrot, unique frames, a 6 kHz tone as its sound); grader:
 vertical-crop search (21 anchors), `alt_during` (timed whisper → frames from the clip while the

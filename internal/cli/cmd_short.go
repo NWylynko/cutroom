@@ -32,6 +32,9 @@ its own with the same sources and transcripts, so every command works on it with
   cutroom timeline --project shorts/laptop
   cutroom edit cut --text "By the way…" --project shorts/laptop
   cutroom render --project shorts/laptop        → shorts/laptop/out/final.mp4
+  cutroom render out/short.mp4 --project shorts/laptop   → ./out/short.mp4 (paths you give are
+                                                relative to your current folder, like any path)
+  cutroom edit frame --size 720x1280 --project shorts/laptop   (resize; a 720p source enlarges less)
 Short-form defaults (L41): 1080×1920 (--size), the picture scaled to fill the frame and cropped around
 --anchor x,y (0–1; default 0.5,0.5: move it onto the speaker with ` + "`cutroom edit frame --anchor 0.4,0.5`" + `),
 pads 0.06 s before / 0.16 s after each cut, every pause tightened to ~0.2 s. Open on the claim and
@@ -163,7 +166,9 @@ func runShort(c *Ctx) (*Result, error) {
 		}
 	}
 	return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"project": rel, "duration": tl.Duration(), "segments": len(tl.Segments)},
-		Next: []string{"cutroom timeline --project " + rel, "cutroom look --output 0:01 --project " + rel + "   (check the framing)"}}, nil
+		Next: []string{"cutroom timeline --project " + rel + "   (read every sentence: cut asides and side points)",
+			"cutroom look --output 0:01 --project " + rel + "   (check the framing)",
+			"cutroom render out/short.mp4 --project " + rel + "   (paths are relative to your current folder)"}}, nil
 }
 
 func parseAnchor(s string) (float64, float64, error) {
