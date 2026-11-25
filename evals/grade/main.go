@@ -52,6 +52,14 @@ type spec struct {
 	BurnedCaptions bool `json:"burned_captions,omitempty"`
 	// SRT: a caption file whose words and timing must match the output's speech.
 	SRT string `json:"srt,omitempty"`
+	// VerticalCrop: the output is a 9:16 crop of the reference at an anchor the agent chose; the
+	// grader finds it (21 positions) and matches frames against the reference cropped the same way.
+	VerticalCrop bool `json:"vertical_crop,omitempty"`
+	// SafeBottom: nothing drawn in the bottom sixth of the frame while lines are said (a vertical
+	// video's own buttons and description sit there).
+	SafeBottom bool `json:"safe_bottom,omitempty"`
+	// AltDuring: while these phrases are said, the picture comes from AltRef (a B-roll cutaway).
+	AltDuring []string `json:"alt_during,omitempty"`
 }
 
 type result struct {
@@ -133,6 +141,14 @@ func main() {
 				"scale_vt=color_matrix=bt709:color_primaries=bt709:color_transfer=bt709,hwdownload,format=p010le")
 			ok := rs > 0 && rr > 0 && math.Abs(os_/rs-1) < 0.1 && math.Abs(or_/rr-1) < 0.1
 			add(c, ok, "saturation %.1f vs tone-mapped source %.1f; luma range %.0f vs %.0f (within 10%%)", os_, rs, or_, rr)
+		case strings.HasPrefix(c, "no_tone="):
+			// a B-roll clip's own sound (a pure tone above the talk's band) must not be in the output
+			f := strings.TrimPrefix(c, "no_tone=")
+			tone, voice := bandRMS(out, f+":100"), bandRMS(out, "1500:1000")
+			add(c, tone-voice < -30, "energy at %s Hz %.1f dB vs speech band %.1f dB (want 30 dB under)", f, tone, voice)
+		case c == "vertical_9x16":
+			w, h := size(out)
+			add(c, h > w && math.Abs(float64(w)/float64(h)-9.0/16) < 0.01, "%dx%d", w, h)
 		case strings.HasPrefix(c, "size="):
 			w, h := size(out)
 			add(c, fmt.Sprintf("size=%dx%d", w, h) == c, "%dx%d", w, h)
@@ -148,7 +164,7 @@ func main() {
 	if sp.SRT != "" {
 		srtCheck(filepath.Join(dir, sp.SRT), out, vd, add)
 	}
-	if has(sp.Checks, "upright") || has(sp.Checks, "frames_from_source") || has(sp.Checks, "av_sync") || has(sp.Checks, "alt_used") || len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions {
+	if has(sp.Checks, "upright") || has(sp.Checks, "frames_from_source") || has(sp.Checks, "av_sync") || has(sp.Checks, "alt_used") || len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions || sp.SafeBottom || len(sp.AltDuring) > 0 {
 		frameAndSync(out, sp, add)
 	}
 	res = append(res, result{"transcript", true, truncate(text, 400)})
@@ -189,6 +205,10 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 	if sp.RefSDR {
 		refFrames = greyFramesPre(ref, []string{"-hwaccel", "videotoolbox", "-hwaccel_output_format", "videotoolbox_vld"},
 			"scale_vt=color_matrix=bt709:color_primaries=bt709:color_transfer=bt709,hwdownload,format=p010le,transpose=clock,transpose=clock")
+	} else if sp.VerticalCrop {
+		var anchor float64
+		refFrames, anchor = verticalRef(ref, out)
+		add("vertical_crop", refFrames != nil, "output is a 9:16 crop of the source around x = %.2f", anchor)
 	} else {
 		refFrames = greyFrames(ref, "")
 	}
@@ -201,7 +221,7 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 	outFrames := greyFrames(out, "fps=30") // resample to a 30 fps grid in output time
 	// with cards or burned captions over the picture, match on the best 3/4 of the frame's tiles
 	errf := mse
-	if len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions {
+	if len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions || sp.SafeBottom {
 		errf = robust
 	}
 	if len(outFrames) == 0 || len(refFrames) == 0 {
@@ -212,6 +232,7 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 		outT, refT, err, flippedErr float64
 		ref                         int // which reference the frame came from
 		covered, bottom             int // tiles that differ from the reference (cards), of them in the bottom band
+		lowest                      int // of them in the bottom sixth (row 6 of 6)
 	}
 	var ms []match
 	for i := 0; i < len(outFrames); i += 6 { // every 0.2 s
@@ -252,8 +273,8 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 		}
 		best := errf(outFrames[i], refSets[br][bi])
 		fl := errf(flip(outFrames[i]), refSets[br][bi])
-		cov, bot := covered(outFrames[i], refSets[br][bi])
-		ms = append(ms, match{float64(i) / refFPS, float64(bi) / refFPS, best, fl, br, cov, bot})
+		cov, bot, low := covered(outFrames[i], refSets[br][bi])
+		ms = append(ms, match{float64(i) / refFPS, float64(bi) / refFPS, best, fl, br, cov, bot, low})
 	}
 	// upright: best match error small and much smaller than the flipped comparison
 	bad := 0
@@ -280,7 +301,34 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 		}
 		add("alt_used", n >= 5, "%d sampled frames (≈%.1f s) come from %s", n, float64(n)*0.2, sp.AltRef)
 	}
-	if len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions {
+	if len(sp.AltDuring) > 0 {
+		ws := transcribeTimed(out)
+		for _, ph := range sp.AltDuring {
+			a, b, ok := phraseSpan(ws, ph)
+			if !ok {
+				add("cutaway during: "+ph, false, "phrase not heard in the output")
+				continue
+			}
+			in, alt, outside, main := 0, 0, 0, 0
+			for _, m := range ms {
+				switch {
+				case m.outT > a+0.2 && m.outT < b-0.2:
+					in++
+					if m.ref == 1 && m.err < maxErr {
+						alt++
+					}
+				case m.outT < a-0.5 || m.outT > b+0.5:
+					outside++
+					if m.ref == 0 && m.err < maxErr {
+						main++
+					}
+				}
+			}
+			add("cutaway during: "+ph, in > 0 && float64(alt) >= 0.8*float64(in), "%d of %d sampled frames while it is said (%.2f–%.2f s) come from %s", alt, in, a, b, sp.AltRef)
+			add("speaker elsewhere", outside > 0 && float64(main) >= 0.9*float64(outside), "%d of %d sampled frames away from it come from the talk", main, outside)
+		}
+	}
+	if len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions || sp.SafeBottom {
 		lines := fixtureLines(ref)
 		during := func(phrase string) (n, card, bottom int) {
 			for _, l := range lines {
@@ -308,6 +356,18 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 		for _, ph := range sp.Clean {
 			n, c, _ := during(ph)
 			add("no card during: "+ph, n > 0 && float64(c) <= 0.2*float64(n), "%d of %d sampled frames while it is said carry a card", c, n)
+		}
+		if sp.SafeBottom {
+			n, bad := 0, 0
+			for _, m := range ms {
+				if m.ref == 0 && m.err < maxErr {
+					n++
+					if m.lowest > 0 {
+						bad++
+					}
+				}
+			}
+			add("safe_bottom", n > 0 && bad == 0, "%d of %d sampled frames have something drawn in the bottom sixth", bad, n)
 		}
 		if sp.BurnedCaptions {
 			n, b := 0, 0
@@ -436,12 +496,15 @@ func robust(a, b []byte) float64 {
 
 // covered counts tiles that clearly differ from the reference frame (something drawn over them),
 // and how many of those are in the bottom band (rows 5–6 of 6: where captions sit).
-func covered(a, b []byte) (n, bottom int) {
+func covered(a, b []byte) (n, bottom, lowest int) {
 	for i, e := range tileErrs(a, b) {
 		if e > 400 {
 			n++
 			if i >= 32 {
 				bottom++
+			}
+			if i >= 40 {
+				lowest++
 			}
 		}
 	}
@@ -879,4 +942,61 @@ func lcs(a, b []string) int {
 		}
 	}
 	return dp[0][0]
+}
+
+// verticalRef finds where the agent cropped the 9:16 frame from the reference: it tries 21 anchors
+// on three output frames and returns the reference cropped at the best one.
+func verticalRef(ref, out string) ([][]byte, float64) {
+	o := greyFrames(out, "fps=30")
+	if len(o) < 10 {
+		return nil, 0
+	}
+	probe := []int{len(o) / 5, len(o) / 2, 4 * len(o) / 5}
+	best, bestA := math.Inf(1), 0.0
+	var bestFr [][]byte
+	for k := 0; k <= 20; k++ {
+		a := float64(k) / 20
+		fr := greyFrames(ref, fmt.Sprintf("crop=ih*9/16:ih:(iw-ow)*%.2f:0", a))
+		t := 0.0
+		for _, i := range probe {
+			e := math.Inf(1)
+			for _, rf := range fr {
+				e = math.Min(e, mse(o[i], rf))
+			}
+			t += e
+		}
+		if t < best {
+			best, bestA, bestFr = t, a, fr
+		}
+	}
+	return bestFr, bestA
+}
+
+// phraseSpan finds a phrase in timed words (fuzzy like count): its output start and end.
+func phraseSpan(ws []tword, phrase string) (float64, float64, bool) {
+	p := tokens(phrase)
+	for i := range ws {
+		k, j := 0, i
+		for ; j < len(ws) && j < i+len(p)+3 && k < len(p); j++ {
+			if ws[j].w == p[k] {
+				k++
+			}
+		}
+		if k >= int(math.Ceil(0.8*float64(len(p)))) && ws[i].w == p[0] {
+			return ws[i].a, ws[j-1].b, true
+		}
+	}
+	return 0, 0, false
+}
+
+// bandRMS is the RMS level (dB) of the output's audio in a band "centre:width" (Hz).
+func bandRMS(p, band string) float64 {
+	parts := strings.Split(band, ":")
+	b, _ := exec.Command("ffmpeg", "-v", "info", "-i", p, "-vn", "-af", fmt.Sprintf("bandpass=f=%s:width_type=h:w=%s,astats=metadata=0", parts[0], parts[1]), "-f", "null", "-").CombinedOutput()
+	m := regexp.MustCompile(`RMS level dB: (-?[0-9.]+|-inf)`).FindAllStringSubmatch(string(b), -1)
+	if len(m) == 0 || m[len(m)-1][1] == "-inf" {
+		return -200
+	}
+	v, _ := strconv.ParseFloat(m[len(m)-1][1], 64)
+	return v
 }

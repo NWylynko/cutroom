@@ -137,5 +137,39 @@ print(re.sub(r"(\d+):(\d\d):(\d\d),(\d\d\d)",sh,open("/tmp/cutroom-selftest.srt"
 want FAIL social "$W/late-srt" "srt: in sync"
 rm -f /tmp/cutroom-selftest.srt
 
+# short: a 9:16 crop of the steps with captions; broll: a full-screen cutaway during a line
+eval "$(python3 - <<'PY'
+import json
+m=json.load(open("evals/work/fixtures/talk.json"))
+keep=[l for l in m["lines"] if l.get("tag") in ("keep","retake-good")]
+steps=[l for l in keep if l["say"].startswith(("The first thing you need is an","Then install","Finally"))]
+print("SHORTSEGS='"+" ".join(f"{l['start']-0.06:.3f}:{l['end']+0.16:.3f}" for l in steps)+"'")
+t=0.0; sw=[]
+for l in steps:
+    a=t+0.06; sw.append((a,a+l["end"]-l["start"])); t+=(l["end"]+0.16)-(l["start"]-0.06)
+print("SHORTSPEECH='"+"+".join(f"between(t,{a:.3f},{b:.3f})" for a,b in sw)+"'")
+t=0.0
+for l in keep:
+    a=t+0.10; b=a+(l["end"]-l["start"])
+    if l["say"].startswith("Finally"): print(f"CUTA={a:.3f}; CUTB={b:.3f}")
+    t+=(l["end"]+0.22)-(l["start"]-0.10)
+PY
+)"
+full_segs=$segs; segs=$SHORTSEGS
+cut $FIX/talk.mp4 "$W/short/out/short.mp4" "crop=ih*9/16:ih:(iw-ow)*0.6:0,scale=1080:1920,drawbox=x=140:y=1300:w=800:h=140:color=black@0.75:t=fill:enable='$SHORTSPEECH'"
+want PASS short "$W/short"
+cut $FIX/talk.mp4 "$W/shortlow/out/short.mp4" "crop=ih*9/16:ih:(iw-ow)*0.6:0,scale=1080:1920,drawbox=x=140:y=1700:w=800:h=140:color=black@0.75:t=fill:enable='$SHORTSPEECH'"
+want FAIL short "$W/shortlow" "safe_bottom"
+cut $FIX/talk.mp4 "$W/shortwide/out/short.mp4" "drawbox=x=300:y=520:w=680:h=60:color=black@0.75:t=fill:enable='$SHORTSPEECH'"
+want FAIL short "$W/shortwide" "vertical_9x16"
+segs=$full_segs
+cut $FIX/talk.mp4 "$W/brollbase/out/final.mp4"
+mkdir -p "$W/broll/out" "$W/brolltone/out"
+ffmpeg -v error -y -i "$W/brollbase/out/final.mp4" -i $FIX/terminal.mp4 -filter_complex "[1:v]setpts=PTS-STARTPTS+$CUTA/TB[t];[0:v][t]overlay=0:0:eof_action=pass:enable='between(t,$CUTA,$CUTB)'[v]" -map "[v]" -map 0:a -c:v libx264 -preset veryfast -c:a copy "$W/broll/out/final.mp4"
+want PASS broll "$W/broll"
+ffmpeg -v error -y -i "$W/broll/out/final.mp4" -i $FIX/terminal.mp4 -filter_complex "[1:a]adelay=${CUTA}s:all=1[t];[0:a][t]amix=inputs=2:duration=first:normalize=0[a]" -map 0:v -map "[a]" -c:v copy -c:a aac "$W/brolltone/out/final.mp4"
+want FAIL broll "$W/brolltone" "no_tone=6000"
+want FAIL broll "$W/brollbase" "cutaway during"
+
 echo "selftest: $pass passed, $fail failed"
 [ $fail -eq 0 ]

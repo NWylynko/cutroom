@@ -155,6 +155,18 @@ func main() {
 	ff("-display_rotation", "180", "-i", path("tmp/hdr.mov"), "-c", "copy", path("talk-hdr.mov"))
 	writeManifest(m)
 
+	// 7. terminal.mp4 — B-roll: 6 s of a different, moving picture (every frame unique) with its own
+	// sound (a 6 kHz tone that must not reach a render: B-roll is muted).
+	m = base
+	m.Name, m.File = "terminal", "terminal.mp4"
+	m.Description = "B-roll clip: 6 s, 1280x720 30 fps, mandelbrot zoom (unique frames), a 6 kHz tone as its sound (the talk is band-limited below 3.5 kHz)."
+	m.Lines = nil
+	m.Facts = map[string]any{"fps": "30", "duration": 6.0}
+	ff("-f", "lavfi", "-i", "mandelbrot=s=1280x720:rate=30", "-f", "lavfi", "-i", "sine=frequency=6000:sample_rate=48000",
+		"-t", "6", "-af", "volume=-12dB", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p",
+		"-c:a", "aac", "-b:a", "128k", path("terminal.mp4"))
+	writeManifest(m)
+
 	os.RemoveAll(tmp)
 	fmt.Println("fixtures in", out)
 }

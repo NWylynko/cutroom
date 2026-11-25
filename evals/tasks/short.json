@@ -1,0 +1,11 @@
+{
+  "fixtures": ["talk.mp4"],
+  "output": "out/short.mp4",
+  "must_contain": ["first thing you need is an old laptop", "install Linux on it", "open the terminal and run the update command"],
+  "must_not_contain": ["um", "my cat", "show you how to set up", "your server is ready"],
+  "duration": [6.0, 14.0],
+  "vertical_crop": true,
+  "burned_captions": true,
+  "safe_bottom": true,
+  "checks": ["vertical_9x16", "frames_from_source", "av_sync"]
+}
