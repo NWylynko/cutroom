@@ -2,6 +2,28 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 50 · 2026-11-25 · T3 r50: 3/4 again; edge-in-sound catches every fragment the reviewers heard
+Did: T3 r50, fresh editors on all four. deploy, started, mps ACCEPT (mps: the editor moved the
+earlier take that completes the camera's cut-off last sentence to the end — a real editor's move);
+sec REJECT again, new fragments: 80 ms of "and" after "with a PIN", and "meaning | you" cut mid-word.
+Both edges came from time-range cuts the editor computed by hand from recorder times, 20 ms "before"
+words whose real onsets were 50–80 ms earlier than the transcript — inside edge-in-word's 40 ms
+tolerance. Transcripts can't see this; the sound can. New check edge-in-sound (Validate, via the
+Quiet hook): a segment edge (not a recording's own edge, not a split) whose level is ≥ 18 dB above
+the pauses within ±0.4 s (5th percentile, digital silence ignored) is in speech; the fix trims to the
+quiet frame within 150 ms nearest the edge, or says there is no pause and to cut by words. quietest()
+now prefers, among frames within 1 dB of the minimum, the one nearest the original edge.
+Also: the timeline header names each take's sound ("mic1 (for sec-take1), mic2 (for sec-take2)");
+a recorder's transcript says `transcript <camera>` shows its words on the camera's clock; a
+transcript range prints whole. Guide: prefer word cuts; edge-in-sound explained.
+Measured: on the eight T3 projects of r49+r50 it flags exactly the four fragments the reviewers
+rejected (r49 sec ×2, r50 sec ×2; r49's join fix = 13.367, the gap found by hand) and nothing on
+the six accepted edits. `timeline` with levels: 35 ms on a 1-min excerpt. e2e 256/256.
+Surprises: a first relative rule (edge vs quietest point within 150 ms) missed "meaning | you" —
+there is no pause there at all; the room level is the right reference. A 20th percentile was too
+high around dense speech; the 5th works.
+Next: T3 r51 on all four, then eval round 11.
+
 ### 49 · 2026-11-25 · T3 r49: 3/4 accepted; sec's word fragments found and fixed at the source
 Did: T3 round r49 (fresh sonnet editors, opus reviewer; packs built by evals/local/t3/pack.sh).
 deploy ACCEPT (≈ the channel's own edit: 8.70–14.83 + 41.57–56.50 vs 8.61–14.86 + 41.52–56.65),
