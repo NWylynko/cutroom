@@ -2,6 +2,29 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 32 · 2026-11-24 · M4 burned-in captions: 1–3 word groups as one alpha clip per chunk (L48)
+Did: `captions.Groups`: per sentence (and pauses ≥ 1 s), a small DP picks group boundaries: ≤ 20
+chars, ≤ 3 words (a 4th only to avoid a weak ending), costs for weak endings (determiners/"to"
+worst), lone words (short ones worse), unbalanced lengths; cheaper breaks after commas and at
+pauses ≥ 0.3 s; trailing ,/. dropped; groups shown until the next starts (no flicker), else last
+word + 0.4 s. `cutroom captions --burn` adds one `captions` overlay over the whole edit; groups are
+computed from the cut at render time, so they follow every re-cut. Cards: bold white on a dark box,
+0.068 × the short side, bottom at 0.92 h (landscape) or 0.77 h (vertical, L41 safe zone); lower
+thirds move up above the caption band when captions are on. Render: each chunk's groups become one
+ffconcat of card PNGs (blank PNG in gaps) with frame-count durations → `fps,format=rgba,trim` →
+one overlay (L48: not ~150 overlays). `look --output` shows them (+cc); `check` samples ≤ 6 groups
+on screen and the gaps between groups clean. Tests: TestL48_CaptionGroups, TestGroupsPauseAndHold,
+TestL48_CaptionsOneClipPerChunk; e2e 169/169 (+6) incl. a render without the captions checked
+against a manifest that has them → FAIL "not visible".
+Measured: fixture 17 groups for 44 words; preview 1.4 s (1.0 s without); card vs picture ≥ 3184.
+Real speech (deploy 153 words → 57 groups; sec 123 → 49): greedy grouping first gave "care about
+the | ongoing cost", "If | you don't know" — pauses forced splits and the weak-word rule only looked
+at one word. The DP plus soft pause breaks gives "care about | the ongoing cost", "If you don't know |
+where to start", "to start with | a Docker file".
+Surprises: treating a short pause as a hard split was the main cause of bad groups: speakers pause
+*after* "the" and "if" while thinking.
+Next: eval round 7 (overlay + captions tasks), then clip overlays.
+
 ### 31 · 2026-11-24 · M4 overlays: text cards and images anchored to words, checked frame-exactly
 Did: guide topic `overlays` first. Timeline gains `overlays` (id, kind text|image, anchor source +
 source time from `--at` words, `--to` words or `--duration`, layout, `--sub`, `--size`, `--fade`);

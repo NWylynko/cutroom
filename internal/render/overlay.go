@@ -16,6 +16,7 @@ import (
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 
+	"github.com/cutroom/cutroom/internal/captions"
 	"github.com/cutroom/cutroom/internal/raster"
 	"github.com/cutroom/cutroom/internal/timeline"
 )
@@ -36,16 +37,40 @@ type Placement struct {
 	Fade  float64    `json:"fade"`
 	Box   [4]float64 `json:"box"`
 	Name  string     `json:"name"`
+	// Groups: burned-in captions, each a card shown over [Start, End)
+	Groups []CapGroup `json:"groups,omitempty"`
+}
+
+// CapGroup is one burned-in caption group as rendered.
+type CapGroup struct {
+	Start float64    `json:"start"`
+	End   float64    `json:"end"`
+	Text  string     `json:"text"`
+	PNG   string     `json:"png"`
+	Key   string     `json:"key"`
+	Box   [4]float64 `json:"box"`
 }
 
 // Placements resolves every overlay of tl that shows to a card PNG at w×h (cached in cacheDir).
 // Overlays whose anchor was cut are skipped (the timeline warns about them).
-func Placements(tl *timeline.Timeline, projDir, cacheDir string, w, h int) ([]Placement, error) {
+func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDir string, w, h int) ([]Placement, error) {
 	var ps []Placement
+	burned := tl.Captions() != nil
 	for _, o := range tl.Overlays {
 		a, b, ok, _ := tl.Window(o)
 		if !ok {
 			continue
+		}
+		if o.Kind == "captions" {
+			p, err := captionPlacement(tl, tr, o, cacheDir, w, h)
+			if err != nil {
+				return nil, err
+			}
+			ps = append(ps, p)
+			continue
+		}
+		if burned && (o.Layout == "lower-third" || o.Layout == "") && o.Kind != "captions" {
+			o.Layout = "lower-third-raised" // keep clear of the caption band
 		}
 		key, err := cardKey(o, projDir, w, h)
 		if err != nil {
@@ -170,7 +195,7 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 			th += lineH(l.face)
 		}
 		accent := 0
-		if o.Layout == "lower-third" || o.Layout == "" {
+		if o.Layout == "lower-third" || o.Layout == "" || o.Layout == "lower-third-raised" {
 			accent = int(math.Max(4, 0.006*float64(w)))
 		}
 		bw, bh := tw+2*pad+accent, th+2*pad
@@ -214,6 +239,8 @@ func place(layout string, W, H, w, h, margin int) (int, int) {
 		return (W - w) / 2, int(0.08 * float64(H))
 	case "corner":
 		return W - margin - w, int(0.06 * float64(H))
+	case "lower-third-raised": // above burned-in captions
+		return margin, int(captionTop(W, H)) - int(0.03*float64(H)) - h
 	default: // lower-third
 		return margin, H - int(0.12*float64(H)) - h
 	}
@@ -242,3 +269,85 @@ func wrapText(f font.Face, s string, mw int) []string {
 
 // Layouts are the overlay positions.
 var Layouts = []string{"lower-third", "title", "top", "corner", "center"}
+
+// --- burned-in captions (L48) ----------------------------------------------------------------
+
+// captionBottom is where the caption box ends: low on landscape frames; on vertical frames above
+// the platform's buttons and description (safe zone, L41: nothing below y 1490 of 1920).
+func captionBottom(W, H int) float64 {
+	if H > W {
+		return 0.77 * float64(H)
+	}
+	return 0.92 * float64(H)
+}
+
+func captionSize(W, H int) float64 { return math.Round(0.068 * float64(min(W, H))) }
+
+// captionTop is the top of the caption band (for raising lower thirds).
+func captionTop(W, H int) float64 {
+	return captionBottom(W, H) - 1.6*captionSize(W, H)
+}
+
+func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline.Overlay, cacheDir string, w, h int) (Placement, error) {
+	ws, missing := captions.OutputWords(tl, tr)
+	if len(missing) > 0 {
+		return Placement{}, fmt.Errorf("burned-in captions need a transcript of %s: run `cutroom transcribe %s`", missing[0], missing[0])
+	}
+	p := Placement{ID: o.ID, Kind: "captions", Start: 0, End: tl.Duration(), Name: "burned-in captions", Key: "captions"}
+	var keys []any
+	for _, g := range captions.Groups(ws, captions.DefaultGroups, tl.Duration()) {
+		key := hash([]any{CardVersion, "caption", w, h, g.Text})
+		png := filepath.Join(cacheDir, "overlays", key+".png")
+		img, r := CaptionCard(g.Text, w, h)
+		if _, err := os.Stat(png); err != nil {
+			if err := ensureDir(png); err != nil {
+				return p, err
+			}
+			if err := raster.SavePNG(png, img); err != nil {
+				return p, err
+			}
+		}
+		box := [4]float64{float64(r.Min.X) / float64(w), float64(r.Min.Y) / float64(h), float64(r.Max.X) / float64(w), float64(r.Max.Y) / float64(h)}
+		p.Groups = append(p.Groups, CapGroup{Start: g.Start, End: g.End, Text: g.Text, PNG: png, Key: key, Box: box})
+		keys = append(keys, []any{key, g.Start, g.End})
+		for i := range 4 { // the placement's box covers every group's box
+			if p.Box == ([4]float64{}) {
+				p.Box = box
+			}
+			if i < 2 {
+				p.Box[i] = math.Min(p.Box[i], box[i])
+			} else {
+				p.Box[i] = math.Max(p.Box[i], box[i])
+			}
+		}
+	}
+	p.Key = hash(keys)
+	return p, nil
+}
+
+// CaptionCard draws one caption group: bold white on a dark box, centred in the caption band.
+func CaptionCard(text string, w, h int) (*image.NRGBA, image.Rectangle) {
+	img := image.NewNRGBA(image.Rect(0, 0, w, h))
+	f := raster.Face("bold", captionSize(w, h))
+	m := f.Metrics()
+	tw := raster.Measure(f, text)
+	padX, padY := int(0.3*captionSize(w, h)), int(0.18*captionSize(w, h))
+	bw, bh := tw+2*padX, (m.Ascent+m.Descent).Round()+2*padY
+	x, y := (w-bw)/2, int(captionBottom(w, h))-bh
+	r := image.Rect(x, y, x+bw, y+bh)
+	draw.Draw(img, r, image.NewUniform(color.NRGBA{0, 0, 0, 170}), image.Point{}, draw.Over)
+	raster.Text(img, f, x+padX, y+padY+m.Ascent.Round(), color.NRGBA{255, 255, 255, 255}, text)
+	return img, r
+}
+
+// blankPNG is a fully transparent frame (gaps between caption groups).
+func blankPNG(cacheDir string, w, h int) (string, error) {
+	p := filepath.Join(cacheDir, "overlays", fmt.Sprintf("blank-%dx%d.png", w, h))
+	if _, err := os.Stat(p); err == nil {
+		return p, nil
+	}
+	if err := ensureDir(p); err != nil {
+		return "", err
+	}
+	return p, raster.SavePNG(p, image.NewNRGBA(image.Rect(0, 0, w, h)))
+}

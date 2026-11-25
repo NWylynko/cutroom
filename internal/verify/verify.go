@@ -1075,6 +1075,10 @@ func overlayCheck(file string, m *render.Manifest, fps float64, r *Report) {
 		return mseMasked(frames[f], burst[bj], [][4]int{box}, true), true
 	}
 	for _, p := range m.Overlays {
+		if p.Kind == "captions" {
+			captionCheck(p, fps, diffIn, r)
+			continue
+		}
 		box := boxPx(p)
 		fa, fb := int(math.Round(p.Start*fps)), int(math.Round(p.End*fps))
 		nf := int(math.Round(p.Fade * fps))
@@ -1115,4 +1119,63 @@ func overlayCheck(file string, m *render.Manifest, fps float64, r *Report) {
 		}
 		r.add(it)
 	}
+}
+
+// captionCheck: burned-in caption groups are on screen during their groups (a sample spread over
+// the edit) and nothing is drawn in the gaps between them (L48).
+func captionCheck(p render.Placement, fps float64, diffIn func(int, [4]int) (float64, bool), r *Report) {
+	var bad []string
+	var picks []render.CapGroup
+	for _, g := range p.Groups {
+		if math.Round(g.End*fps)-math.Round(g.Start*fps) >= 3 {
+			picks = append(picks, g)
+		}
+	}
+	if len(picks) > 6 {
+		var keep []render.CapGroup
+		for i := 0; i < 6; i++ {
+			keep = append(keep, picks[i*(len(picks)-1)/5])
+		}
+		picks = keep
+	}
+	minIn := math.Inf(1)
+	for _, g := range picks {
+		f := int(math.Round((g.Start + g.End) / 2 * fps))
+		if d, ok := diffIn(f, boxPx(render.Placement{Box: g.Box})); ok {
+			minIn = math.Min(minIn, d)
+			if d < 150 {
+				bad = append(bad, fmt.Sprintf("%q not visible at %.3f (difference %.0f)", g.Text, float64(f)/fps, d))
+			}
+		}
+	}
+	// gaps: before the first group, between groups, after the last
+	gaps, clean := 0, 0
+	prevEnd := 0.0
+	ends := append(append([]render.CapGroup{}, p.Groups...), render.CapGroup{Start: p.End})
+	for _, g := range ends {
+		a, b := int(math.Round(prevEnd*fps)), int(math.Round(g.Start*fps))
+		if b-a >= 1 {
+			gaps++
+			if gaps <= 4 {
+				f := (a + b - 1) / 2
+				if d, ok := diffIn(f, boxPx(p)); ok {
+					if d > 60 {
+						bad = append(bad, fmt.Sprintf("something drawn at %.3f, between caption groups (difference %.0f)", float64(f)/fps, d))
+					} else {
+						clean++
+					}
+				}
+			}
+		}
+		prevEnd = g.End
+	}
+	it := Item{Check: "captions"}
+	if len(bad) > 0 {
+		it.Status, it.Detail = "fail", fmt.Sprintf("burned-in captions: %s", strings.Join(bad, "; "))
+		it.Fix = "re-render (`cutroom render`); if it repeats, this is a cutroom bug"
+	} else {
+		it.Status = "pass"
+		it.Detail = fmt.Sprintf("burned-in captions: %d groups; %d sampled on screen (card differs from the picture by ≥ %.0f), %d gap(s) checked clean", len(p.Groups), len(picks), minIn, clean)
+	}
+	r.add(it)
 }

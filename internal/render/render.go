@@ -37,18 +37,19 @@ type Source struct {
 }
 
 type Options struct {
-	Preview  bool
-	Range    [2]float64 // output seconds; zero = all
-	Jobs     int
-	Target   float64 // chunk length (s)
-	CacheDir string
-	Loudness float64 // LUFS
-	TruePeak float64 // dBTP
-	Chain    string
-	DryRun   bool
-	Progress func(string)
-	ProjDir  string      // overlay image paths are relative to it
-	Overlays []Placement // set by Render: overlays in the planned timeline's output time
+	Preview     bool
+	Range       [2]float64 // output seconds; zero = all
+	Jobs        int
+	Target      float64 // chunk length (s)
+	CacheDir    string
+	Loudness    float64 // LUFS
+	TruePeak    float64 // dBTP
+	Chain       string
+	DryRun      bool
+	Progress    func(string)
+	ProjDir     string               // overlay image paths are relative to it
+	Transcripts timeline.Transcripts // for burned-in captions
+	Overlays    []Placement          // set by Render: overlays in the planned timeline's output time
 }
 
 type Chunk struct {
@@ -70,6 +71,61 @@ type ChunkOverlay struct {
 	From, To int64
 	FadeIn   bool `json:"fade_in"`
 	FadeOut  bool `json:"fade_out"`
+	// Frames: burned-in captions as runs of chunk frames, each showing one card ("" = nothing)
+	Frames []CapRun `json:"frames,omitempty"`
+}
+
+// CapRun is a run of chunk frames [From, To) showing one caption card (PNG "" = none).
+type CapRun struct {
+	PNG      string `json:"png"`
+	From, To int64
+}
+
+// captionFrames lays the caption groups over a chunk's frames [c0, c0+n) as runs, gaps included.
+func captionFrames(p Placement, c0, n int64, fps float64) []CapRun {
+	var rs []CapRun
+	at := int64(0)
+	for _, g := range p.Groups {
+		a, b := int64(math.Round(g.Start*fps))-c0, int64(math.Round(g.End*fps))-c0
+		a, b = max(a, at), min(b, n)
+		if b <= a {
+			continue
+		}
+		if a > at {
+			rs = append(rs, CapRun{"", at, a})
+		}
+		rs = append(rs, CapRun{g.PNG, a, b})
+		at = b
+	}
+	if len(rs) == 0 {
+		return nil
+	}
+	if at < n {
+		rs = append(rs, CapRun{"", at, n})
+	}
+	return rs
+}
+
+// capList is the ffconcat list that plays caption runs as one clip: each card for its run's frames.
+func capList(runs []CapRun, blank string, fps float64) string {
+	var b strings.Builder
+	b.WriteString("ffconcat version 1.0\n")
+	q := func(p string) string { return "'" + strings.ReplaceAll(p, "'", `'\''`) + "'" }
+	last := ""
+	for _, r := range runs {
+		p := r.PNG
+		if p == "" {
+			p = blank
+		}
+		fmt.Fprintf(&b, "file %s\nduration %s\n", q(p), f6(float64(r.To-r.From)/fps))
+		last = p
+	}
+	fmt.Fprintf(&b, "file %s\n", q(last)) // the concat demuxer needs the last file once more
+	return b.String()
+}
+
+func capListPath(c Chunk, k int) string {
+	return strings.TrimSuffix(c.file, ".mp4") + fmt.Sprintf(".cap%d.ffconcat", k)
 }
 
 type Result struct {
@@ -158,6 +214,15 @@ func Plan(tl *timeline.Timeline, srcs map[string]Source, o Options) []Chunk {
 				continue
 			}
 			co := ChunkOverlay{P: p, From: from, To: to, FadeIn: pa >= c0 && p.Fade > 0, FadeOut: pb <= c0+c.Frames && p.Fade > 0}
+			if p.Kind == "captions" {
+				co.Frames = captionFrames(p, c0, c.Frames, tl.Rate())
+				if len(co.Frames) == 0 {
+					continue
+				}
+				ovs = append(ovs, []any{"captions", co.Frames})
+				c.Overlays = append(c.Overlays, co)
+				continue
+			}
 			c.Overlays = append(c.Overlays, co)
 			ovs = append(ovs, []any{p.Key, from, to, co.FadeIn, co.FadeOut, p.Fade, pa - c0, pb - c0})
 		}
@@ -215,8 +280,19 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 	// rather than ended (L16); fades are alpha fades counted in frames
 	for k, co := range c.Overlays {
 		in := len(c.Segments) + k
+		var chain string
+		if co.P.Kind == "captions" { // every caption group of the chunk as one alpha clip (L48)
+			args = append(args, "-f", "concat", "-safe", "0", "-i", capListPath(c, k))
+			fc = append(fc, fmt.Sprintf("[%d:v]fps=fps=%s:round=near,format=rgba,trim=end_frame=%d,setpts=PTS-STARTPTS[o%d]", in, fps, c.Frames, k))
+			next := fmt.Sprintf("base%d", k+1)
+			if k == len(c.Overlays)-1 {
+				next = "ovl"
+			}
+			fc = append(fc, fmt.Sprintf("[base%d][o%d]overlay=0:0:eof_action=repeat[%s]", k, k, next))
+			continue
+		}
 		args = append(args, "-loop", "1", "-framerate", fps, "-t", f6(float64(c.Frames+3)/tl.Rate()), "-i", co.P.PNG)
-		chain := fmt.Sprintf("[%d:v]format=rgba", in)
+		chain = fmt.Sprintf("[%d:v]format=rgba", in)
 		nf := int64(math.Max(1, math.Round(co.P.Fade*tl.Rate())))
 		if co.FadeIn {
 			chain += fmt.Sprintf(",fade=t=in:s=%d:n=%d:alpha=1", co.From, nf)
@@ -248,6 +324,19 @@ func renderChunk(tl *timeline.Timeline, srcs map[string]Source, c *Chunk, previe
 		return err
 	}
 	tmp := strings.TrimSuffix(c.file, ".mp4") + ".tmp.mp4"
+	for k, co := range c.Overlays {
+		if co.P.Kind != "captions" {
+			continue
+		}
+		w, h := size(tl, preview)
+		blank, err := blankPNG(filepath.Dir(filepath.Dir(c.file)), w, h)
+		if err != nil {
+			return err
+		}
+		if err := os.WriteFile(capListPath(*c, k), []byte(capList(co.Frames, blank, tl.Rate())), 0o644); err != nil {
+			return err
+		}
+	}
 	t0 := time.Now()
 	if _, err := deps.Run("ffmpeg", chunkCmd(tl, srcs, *c, preview, tmp)...); err != nil {
 		return err
@@ -288,7 +377,7 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 		say = func(string) {}
 	}
 	w, h := size(tl, o.Preview)
-	ps, err := Placements(tl, o.ProjDir, o.CacheDir, w, h)
+	ps, err := Placements(tl, o.Transcripts, o.ProjDir, o.CacheDir, w, h)
 	if err != nil {
 		return nil, err
 	}
@@ -303,6 +392,14 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 		ro.Overlays = nil
 		for _, p := range ps { // into the range file's time
 			p.Start, p.End = round6(math.Max(0, p.Start-res.RangeStart)), round6(math.Min(vtl.Duration(), p.End-res.RangeStart))
+			var gs []CapGroup
+			for _, g := range p.Groups {
+				g.Start, g.End = round6(math.Max(0, g.Start-res.RangeStart)), round6(math.Min(vtl.Duration(), g.End-res.RangeStart))
+				if g.End > g.Start {
+					gs = append(gs, g)
+				}
+			}
+			p.Groups = gs
 			if p.End > p.Start {
 				ro.Overlays = append(ro.Overlays, p)
 			}

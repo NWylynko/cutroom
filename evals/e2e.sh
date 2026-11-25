@@ -274,6 +274,15 @@ python3 -c 'import json;m=json.load(open("out/final.mp4.cutroom.json"));m["outpu
 expect "check: overlay missing"    'FAIL overlay +o1 .*not visible'      cutroom check out/bare.mp4
 cutroom edit undo >/dev/null; cutroom edit undo >/dev/null
 expect "overlay back after undo"   'o1 +text'                            cutroom overlay list
+expect "captions --burn"           'burning in captions: [0-9]+ groups of 1–3 words' cutroom captions --burn
+expect "captions --burn twice"     'already on \(o3\)'                 cutroom captions --burn
+expect "look shows captions"       'o3 \(burned-in captions, \+cc\)'    cutroom look --output 1
+expect "render with captions"      '^wrote out/final\.mp4'               cutroom render
+expect "check: captions on screen" 'ok   captions +burned-in captions: [0-9]+ groups; [0-9]+ sampled on screen' cutroom check
+cutroom overlay rm o3 >/dev/null; cutroom render out/nocc.mp4 >/dev/null 2>&1
+python3 -c 'import json;m=json.load(open("out/final.mp4.cutroom.json"));m["output"]="out/nocc.mp4";json.dump(m,open("out/nocc.mp4.cutroom.json","w"))'
+expect "check: captions missing"   'FAIL captions .*not visible'          cutroom check out/nocc.mp4
+cutroom edit undo >/dev/null
 cutroom edit cut --text "Then install Linux on it." >/dev/null
 expect "orphaned overlay warned"   'overlay-orphaned.*o1'                cutroom timeline
 expect "list says not shown"       'NOT SHOWN: its anchor "Then install"' cutroom overlay list

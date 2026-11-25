@@ -188,7 +188,7 @@ func lookEdit(c *Ctx) (*Result, error) {
 		prev := ""
 		var prevSeg *timeline.Segment
 		// overlays drawn as the render will (cards at the output size)
-		ps, err := render.Placements(tl, e.p.Dir, cacheDir(e.p), tl.Width, tl.Height)
+		ps, err := render.Placements(tl, e.tr, e.p.Dir, cacheDir(e.p), tl.Width, tl.Height)
 		if err != nil {
 			return nil, Errf(ExitInvalid, "overlay-failed", "`cutroom overlay list`; fix or remove the overlay", "%v", err)
 		}
@@ -208,6 +208,16 @@ func lookEdit(c *Ctx) (*Result, error) {
 			}
 			var over []string
 			for _, p := range ps {
+				if p.Kind == "captions" {
+					for _, g := range p.Groups {
+						if t >= g.Start && t < g.End {
+							over = append(over, g.PNG)
+							label += " +cc"
+							shown[p.ID] = true
+						}
+					}
+					continue
+				}
 				if t >= p.Start && t < p.End {
 					over = append(over, p.PNG)
 					label += " +" + p.ID
@@ -225,7 +235,11 @@ func lookEdit(c *Ctx) (*Result, error) {
 			var ids []string
 			for _, p := range ps {
 				if shown[p.ID] {
-					ids = append(ids, p.ID)
+					if p.Kind == "captions" {
+						ids = append(ids, p.ID+" (burned-in captions, +cc)")
+					} else {
+						ids = append(ids, p.ID)
+					}
 				}
 			}
 			desc += "; with overlay(s) " + strings.Join(ids, ", ") + " drawn as rendered (+oN in the label)"

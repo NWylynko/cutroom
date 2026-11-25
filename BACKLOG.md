@@ -7,8 +7,8 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- M4: burned-in captions (`captions --burn` or a captions overlay): one alpha clip, 1–3 words per
-  group (L48), safe zones; then clip overlays (a video inset / B-roll over the speaker).
+- M4: clip overlays (a video inset / B-roll over the speaker), anchored like text/image overlays.
+- Eval round 7 (due: iteration 31 was 5 after round 6's record): add overlay + captions tasks.
 - Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
   T3 review, doctor/README.
 ## M0 — leftovers
@@ -49,6 +49,8 @@ Move done items to the journal, not here.
 - `check --frames` full frame-by-frame PSNR vs an overlay-free render once overlays exist (L20, L21).
 
 ## M4 — overlays & text
+- burned captions: a group can still end on "and"/"is" when the 20-char limit leaves no other
+  split ("authentication and | authorization checks"); word-level highlight (karaoke) is not v1.
 - captions: line breaks can split an adjective from its noun ("fully | working" on deploy); a
   part-of-speech-free fix would be a small list of common adjective/noun pairs — low priority.
 - Clip overlays (video B-roll/insets), anchored like text/image overlays. [L16]

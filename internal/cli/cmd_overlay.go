@@ -120,6 +120,9 @@ func runOverlay(c *Ctx) (*Result, error) {
 }
 
 func ovDesc(o timeline.Overlay) string {
+	if o.Kind == "captions" {
+		return "burned-in captions (the whole edit)"
+	}
 	if o.Kind == "image" {
 		return o.Path
 	}
@@ -221,6 +224,10 @@ func overlayList(e *editEnv) *Result {
 		sub := ""
 		if o.Sub != "" {
 			sub = fmt.Sprintf(" / %q", o.Sub)
+		}
+		if o.Kind == "captions" {
+			lines = append(lines, fmt.Sprintf("%-4s %-5s burned in over the whole edit (%s), groups from the cut at render time — `cutroom captions --burn --dry-run` shows them", o.ID, "captions", when))
+			continue
 		}
 		lines = append(lines, fmt.Sprintf("%-4s %-5s %q%s  %s  %s  on %q (%s %s)", o.ID, o.Kind, ovDesc(o), sub, o.Layout, when, o.AnchorText, o.Source, clock(o.At)))
 	}

@@ -10,6 +10,7 @@ import (
 
 	"github.com/cutroom/cutroom/internal/captions"
 	"github.com/cutroom/cutroom/internal/render"
+	"github.com/cutroom/cutroom/internal/timeline"
 )
 
 func init() {
@@ -26,7 +27,9 @@ Examples:
   cutroom captions                       out/captions.srt
   cutroom captions --vtt                 out/captions.vtt (WebVTT)
   cutroom captions --check out/captions.srt   check a file (e.g. after editing it by hand) against the timeline
-  cutroom captions --dry-run             show the cues and checks, write nothing`,
+  cutroom captions --dry-run             show the cues and checks, write nothing
+  cutroom captions --burn                burn short captions into the video (1–3 words at a time,
+                                         as on shorts); they follow the cut. Remove: cutroom overlay rm <id>`,
 		Flags: []Flag{
 			{Name: "vtt", Kind: "bool", Help: "WebVTT instead of SRT"},
 			{Name: "output", Kind: "string", Help: "Path (default out/captions.srt or .vtt)"},
@@ -35,6 +38,7 @@ Examples:
 			{Name: "lines", Kind: "int", Default: "2", Help: "Lines per cue (1 for shorts)"},
 			{Name: "dry-run", Kind: "bool", Help: "Print the cues and checks; write nothing"},
 			{Name: "all", Kind: "bool", Help: "Print every cue"},
+			{Name: "burn", Kind: "bool", Help: "Burn captions into the picture: short 1–3 word groups (L48), drawn by the next render"},
 		},
 		Run: runCaptions,
 	})
@@ -68,6 +72,9 @@ func runCaptions(c *Ctx) (*Result, error) {
 		return nil, Errf(ExitInvalid, "no-words", "check the transcript: `cutroom transcript`", "the timeline keeps no words to caption")
 	}
 	dur := e.tl.Duration()
+	if c.Bool("burn") {
+		return burnCaptions(c, e, ws, dur)
+	}
 	var lines []string
 	var cues []captions.Cue
 	out := ""
@@ -159,4 +166,48 @@ func runCaptions(c *Ctx) (*Result, error) {
 		next = []string{"cutroom captions"}
 	}
 	return &Result{Text: strings.Join(lines, "\n"), Data: data, Next: next}, nil
+}
+
+func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64) (*Result, error) {
+	gs := captions.Groups(ws, captions.DefaultGroups, dur)
+	var lines []string
+	verb := "burning in"
+	if c.Bool("dry-run") {
+		verb = "would burn in"
+	}
+	existing := e.tl.Captions()
+	lines = append(lines, fmt.Sprintf("%s captions: %d groups of 1–3 words (≤ 20 chars), %d words over %s", verb, len(gs), len(ws), clock(dur)))
+	show := len(gs)
+	if !c.Bool("all") && show > 12 {
+		show = 10
+	}
+	for _, g := range gs[:show] {
+		lines = append(lines, fmt.Sprintf("  %s–%s  %s", clock(g.Start), clock(g.End), g.Text))
+	}
+	if show < len(gs) {
+		lines = append(lines, fmt.Sprintf("  … %d more (--all)", len(gs)-show))
+	}
+	id := ""
+	switch {
+	case existing != nil:
+		id = existing.ID
+		lines = append(lines, fmt.Sprintf("already on (%s): the groups follow the cut; the next render draws them", id))
+	case c.Bool("dry-run"):
+		lines = append(lines, "DRY RUN: nothing was changed; run the same command without --dry-run to apply it")
+	default:
+		id = e.tl.AddOverlay(timeline.Overlay{Kind: "captions", Layout: "bottom"})
+		if err := timeline.Checkpoint(e.p.Dir, cacheDir(e.p), "captions --burn"); err != nil {
+			return nil, err
+		}
+		if err := e.tl.Save(e.p.Dir); err != nil {
+			return nil, err
+		}
+		lines = append(lines, fmt.Sprintf("added %s: burned-in captions over the whole edit (lower thirds move up above them); remove with `cutroom overlay rm %s`", id, id))
+	}
+	mid := 0.0
+	if len(gs) > 0 {
+		mid = (gs[0].Start + gs[0].End) / 2
+	}
+	return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"groups": gs, "overlay": id},
+		Next: []string{fmt.Sprintf("cutroom look --output %.2f   (see them)", mid), "cutroom render --preview"}}, nil
 }

@@ -36,3 +36,12 @@ Checks (printed every time; `--check <file>` runs them on an existing or hand-ed
 
 Captions follow the timeline: after any edit, run `cutroom captions` again (`cutroom status` says
 when the file is stale).
+
+## Burned-in captions (in the picture)
+
+`cutroom captions --burn` draws captions into the video itself, the short-form way: 1–3 words at a
+time (≤ 20 characters), never ending on a weak word, never leaving a lone short word (L48), white on a
+dark box low in the frame (on vertical video, above the platform's buttons). They are one overlay
+over the whole edit: the groups are made from the cut at render time, so they follow every re-cut.
+`cutroom look --output <time>` shows them (`+cc`); `cutroom check` samples groups on screen and the
+gaps between them; lower thirds move up above them. Remove with `cutroom overlay rm <id>`.

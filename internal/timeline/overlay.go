@@ -10,7 +10,7 @@ import (
 // words; its output window is derived (Window).
 type Overlay struct {
 	ID     string  `json:"id"`
-	Kind   string  `json:"kind"`   // text | image
+	Kind   string  `json:"kind"`   // text | image | captions (burned in, the whole edit)
 	Source string  `json:"source"` // anchor source
 	At     float64 `json:"at"`     // anchor: source time where it appears
 	Until  float64 `json:"until,omitempty"`
@@ -29,6 +29,9 @@ type Overlay struct {
 // anchor moment is no longer in the edit.
 func (t *Timeline) Window(o Overlay) (start, end float64, ok bool, why string) {
 	t.Recompute()
+	if o.Kind == "captions" { // burned-in captions run over the whole edit
+		return 0, t.Duration(), t.Duration() > 0, ""
+	}
 	a, ok := t.ToOutput(o.Source, o.At+0.5/t.fpsNum)
 	if !ok {
 		// the anchor word's start may sit in a cut pad: accept the first kept moment of the phrase
@@ -93,6 +96,9 @@ func (t *Timeline) overlayIssues() []Issue {
 			continue
 		}
 		for _, w := range ws {
+			if w.o.Kind == "captions" || o.Kind == "captions" {
+				continue // lower thirds move up above burned-in captions
+			}
 			if w.o.Layout == o.Layout && a < w.b && b > w.a {
 				is = append(is, Issue{Level: "warn", Code: "overlay-overlap", At: round6(math.Max(a, w.a)),
 					Message: fmt.Sprintf("overlays %s and %s are both %s at output %.2f–%.2f s: they draw over each other", w.o.ID, o.ID, o.Layout, math.Max(a, w.a), math.Min(b, w.b)),
@@ -104,7 +110,20 @@ func (t *Timeline) overlayIssues() []Issue {
 	return is
 }
 
+// Captions returns the burned-in captions overlay, if any.
+func (t *Timeline) Captions() *Overlay {
+	for i := range t.Overlays {
+		if t.Overlays[i].Kind == "captions" {
+			return &t.Overlays[i]
+		}
+	}
+	return nil
+}
+
 func ovName(o Overlay) string {
+	if o.Kind == "captions" {
+		return "burned-in captions"
+	}
 	if o.Kind == "text" {
 		return o.Text
 	}

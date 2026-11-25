@@ -200,3 +200,46 @@ func TestL16_OverlayAcrossChunksIsFrameExact(t *testing.T) {
 		t.Errorf("L16 / wrong fade in first part: %s", args)
 	}
 }
+
+// L48: burned-in captions are one alpha clip per chunk (an ffconcat of cards), not an overlay per
+// group; its runs cover every frame of the chunk exactly once.
+func TestL48_CaptionsOneClipPerChunk(t *testing.T) {
+	tl := timeline.New("30", 1280, 720, "cam", "cam", 0, 200)
+	for s := 10.0; s < 190; s += 10 {
+		tl.Cut("cam", s, s+1, "x", true)
+	}
+	o := Options{Target: 45, CacheDir: t.TempDir()}
+	plain := Plan(tl, srcs(), o)
+	var gs []CapGroup
+	for x := 0.5; x < tl.Duration()-1; x += 0.7 {
+		gs = append(gs, CapGroup{Start: x, End: x + 0.6, Text: "w", PNG: fmt.Sprintf("/x/g%.1f.png", x)})
+	}
+	o.Overlays = []Placement{{ID: "o1", Kind: "captions", Start: 0, End: tl.Duration(), Groups: gs}}
+	cs := Plan(tl, srcs(), o)
+	for i, c := range cs {
+		if len(c.Overlays) != 1 {
+			t.Fatalf("chunk %d: %d caption overlays", i, len(c.Overlays))
+		}
+		at := int64(0)
+		for _, r := range c.Overlays[0].Frames {
+			if r.From != at || r.To <= r.From {
+				t.Fatalf("chunk %d: runs not contiguous at %d: %+v", i, at, r)
+			}
+			at = r.To
+		}
+		if at != c.Frames {
+			t.Fatalf("chunk %d: runs cover %d of %d frames", i, at, c.Frames)
+		}
+		if c.Key == plain[i].Key {
+			t.Errorf("chunk %d key unchanged by captions", i)
+		}
+		args := strings.Join(chunkCmd(tl, srcs(), c, false, "out.mp4"), " ")
+		if strings.Count(args, "-f concat") != 1 || strings.Contains(args, "-loop 1") || !strings.Contains(args, "eof_action=repeat") {
+			t.Errorf("chunk %d: captions must be one concat clip: %s", i, args)
+		}
+	}
+	list := capList(cs[0].Overlays[0].Frames, "/x/blank.png", 30)
+	if !strings.HasPrefix(list, "ffconcat version 1.0\n") || strings.Count(list, "duration ") != len(cs[0].Overlays[0].Frames) {
+		t.Errorf("concat list: %s", list)
+	}
+}
