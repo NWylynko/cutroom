@@ -2,6 +2,22 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 51 · 2026-11-25 · Golden 4 met: T3 r51 accepts all four real-footage edits
+Did: T3 r51, fresh sonnet editors on all four excerpts, opus reviewer: deploy, started, mps, sec all
+ACCEPT; `check` PASS on all four (sync 0 ms vs each recorder, ≤ 15 ms vs camera sound; −16 to
+−16.8 LUFS). Minor notes only: deploy's one join could breathe a little longer; started keeps a faint
+0.1 s tail of a weak "up"; mps dropped 7.5 s of on-topic content to avoid opening on "And they…" (a
+content choice); sec's take change shows a framing/colour-temperature difference.
+Fixes from r51 friction: `edit cut` now reports every word a cut moved to the quiet point really
+removes (and its warnings name the true neighbours) — "to create" also took a 40 ms "up";
+ambiguous text in several sources suggests --source; --from/--to/--text given a time say to cut a
+range; the workflow guide names the output size (4K sources render 4K; `--size 1080p`).
+Measured: make check green; e2e 257/257. Across r48–r51 the reviewer's rejects went 1 → 1 → 1 → 0,
+each traced to a cause in cutroom rather than the editor: dangling ending (ends-mid-speech),
+fragments at the camera's end and in continuous speech (mapped-edge words, quiet-frame cuts),
+fragments from time-range cuts (edge-in-sound).
+Next: eval round 11 (T2, sonnet gate + haiku), all criteria in the same round.
+
 ### 50 · 2026-11-25 · T3 r50: 3/4 again; edge-in-sound catches every fragment the reviewers heard
 Did: T3 r50, fresh editors on all four. deploy, started, mps ACCEPT (mps: the editor moved the
 earlier take that completes the camera's cut-off last sentence to the end — a real editor's move);
