@@ -207,7 +207,9 @@ func heardWords(p *project.Project, tl *timeline.Timeline, tr timeline.Transcrip
 			continue
 		}
 		sy := p.Sources[a].Sync
+		cam := tr[v]
 		tr[v] = tr[a].MapTo(v, func(r float64) float64 { return (r - sy.Offset) / (1 + sy.Drift) }, dur[v])
+		tr[v].ReconcileTiming(cam, 1.2) // words the recorder couldn't place: the camera's own microphone heard them
 	}
 }
 
@@ -302,4 +304,46 @@ func unsafeBox(boxes [][4]float64, W, H int) string {
 		}
 	}
 	return ""
+}
+
+// quietLevels measures, for the timeline's Quiet hook, the level (dB) of the sound the edit uses for
+// a video source at given source times: its recorder's when synced (camera time → recorder time
+// through the offset and drift), else its own. Each wav is read once, on first use.
+func quietLevels(p *project.Project, tl *timeline.Timeline) func(string, []float64) []float64 {
+	rs := renderSources(p)
+	envs := map[string]*speech.Envelope{}
+	return func(src string, ts []float64) []float64 {
+		a, _, err := render.AudioFor(tl, rs, src)
+		if err != nil || a == "" || p.Sources[a] == nil {
+			return nil
+		}
+		toA := func(t float64) float64 { return t }
+		if a != src {
+			sy := p.Sources[a].Sync
+			if sy == nil || sy.To != src {
+				return nil
+			}
+			toA = func(t float64) float64 { return t*(1+sy.Drift) + sy.Offset }
+		}
+		env, ok := envs[a]
+		if !ok {
+			if x, err := srcWav(p, p.Sources[a]); err == nil {
+				env = speech.NewEnvelope(x)
+			}
+			envs[a] = env
+		}
+		if env == nil {
+			return nil
+		}
+		start := 0.0 // the wav begins at the first audio sample: source time = wav time + audio start
+		if f := p.Sources[a].Facts; f != nil && f.Audio != nil {
+			start = f.Audio.Start
+		}
+		out := make([]float64, len(ts))
+		for i, t := range ts {
+			r := toA(t) - start
+			out[i] = env.Level(r-0.01, r+0.01)
+		}
+		return out
+	}
 }

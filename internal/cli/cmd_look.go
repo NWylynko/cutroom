@@ -393,6 +393,10 @@ func fileArg(c *Ctx) error {
 		return Errf(ExitUsage, "bad-args", fmt.Sprintf("--output is a switch, the time follows it once: `cutroom %s --output %s`", c.Cmd.Name, c.Args[len(c.Args)-1]),
 			"two times given (%s); --output takes no value", strings.Join(c.Args, ", "))
 	}
+	// `listen 0 3`: two times are a range (T3 r49: "listen 0 3" failed)
+	if len(c.Args) == 2 && isNumberish(c.Args[0]) && isNumberish(c.Args[1]) {
+		c.Args = []string{c.Args[0] + "-" + c.Args[1]}
+	}
 	if len(c.Args) > 1 {
 		return Errf(ExitUsage, "bad-args", fmt.Sprintf("one time or range, optionally after a file: `cutroom %s out/final.mp4 3-5`", c.Cmd.Name),
 			"%q is not a file and %s takes one time or range", c.Args[0], c.Cmd.Name)

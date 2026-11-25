@@ -156,7 +156,7 @@ func runTranscribe(c *Ctx) (*Result, error) {
 func transcribeFile(p *project.Project, path string) (*speech.Transcript, error) {
 	st, err := os.Stat(path)
 	if err != nil {
-		return nil, Errf(ExitUsage, "file-not-found", "check the path", "%s not found", path)
+		return nil, fileNotFound(path)
 	}
 	f, err := media.Probe(path, media.Options{})
 	if err != nil || f.Audio == nil {

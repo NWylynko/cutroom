@@ -60,6 +60,11 @@ type Timeline struct {
 	Accepted []Accepted `json:"accepted,omitempty"`
 	Modified time.Time  `json:"modified"`
 	fpsNum   float64
+	// Quiet, when set (by the CLI, from the sound the edit uses for src), gives the level in dB at
+	// each source time; CutWords puts a cut in continuous speech at the quietest frame boundary near
+	// the word boundary instead of on the recogniser's boundary, which runs ±50 ms there (T3 r49:
+	// 40 ms of a cut "you" stayed audible after "access,").
+	Quiet func(src string, ts []float64) []float64 `json:"-"`
 }
 
 var ErrNone = errors.New("no timeline yet")

@@ -215,6 +215,7 @@ func loadEditEnv(c *Ctx, create bool) (*editEnv, error) {
 	}
 	e.trimToEnds()
 	heardWords(p, e.tl, e.tr, e.dur)
+	e.tl.Quiet = quietLevels(p, e.tl)
 	return e, nil
 }
 
@@ -724,8 +725,8 @@ func (e *editEnv) applySpan(c *Ctx, op string) ([]string, string, error) {
 		var iLast int
 		src, i, iLast, err = e.resolve(c, c.Str("from"), keptOnly, "", -1, -1)
 		if err == nil {
-			// --to: the first match that starts after --from starts and ends at or after it ends
-			_, _, j, err = e.resolve(c, c.Str("to"), keptOnly, src, i+1, iLast)
+			// --to: the first match that starts at or after --from and ends at or after it ends (--to = --from: that phrase)
+			_, _, j, err = e.resolve(c, c.Str("to"), keptOnly, src, i, iLast)
 		}
 	}
 	if err != nil {
@@ -737,10 +738,10 @@ func (e *editEnv) applySpan(c *Ctx, op string) ([]string, string, error) {
 		// from just before the first word to just after the last, inside the pauses around them
 		a, b := words[i].Start-e.tl.PadBefore, words[j].End+e.tl.PadAfter
 		if i > 0 {
-			a = clampF(a, words[i-1].End, words[i].Start)
+			a = e.tl.Boundary(src, words[i-1].End, words[i].Start, clampF(a, words[i-1].End, words[i].Start))
 		}
 		if j+1 < len(words) {
-			b = clampF(b, words[j].End, words[j+1].Start)
+			b = e.tl.Boundary(src, words[j].End, words[j+1].Start, clampF(b, words[j].End, words[j+1].Start))
 		}
 		desc = fmt.Sprintf("edit zoom %g %q", e.zoom, ellipsize(speech.Text(words, i, j), 60))
 		return e.applyZoom(src, a, b), desc, nil
@@ -749,10 +750,10 @@ func (e *editEnv) applySpan(c *Ctx, op string) ([]string, string, error) {
 		a := words[i].Start - e.tl.PadBefore
 		b := words[j].End + e.tl.PadAfter
 		if i > 0 {
-			a = clampF(a, words[i-1].End, words[i].Start)
+			a = e.tl.Boundary(src, words[i-1].End, words[i].Start, clampF(a, words[i-1].End, words[i].Start))
 		}
 		if j+1 < len(words) {
-			b = clampF(b, words[j].End, words[j+1].Start)
+			b = e.tl.Boundary(src, words[j].End, words[j+1].Start, clampF(b, words[j].End, words[j+1].Start))
 		}
 		e.tl.Keep(src, a, b, orStr(reason, "keep \""+speech.Text(words, i, j)+"\""))
 		return []string{fmt.Sprintf("kept only %s %s–%s: %q", src, clock(a), clock(b), ellipsize(speech.Text(words, i, j), 120))}, desc, nil
@@ -1215,7 +1216,7 @@ func (e *editEnv) applyAdd(c *Ctx) ([]string, string, error) {
 		var iLast int
 		src, i, iLast, err = e.resolve(c, c.Str("from"), false, "", -1, -1)
 		if err == nil {
-			_, _, j, err = e.resolve(c, c.Str("to"), false, src, i+1, iLast)
+			_, _, j, err = e.resolve(c, c.Str("to"), false, src, i, iLast)
 		}
 	}
 	if err != nil {
@@ -1224,10 +1225,10 @@ func (e *editEnv) applyAdd(c *Ctx) ([]string, string, error) {
 	words := e.tr[src].Words
 	a, b := words[i].Start-e.tl.PadBefore, words[j].End+e.tl.PadAfter
 	if i > 0 {
-		a = clampF(a, words[i-1].End, words[i].Start)
+		a = e.tl.Boundary(src, words[i-1].End, words[i].Start, clampF(a, words[i-1].End, words[i].Start))
 	}
 	if j+1 < len(words) {
-		b = clampF(b, words[j].End, words[j+1].Start)
+		b = e.tl.Boundary(src, words[j].End, words[j+1].Start, clampF(b, words[j].End, words[j+1].Start))
 	}
 	text := speech.Text(words, i, j)
 	id := e.tl.Insert(src, a, b, pos, orStr(reason, "add \""+ellipsize(text, 60)+"\""))
@@ -1267,7 +1268,7 @@ func (e *editEnv) applyReplace(c *Ctx) ([]string, string, error) {
 		if err != nil {
 			return "", 0, 0, err
 		}
-		_, _, j, err := e.resolve(c, c.Str("to"), keptOnly, src, i+1, iLast)
+		_, _, j, err := e.resolve(c, c.Str("to"), keptOnly, src, i, iLast)
 		return src, i, j, err
 	}
 	// 1. the version in the edit now (kept words, any source but --with)

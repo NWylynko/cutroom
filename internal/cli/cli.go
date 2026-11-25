@@ -7,6 +7,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"os"
+	"path/filepath"
 	"sort"
 	"strconv"
 	"strings"
@@ -516,4 +518,23 @@ func overview() string {
 	}
 	b.WriteString("\nEvery command: --help, --json (complete result), --project <dir>.")
 	return b.String()
+}
+
+// fileNotFound names the renders that do exist next to a missing path (T3 r49: `render --preview
+// --range` writes out/preview-range.mp4; the agent looked for out/preview.mp4 and got "check the path").
+func fileNotFound(path string) error {
+	fix := "check the path"
+	dir := filepath.Dir(path)
+	if ents, err := os.ReadDir(dir); err == nil {
+		var have []string
+		for _, e := range ents {
+			if ext := strings.ToLower(filepath.Ext(e.Name())); !e.IsDir() && (ext == ".mp4" || ext == ".mov" || ext == ".m4a" || ext == ".wav") {
+				have = append(have, filepath.Join(dir, e.Name()))
+			}
+		}
+		if len(have) > 0 {
+			fix = "files there: " + strings.Join(truncList(have, 6), ", ")
+		}
+	}
+	return Errf(ExitUsage, "file-not-found", fix, "%s not found", path)
 }

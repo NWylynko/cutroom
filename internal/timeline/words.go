@@ -55,6 +55,7 @@ func (t *Timeline) CutWords(src string, words []speech.Word, i, j int, reason st
 		p := words[prev]
 		a = clamp(p.End+t.PadAfter, p.End, wi.Start)
 		if wi.Start-p.End < 0.12 {
+			a = t.Boundary(src, p.End, wi.Start, a)
 			r.Warnings = append(r.Warnings, fmt.Sprintf("the cut starts inside continuous speech right after %q — `cutroom listen` the join", p.Text))
 		}
 	} else if segI != nil {
@@ -66,6 +67,7 @@ func (t *Timeline) CutWords(src string, words []speech.Word, i, j int, reason st
 		n := words[next]
 		b = clamp(n.Start-t.PadBefore, wj.End, n.Start)
 		if n.Start-wj.End < 0.12 {
+			b = t.Boundary(src, wj.End, n.Start, b)
 			r.Warnings = append(r.Warnings, fmt.Sprintf("the cut ends inside continuous speech right before %q — `cutroom listen` the join", n.Text))
 		}
 	} else if segJ != nil {
@@ -85,6 +87,42 @@ func (t *Timeline) CutWords(src string, words []speech.Word, i, j int, reason st
 		r.JoinPause = t.KeptBetween(src, words[prev].End, words[next].Start)
 	}
 	return r
+}
+
+// Boundary is where to cut between a word ending at leftEnd and the next starting at rightStart:
+// def when there is a pause; in continuous speech (< 0.12 s apart) the quietest frame boundary from
+// 120 ms before to 30 ms after the recogniser's boundary: its onsets run late (T3 r49: the gap
+// before "you" was 50–80 ms earlier than the transcript said).
+func (t *Timeline) Boundary(src string, leftEnd, rightStart, def float64) float64 {
+	if rightStart-leftEnd >= 0.12 {
+		return def
+	}
+	return t.quietest(src, leftEnd-0.12, rightStart+0.03, def)
+}
+
+// quietest is the frame boundary in [lo, hi] where the edit's sound for src is quietest (def when
+// the level isn't known).
+func (t *Timeline) quietest(src string, lo, hi, def float64) float64 {
+	if t.Quiet == nil || hi <= lo || t.fpsNum == 0 {
+		return def
+	}
+	var ts []float64
+	for s := t.Snap(lo); s <= hi+1e-9; s = round6(s + 1/t.fpsNum) {
+		if s >= lo-1e-9 {
+			ts = append(ts, s)
+		}
+	}
+	db := t.Quiet(src, ts)
+	if len(ts) == 0 || len(db) != len(ts) {
+		return def
+	}
+	best := 0
+	for i := range ts {
+		if db[i] < db[best] {
+			best = i
+		}
+	}
+	return ts[best]
 }
 
 // KeptBetween is how much of source range [a, b) the timeline keeps (e.g. the pause at a join).
@@ -242,14 +280,25 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 		if tx == nil {
 			continue
 		}
-		for _, w := range tx.Words {
+		for wk, w := range tx.Words {
+			// in continuous speech the recogniser's boundary runs late; Boundary cuts up to 120 ms
+			// before it, in the measured gap — not inside the word
+			contAfter := wk+1 < len(tx.Words) && tx.Words[wk+1].Start-w.End < 0.12
 			for _, edge := range []struct {
 				at  float64
 				nm  string
 				out float64
 			}{{g.In, "starts", g.OutStart}, {g.Out, "ends", g.OutStart + g.Out - g.In}} {
+				if contAfter && edge.at >= w.End-0.12 {
+					continue
+				}
 				if edge.at > w.Start+0.04 && edge.at < w.End-0.04 {
-					add("warn", "edge-in-word", g, edge.out, "move the edge into a pause (cut by words with `cutroom edit cut --from/--to`), or `cutroom listen` it",
+					// a runnable fix: cut the piece of the word the segment holds, from just outside it
+					fix := fmt.Sprintf("cut the piece of %q the segment keeps: `cutroom edit cut %.3f-%.3f%s`; or move the edge into a pause (cut by words with `cutroom edit cut --from/--to`), or `cutroom listen` it", w.Text, g.In, math.Min(w.End+0.02, g.Out), srcFlag(tr, g.Source))
+					if edge.nm == "ends" {
+						fix = fmt.Sprintf("cut the piece of %q the segment keeps: `cutroom edit cut %.3f-%.3f%s`; or move the edge into a pause (cut by words with `cutroom edit cut --from/--to`), or `cutroom listen` it", w.Text, math.Max(w.Start-0.02, g.In), g.Out, srcFlag(tr, g.Source))
+					}
+					add("warn", "edge-in-word", g, edge.out, fix,
 						"segment %s %s inside the word %q (%.3f–%.3f)", g.ID, edge.nm, w.Text, w.Start, w.End)
 				}
 			}
@@ -674,4 +723,11 @@ func ellipsizeWords(s string, n int) string {
 		return s
 	}
 	return strings.Join(f[:n], " ") + " …"
+}
+
+func srcFlag(tr Transcripts, id string) string {
+	if len(tr) > 1 {
+		return " --source " + id
+	}
+	return ""
 }

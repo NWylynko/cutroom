@@ -49,6 +49,7 @@ expect "look crop"             '_crop100-50-200-100.png'             cutroom loo
 expect "look past end → fix"   'is 30\.[0-9]+ s long'                cutroom look 400
 expect "listen finds burst"    'sound with no transcript words 0:16\.9' cutroom listen 15.3-18.9
 expect "listen heard"          'heard \(isolated clip\): .*by the way' cutroom listen 15.3-18.9
+expect "listen a b = range"   'heard \(isolated clip\): .*by the way' cutroom listen 15.3 18.9
 expect "listen too long → fix" 'at most 30 s'                        cutroom listen 0-29.9 --pad 1
 # rotated source must come out upright: compare a frame with the clean source's frame
 cutroom look 12.5 --source talk --json >/dev/null; cutroom look 12.5 --source talk-rot --json >/dev/null
@@ -71,6 +72,7 @@ expect "its cut removes the false start"  'removed\): "The first thing you need 
 cutroom edit undo >/dev/null
 expect "cut retake by words"        'removed\): "The first thing you need is, UM, the first thing\."' cutroom edit cut --from "The first thing you need is, um" --to "the first thing."
 expect "join pause is real"         'join: .*\(pause 0\.[23][0-9] s\)'  cutroom edit cut --from "By the way" --to "keyboard." --dry-run
+expect "--to = --from cuts that phrase" 'removed\): "By the way' cutroom edit cut --from "By the way" --to "By the way" --dry-run
 expect "dry run not saved"          'my cat'                          cutroom timeline
 expect "cut aside"                  'removed\): "By the way'           cutroom edit cut --from "By the way" --to "keyboard."
 expect "clean timeline"             'no problems found'               cutroom timeline
@@ -92,6 +94,7 @@ expect "listen --output (render)"   'cuts in range: 0:03\.933'         cutroom l
 expect "look --file"                'of out/final.mp4 at 0:03\.900 \(file time\)' cutroom look 3.9 --file out/final.mp4
 expect "look <file> <time>"         'of out/final.mp4 at 0:03\.900 \(file time\)' cutroom look out/final.mp4 3.9
 expect "listen <file> needs range"  'cutroom listen out/final.mp4 3-5' cutroom listen out/final.mp4
+expect "missing file names renders" 'files there: out/' cutroom look --file out/nope.mp4 3
 expect "render --output works"     "out/x\.mp4"                       cutroom render --output out/x.mp4 --dry-run
 expect "range dry run is the range" 'range: output 0:02\.000–0:04\.000' cutroom render --dry-run --range 0:02-0:04
 expect "range renders the range"   '2\.000 s, 60 frames'             cutroom render --preview --range 0:02-0:04

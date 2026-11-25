@@ -151,7 +151,7 @@ func lookEdit(c *Ctx) (*Result, error) {
 	case c.Has("file"):
 		f := c.Str("file")
 		if _, err := os.Stat(f); err != nil {
-			return nil, Errf(ExitUsage, "file-not-found", "check the path", "%s not found", f)
+			return nil, fileNotFound(f)
 		}
 		var words []speech.Word
 		if m, err := render.LoadManifest(f); err == nil {
@@ -332,7 +332,7 @@ func listenFile(c *Ctx) (*Result, error) {
 	if c.Has("file") {
 		f = c.Str("file")
 		if _, err := os.Stat(f); err != nil {
-			return nil, Errf(ExitUsage, "file-not-found", "check the path", "%s not found", f)
+			return nil, fileNotFound(f)
 		}
 		m, _ = render.LoadManifest(f)
 	} else if f, m, err = e.currentRender(); err != nil {

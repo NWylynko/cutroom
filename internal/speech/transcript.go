@@ -52,9 +52,12 @@ func (t *Transcript) MapTo(src string, toRef func(float64) float64, dur float64)
 	m.Source, m.From, m.Duration, m.Words, m.Suspects = src, t.Source, dur, nil, nil
 	for _, w := range t.Words {
 		w.Start, w.End = toRef(w.Start), toRef(w.End)
-		if w.Start < 0 || w.End > dur {
+		if w.End <= 0 || w.Start >= dur {
 			continue
 		}
+		// a word the camera's recording cuts off is still there at its edge (T3 r49: the recorder's
+		// "and" ran past the camera's last frame, was dropped, and 55 ms of it ended the video)
+		w.Start, w.End = math.Max(0, w.Start), math.Min(dur, w.End)
 		w.I = len(m.Words)
 		m.Words = append(m.Words, w)
 	}
@@ -561,4 +564,75 @@ func Asides(words []Word) []Suspect {
 func endsSentenceWord(w string) bool {
 	w = strings.TrimRight(w, `"')`)
 	return strings.HasSuffix(w, ".") || strings.HasSuffix(w, "?") || strings.HasSuffix(w, "!")
+}
+
+// ReconcileTiming fixes words this transcript could not place in its own sound (flag
+// "uncertain-timing") using a second transcript of the same speech on the same clock — a recorder's
+// words mapped onto a camera, checked against the camera microphone's own words. A word is moved
+// only when the reference has the same word, confidently placed within maxShift, with a neighbour
+// that agrees too (so the two are the same utterance). The next word's onset is pushed past it when
+// they now overlap. Moved words get the flag "timing-from-camera". Returns how many moved.
+// (T3 r49: a recorder's "and" after a pause sat 0.9 s early; a cut "before they" left it audible.)
+func (t *Transcript) ReconcileTiming(ref *Transcript, maxShift float64) int {
+	if t == nil || ref == nil {
+		return 0
+	}
+	has := func(w Word, f string) bool {
+		for _, x := range w.Flags {
+			if x == f {
+				return true
+			}
+		}
+		return false
+	}
+	n := 0
+	for i := range t.Words {
+		w := t.Words[i]
+		if !has(w, "uncertain-timing") || Norm(w.Text) == "" {
+			continue
+		}
+		best, bd := -1, maxShift
+		for k, r := range ref.Words {
+			if Norm(r.Text) != Norm(w.Text) || has(r, "uncertain-timing") {
+				continue
+			}
+			d := math.Abs(r.Start - w.Start)
+			if d > bd {
+				continue
+			}
+			prevOK := i > 0 && k > 0 && Norm(t.Words[i-1].Text) == Norm(ref.Words[k-1].Text)
+			nextOK := i+1 < len(t.Words) && k+1 < len(ref.Words) && Norm(t.Words[i+1].Text) == Norm(ref.Words[k+1].Text)
+			if prevOK || nextOK {
+				best, bd = k, d
+			}
+		}
+		if best < 0 || math.Abs(ref.Words[best].Start-w.Start) < 0.08 {
+			continue
+		}
+		r := ref.Words[best]
+		lo, hi := math.Inf(-1), math.Inf(1)
+		if i > 0 {
+			lo = t.Words[i-1].End
+		}
+		if i+1 < len(t.Words) {
+			hi = t.Words[i+1].End - 0.05
+		}
+		s, e := math.Max(r.Start, lo), math.Min(r.End, hi)
+		if e-s < 0.03 {
+			continue
+		}
+		t.Words[i].Start, t.Words[i].End = round3(s), round3(e)
+		var fl []string
+		for _, x := range w.Flags {
+			if x != "uncertain-timing" {
+				fl = append(fl, x)
+			}
+		}
+		t.Words[i].Flags = append(fl, "timing-from-camera")
+		if i+1 < len(t.Words) && t.Words[i+1].Start < t.Words[i].End {
+			t.Words[i+1].Start = t.Words[i].End
+		}
+		n++
+	}
+	return n
 }
