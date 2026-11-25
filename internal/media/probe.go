@@ -54,6 +54,19 @@ type Audio struct {
 	SilentHead float64 `json:"-"`
 }
 
+// End is where the source's usable content ends: the earliest end of its picture and its sound.
+// A container can run past both (a data or metadata track); edits never reach past End.
+func (f *Facts) End() float64 {
+	end := f.Duration
+	if v := f.Video; v != nil && v.Duration > 0 {
+		end = math.Min(end, v.Start+v.Duration)
+	}
+	if a := f.Audio; a != nil && a.Duration > 0 && f.Video != nil {
+		end = math.Min(end, a.Start+a.Duration)
+	}
+	return end
+}
+
 type Warning struct {
 	Code    string `json:"code"`
 	Lesson  string `json:"lesson,omitempty"`
@@ -296,7 +309,8 @@ func warnings(f *Facts) []Warning {
 		}
 		if v.Width*v.Height > 1920*1080 {
 			w = append(w, Warning{Code: "large", Handled: true,
-				Message: fmt.Sprintf("%dx%d source; previews render at reduced size, finals at the timeline size", v.Width, v.Height)})
+				Message: fmt.Sprintf("%dx%d source; previews render at reduced size, finals at the timeline size (the source's unless you set it)", v.Width, v.Height),
+				Fix:     "for a 1080p video: `cutroom edit frame --size 1080p` before the final render"})
 		}
 	}
 	if a := f.Audio; a != nil {
@@ -316,6 +330,18 @@ func warnings(f *Facts) []Warning {
 			w = append(w, Warning{Code: "clipping", Message: fmt.Sprintf("audio peaks at %.1f dBTP; it may be clipped in the recording", a.PeakDB),
 				Fix: "listen to the loudest passages with `cutroom listen`; clipping cannot be undone"})
 		}
+	}
+	if end := f.End(); f.Duration-end > 0.1 {
+		parts := []string{}
+		if f.Video != nil {
+			parts = append(parts, fmt.Sprintf("picture %.3f s", f.Video.Start+f.Video.Duration))
+		}
+		if f.Audio != nil {
+			parts = append(parts, fmt.Sprintf("sound %.3f s", f.Audio.Start+f.Audio.Duration))
+		}
+		w = append(w, Warning{Code: "short-streams", Handled: true,
+			Message: fmt.Sprintf("the file is %.3f s long but its streams end earlier (%s; the rest is another track, e.g. metadata)", f.Duration, strings.Join(parts, ", ")),
+			Fix:     fmt.Sprintf("nothing to do: edits use 0–%.3f s, where both picture and sound exist", end)})
 	}
 	if f.Video != nil && f.Audio == nil {
 		w = append(w, Warning{Code: "no-audio", Message: "no audio stream", Fix: "add audio from another source with `cutroom init --source id=<file>` and use it as the timeline's audio"})

@@ -9,6 +9,7 @@ import (
 
 	"github.com/cutroom/cutroom/internal/render"
 	"github.com/cutroom/cutroom/internal/timecode"
+	"github.com/cutroom/cutroom/internal/timeline"
 )
 
 func init() {
@@ -37,6 +38,7 @@ Examples:
 			{Name: "jobs", Kind: "int", Default: "4", Help: "Chunks rendered in parallel"},
 			{Name: "loudness", Kind: "float", Default: "-16", Help: "Integrated loudness target (LUFS)"},
 			{Name: "true-peak", Kind: "float", Default: "-1.5", Help: "Peak ceiling (dBTP)"},
+			{Name: "size", Kind: "string", Help: "Set the output size first (saved in the timeline, undoable): 1080p, 720p, 2160p or WxH"},
 			{Name: "audio-chain", Kind: "string", Default: "voice", Help: "voice (default speech chain), none, or an ffmpeg audio filter chain"},
 		},
 		Run: runRender,
@@ -47,6 +49,27 @@ func runRender(c *Ctx) (*Result, error) {
 	e, err := loadEditEnv(c, false)
 	if err != nil {
 		return nil, err
+	}
+	var sizeNote string
+	if c.Has("size") {
+		w, h, err := parseSize(c.Str("size"), e.tl.Width, e.tl.Height)
+		if err != nil {
+			return nil, err
+		}
+		if w != e.tl.Width || h != e.tl.Height {
+			if !c.Bool("dry-run") {
+				if err := timeline.Checkpoint(e.p.Dir, cacheDir(e.p), fmt.Sprintf("edit frame --size %dx%d (render --size)", w, h)); err != nil {
+					return nil, err
+				}
+			}
+			sizeNote = fmt.Sprintf("output size %dx%d → %dx%d (saved in the timeline, like `edit frame --size`; `cutroom edit undo` reverts it)", e.tl.Width, e.tl.Height, w, h)
+			e.tl.Width, e.tl.Height = w, h
+			if !c.Bool("dry-run") {
+				if err := e.tl.Save(e.p.Dir); err != nil {
+					return nil, err
+				}
+			}
+		}
 	}
 	issues := e.validate()
 	for _, is := range issues {
@@ -118,11 +141,21 @@ func runRender(c *Ctx) (*Result, error) {
 	if err := writeTarget(e.p, out); err != nil {
 		return nil, err
 	}
+	if !o.Preview && !o.DryRun && e.tl.Width*e.tl.Height > 1920*1080 {
+		fmt.Fprintf(c.ErrW, "rendering at %dx%d (the timeline's size, from the source); for 1080p stop and run `cutroom edit frame --size 1080p` (or `render --size 1080p`)\n", e.tl.Width, e.tl.Height)
+	}
 	res, err := render.Render(e.tl, srcs, out, o)
 	if err != nil {
-		return nil, Errf(ExitExternal, "render-failed", "re-run the same command (finished chunks are kept); if it repeats, `cutroom timeline` and `cutroom doctor`", "%v", err)
+		fix := "re-run the same command (finished chunks are kept); if it repeats, `cutroom timeline` and `cutroom doctor`"
+		if strings.Contains(err.Error(), "(L14)") {
+			fix = "a source has fewer frames there than the timeline expects (re-running won't help): `cutroom inspect <source>` shows where its picture and sound end and any gaps; cut the edit back from that point (`cutroom edit cut <start>-<end> --source <id>`), then render again"
+		}
+		return nil, Errf(ExitExternal, "render-failed", fix, "%v", err)
 	}
 	var lines []string
+	if sizeNote != "" {
+		lines = append(lines, sizeNote)
+	}
 	cached := 0
 	for _, ch := range res.Chunks {
 		if ch.Cached {

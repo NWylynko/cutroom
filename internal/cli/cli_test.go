@@ -93,3 +93,18 @@ func TestSuggest(t *testing.T) {
 		}
 	}
 }
+
+func TestParseSize(t *testing.T) {
+	for _, c := range []struct {
+		in         string
+		cw, ch     int
+		w, h       int
+		shouldFail bool
+	}{{"1080p", 3840, 2160, 1920, 1080, false}, {"1080p", 1080, 1920, 1080, 1920, false}, {"4K", 1920, 1080, 3840, 2160, false},
+		{"720x1280", 1920, 1080, 720, 1280, false}, {"1081x3", 1920, 1080, 0, 0, true}} {
+		w, h, err := parseSize(c.in, c.cw, c.ch)
+		if (err != nil) != c.shouldFail || w != c.w || h != c.h {
+			t.Errorf("%s from %dx%d: %dx%d %v", c.in, c.cw, c.ch, w, h, err)
+		}
+	}
+}

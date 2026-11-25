@@ -81,7 +81,7 @@ func runShort(c *Ctx) (*Result, error) {
 	// words come from the parent's transcripts (any source, kept by its edit or not)
 	e := &editEnv{p: p, tr: timeline.Transcripts{}, dur: map[string]float64{}}
 	for _, id := range p.IDs() {
-		e.dur[id] = p.Sources[id].Facts.Duration
+		e.dur[id] = p.Sources[id].Facts.End()
 		if t, err := speech.Load(cacheDir(p), id); err == nil {
 			e.tr[id] = t
 		}

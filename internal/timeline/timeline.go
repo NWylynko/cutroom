@@ -118,6 +118,9 @@ func (t *Timeline) Snap(s float64) float64 {
 	return round6(t.Grid + k/t.fpsNum)
 }
 
+// SnapDown is the last frame boundary at or before s.
+func (t *Timeline) SnapDown(s float64) float64 { return t.snapDown(s) }
+
 func (t *Timeline) snapDown(s float64) float64 {
 	k := math.Floor((s-t.Grid)*t.fpsNum + 1e-6)
 	return round6(t.Grid + k/t.fpsNum)

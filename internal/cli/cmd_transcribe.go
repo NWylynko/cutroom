@@ -63,6 +63,7 @@ Examples:
 			{Name: "retakes", Kind: "bool", Help: "Only repeats: each take, and whether the edit keeps it"},
 			{Name: "output", Kind: "bool", Help: "The edit's words in output time, through the timeline (no render needed)"},
 			{Name: "phrases", Kind: "bool", Help: "One line per phrase (the default view)"},
+			{Name: "camera", Kind: "bool", Help: "A camera whose sound comes from a recorder: show the camera microphone's own words instead"},
 			{Name: "range", Kind: "string", Help: "Range start-end (e.g. 6-12 or 0:06-0:12); same as --from/--to"},
 			{Name: "from", Kind: "string", Help: "Start of range (time)"},
 			{Name: "to", Kind: "string", Help: "End of range (time)"},
@@ -293,6 +294,16 @@ func runTranscript(c *Ctx) (*Result, error) {
 		}
 	} else if t, err = loadTranscript(p, id); err != nil {
 		return nil, err
+	} else if tl, err := timeline.Load(p.Dir); err == nil && !c.Bool("camera") { // a recorder's words, if the edit uses it
+		tr, dur := timeline.Transcripts{t.Source: t}, map[string]float64{}
+		for _, sid := range p.IDs() {
+			if x, err := speech.Load(cacheDir(p), sid); err == nil && sid != t.Source {
+				tr[sid] = x
+			}
+			dur[sid] = p.Sources[sid].Facts.End()
+		}
+		heardWords(p, tl, tr, dur)
+		t = tr[t.Source]
 	}
 	lo, hi := 0.0, 1e18
 	if c.Has("range") {
@@ -346,6 +357,9 @@ func runTranscript(c *Ctx) (*Result, error) {
 		}
 	}
 	head := fmt.Sprintf("%s — %d words, %s  (%s, %d pass(es))", t.Source, len(t.Words), clock(t.Duration), t.Model, t.Passes)
+	if t.From != "" {
+		head += fmt.Sprintf("\nwords from recorder %s (the sound the edit uses for %s), on %s's clock — quote these in edits; --camera shows what the camera's own microphone heard", t.From, t.Source, t.Source)
+	}
 	if id == "" && !c.Has("file") {
 		if o := otherTranscripts(p, t.Source); len(o) > 0 {
 			head += fmt.Sprintf("\nalso transcribed: %s — `cutroom transcript %s` (this is %s; times are each source's own)", strings.Join(o, ", "), o[0], t.Source)

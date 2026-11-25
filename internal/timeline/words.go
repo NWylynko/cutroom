@@ -227,7 +227,7 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 			continue
 		}
 		if g.In < -1e-6 || g.Out > d+1/t.fpsNum+1e-6 || g.Out <= g.In {
-			add("error", "out-of-source", g, g.OutStart, "`cutroom edit undo`", "segment %s range %.3f–%.3f is outside %s (0–%.3f)", g.ID, g.In, g.Out, g.Source, d)
+			add("error", "out-of-source", g, g.OutStart, fmt.Sprintf("keep the segment inside 0–%.3f: `cutroom edit cut` the part outside it (`cutroom inspect %s` shows where its picture and sound end), or `cutroom edit undo` if the last edit put it there", d, g.Source), "segment %s range %.3f–%.3f is outside %s (0–%.3f)", g.ID, g.In, g.Out, g.Source, d)
 		}
 		if g.Out-g.In < 0.3 {
 			add("warn", "short-segment", g, g.OutStart, "check it is intended: `cutroom timeline`", "segment %s is only %.2f s", g.ID, g.Out-g.In)
@@ -380,7 +380,83 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 			}
 		}
 	}
+	is = append(is, t.edgeIssues(durations, tr)...)
 	is = append(is, t.overlayIssues()...)
+	return is
+}
+
+// edgeIssues: an edit that opens or closes right where the recording does, with the speaker still
+// talking, opens on the tail of a sentence begun before the camera started or closes on the start
+// of one it stopped in the middle of (T3: "Those are much better." ended an edit, contradicting the
+// sentence before it).
+func (t *Timeline) edgeIssues(durations map[string]float64, tr Transcripts) []Issue {
+	var is []Issue
+	if len(t.Segments) == 0 {
+		return nil
+	}
+	const near = 0.3 // speech this close to the recording's edge: no pause there
+	in := func(g Segment, w speech.Word) bool { m := (w.Start + w.End) / 2; return m >= g.In && m < g.Out }
+	quote := func(ws []speech.Word, a, b int) (string, string, string) {
+		var all []string
+		for k := a; k <= b; k++ {
+			all = append(all, strings.TrimSpace(ws[k].Text))
+		}
+		return strings.Join(all, " "), strings.Join(all[:min(3, len(all))], " "), strings.Join(all[max(0, len(all)-2):], " ")
+	}
+	src := func(id string) string {
+		if len(tr) > 1 {
+			return " --source " + id
+		}
+		return ""
+	}
+	last := t.Segments[len(t.Segments)-1]
+	if tx, d := tr[last.Source], durations[last.Source]; tx != nil && d > 0 {
+		k := -1
+		for i, w := range tx.Words {
+			if in(last, w) && speech.Norm(w.Text) != "" {
+				k = i
+			}
+		}
+		if k >= 0 && tx.Words[k].End >= d-near {
+			j := k
+			for j > 0 && in(last, tx.Words[j-1]) && !endsSentence(tx.Words[j-1].Text) {
+				j--
+			}
+			text, from, to := quote(tx.Words, j, k)
+			o, _ := t.ToOutput(last.Source, tx.Words[j].Start+0.01)
+			fix := fmt.Sprintf("end on the sentence before it: `cutroom edit cut --from %q --to %q%s`", from, to, src(last.Source))
+			if len(t.Segments) == 1 && (j == 0 || !in(last, tx.Words[j-1])) { // the sentence is the whole edit
+				fix = "listen to it (`cutroom listen --output` the last seconds) and decide whether it can end the video"
+			}
+			is = append(is, Issue{Level: "warn", Code: "ends-mid-speech", At: math.Round(o*1000) / 1000, Segment: last.ID,
+				Message: fmt.Sprintf("the edit ends on %q, and %s's recording stops %.2f s after it with the speaker still talking: it may be the start of a thought the recording cuts off", ellipsizeWords(text, 12), last.Source, math.Max(0, d-tx.Words[k].End)),
+				Fix:     fix + fmt.Sprintf("; or keep it on purpose: `cutroom timeline --accept ends-mid-speech@%.2f --reason \"…\"`", o)})
+		}
+	}
+	first := t.Segments[0]
+	if tx := tr[first.Source]; tx != nil && first.In < near {
+		k := -1
+		for i, w := range tx.Words {
+			if in(first, w) && speech.Norm(w.Text) != "" {
+				k = i
+				break
+			}
+		}
+		if k >= 0 && tx.Words[k].Start <= tx.Offset+near && startsLower(tx.Words[k].Text) {
+			j := k
+			for j < len(tx.Words)-1 && in(first, tx.Words[j+1]) && !endsSentence(tx.Words[j].Text) {
+				j++
+			}
+			text, from, to := quote(tx.Words, k, j)
+			fix := fmt.Sprintf("start on the next sentence: `cutroom edit cut --from %q --to %q%s`", from, to, src(first.Source))
+			if !endsSentence(tx.Words[j].Text) {
+				fix = "listen to the opening (`cutroom listen --output 0-3`) and decide whether it can start the video"
+			}
+			is = append(is, Issue{Level: "warn", Code: "starts-mid-speech", At: 0, Segment: first.ID,
+				Message: fmt.Sprintf("the edit opens on %q, spoken as %s's recording starts: it may be the end of a sentence begun before the camera rolled", ellipsizeWords(text, 12), first.Source),
+				Fix:     fix + "; or keep it on purpose: `cutroom timeline --accept starts-mid-speech --reason \"…\"`"})
+		}
+	}
 	return is
 }
 

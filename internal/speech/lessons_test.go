@@ -35,3 +35,13 @@ func TestL46_PauseFoundUnderRumble(t *testing.T) {
 		t.Fatalf("pause found at %.2f–%.2f, want 1–2", rs[0].End, rs[1].Start)
 	}
 }
+
+// A recorder's words re-timed onto the camera's clock keep their order and drop what the camera
+// didn't record.
+func TestMapToCameraClock(t *testing.T) {
+	rec := &Transcript{Source: "mic", Words: []Word{{Text: "before", Start: 1, End: 1.5}, {Text: "hello", Start: 16, End: 16.5}, {Text: "world.", Start: 17, End: 17.4}}}
+	m := rec.MapTo("cam", func(r float64) float64 { return r - 15.17 }, 60)
+	if m.Source != "cam" || m.From != "mic" || len(m.Words) != 2 || m.Words[0].Text != "hello" || m.Words[0].I != 0 || math.Abs(m.Words[0].Start-0.83) > 1e-9 {
+		t.Fatalf("%+v", m)
+	}
+}

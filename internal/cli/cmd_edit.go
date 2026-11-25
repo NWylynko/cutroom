@@ -72,7 +72,7 @@ never moves them.`,
 			{Name: "before", Kind: "string", Help: "add/move: put it before this segment id (default for add: at the end)"},
 			{Name: "fill", Kind: "bool", Help: "frame: scale the picture to fill the output frame (crop the rest)"},
 			{Name: "fit", Kind: "bool", Help: "frame: fit the whole picture (bars where shapes differ)"},
-			{Name: "size", Kind: "string", Help: "frame: output size WxH (e.g. 720x1280)"},
+			{Name: "size", Kind: "string", Help: "frame: output size: 1080p, 720p, 2160p, or WxH (e.g. 1920x1080, 1080x1920)"},
 			{Name: "in", Kind: "bool", Help: "pin: only the segment's start"},
 			{Name: "out", Kind: "bool", Help: "pin: only the segment's end"},
 			{Name: "unpin", Kind: "bool", Help: "pin: release instead (tighten may move it)"},
@@ -173,6 +173,7 @@ type editEnv struct {
 	tr           timeline.Transcripts
 	dur          map[string]float64
 	made         bool
+	notes        []timeline.Issue // said once: segments trimmed to where their source really ends
 }
 
 func loadEditEnv(c *Ctx, create bool) (*editEnv, error) {
@@ -183,7 +184,7 @@ func loadEditEnv(c *Ctx, create bool) (*editEnv, error) {
 	e := &editEnv{p: p, tr: timeline.Transcripts{}, dur: map[string]float64{}}
 	for _, id := range p.IDs() {
 		s := p.Sources[id]
-		e.dur[id] = s.Facts.Duration
+		e.dur[id] = s.Facts.End()
 		if t, err := speech.Load(cacheDir(p), id); err == nil {
 			if stale, _ := p.Stale(s); !stale {
 				e.tr[id] = t
@@ -212,7 +213,30 @@ func loadEditEnv(c *Ctx, create bool) (*editEnv, error) {
 	} else if err != nil {
 		return nil, Errf(ExitInvalid, "bad-timeline", "fix "+timeline.File+" or run `cutroom edit undo`", "%v", err)
 	}
+	e.trimToEnds()
+	heardWords(p, e.tl, e.tr, e.dur)
 	return e, nil
+}
+
+// trimToEnds stops a segment that runs a little past its source's real end (a container longer than
+// its streams; timelines made before cutroom measured that) at the last frame the source has.
+func (e *editEnv) trimToEnds() {
+	changed := false
+	for i := range e.tl.Segments {
+		g := &e.tl.Segments[i]
+		d, ok := e.dur[g.Source]
+		if !ok || g.Out <= d+1e-6 || g.Out-d > 0.5 || g.In >= d-0.1 {
+			continue
+		}
+		end := e.tl.SnapDown(d)
+		e.notes = append(e.notes, timeline.Issue{Level: "info", Code: "trimmed-to-source-end", Segment: g.ID, At: g.OutStart,
+			Message: fmt.Sprintf("segment %s ran to %s %.3f, past where its picture and sound end (%.3f); it now stops at %.3f", g.ID, g.Source, g.Out, d, end)})
+		g.Out = end
+		changed = true
+	}
+	if changed {
+		e.tl.Recompute()
+	}
 }
 
 func newTimeline(s *project.Source) *timeline.Timeline {
@@ -221,7 +245,7 @@ func newTimeline(s *project.Source) *timeline.Timeline {
 	if s.Facts.Audio != nil {
 		audio, grid = s.ID, s.Facts.Audio.Start
 	}
-	return timeline.New(v.FPS, v.Width, v.Height, s.ID, audio, grid, s.Facts.Duration)
+	return timeline.New(v.FPS, v.Width, v.Height, s.ID, audio, grid, s.Facts.End())
 }
 
 func runEdit(c *Ctx) (*Result, error) {
@@ -307,7 +331,10 @@ func runEdit(c *Ctx) (*Result, error) {
 		if c.Bool("dry-run") {
 			verb = "would create"
 		}
-		l := fmt.Sprintf("%s timeline from %s (whole source, %s)", verb, e.tl.Video, secs(e.tl.Duration()))
+		l := fmt.Sprintf("%s timeline from %s (whole source, %s); output %dx%d at %s fps, the source's", verb, e.tl.Video, secs(e.tl.Duration()), e.tl.Width, e.tl.Height, fpsStr(e.tl.FPS))
+		if e.tl.Width*e.tl.Height > 1920*1080 {
+			l += fmt.Sprintf(" — for a 1080p video: `cutroom edit frame --size 1080p`")
+		}
 		videos := 0
 		for _, id := range e.p.IDs() {
 			if s := e.p.Sources[id]; s.Facts != nil && s.Facts.Video != nil {
@@ -453,9 +480,9 @@ func runEdit(c *Ctx) (*Result, error) {
 			return nil, Errf(ExitUsage, "missing-flag", "`cutroom edit frame --anchor 0.4,0.5` (where to crop a filled frame), --fill, --fit or --size 720x1280", "edit frame needs --anchor, --fill, --fit or --size")
 		}
 		if c.Has("size") {
-			var w, h int
-			if _, err := fmt.Sscanf(c.Str("size"), "%dx%d", &w, &h); err != nil || w < 64 || h < 64 || w%2+h%2 != 0 {
-				return nil, Errf(ExitUsage, "bad-flag-value", "--size WxH with even numbers, e.g. 720x1280", "bad --size %q", c.Str("size"))
+			w, h, err := parseSize(c.Str("size"), e.tl.Width, e.tl.Height)
+			if err != nil {
+				return nil, err
 			}
 			e.tl.Width, e.tl.Height = w, h
 		}
@@ -1053,12 +1080,33 @@ func (e *editEnv) keptSounds() []keptSound {
 
 // splitIssues separates issues this edit introduced from ones that were already open (same code and
 // message), so an edit doesn't repeat a warning the agent has already seen in full.
+// parseSize reads an output size: WxH, or 2160p / 1440p / 1080p / 720p / 4k in the timeline's
+// orientation (vertical timelines get 1080x1920 for 1080p).
+func parseSize(s string, curW, curH int) (int, int, error) {
+	short := map[string]int{"2160p": 2160, "4k": 2160, "1440p": 1440, "1080p": 1080, "720p": 720, "540p": 540}
+	if n, ok := short[strings.ToLower(s)]; ok {
+		long := n * 16 / 9
+		if curH > curW {
+			return n, long, nil
+		}
+		return long, n, nil
+	}
+	var w, h int
+	if _, err := fmt.Sscanf(s, "%dx%d", &w, &h); err != nil || w < 64 || h < 64 || w%2+h%2 != 0 {
+		return 0, 0, Errf(ExitUsage, "bad-flag-value", "--size 1080p (or 720p, 1440p, 2160p), or WxH with even numbers, e.g. 1920x1080 or 1080x1920", "bad --size %q", s)
+	}
+	return w, h, nil
+}
+
 func splitIssues(now, before []timeline.Issue) (fresh, open []timeline.Issue) {
 	seen := map[string]bool{}
 	for _, x := range before {
 		seen[x.Code+"|"+x.Message] = true
 	}
 	for _, x := range now {
+		if x.Level == "accepted" { // decided: neither new nor open
+			continue
+		}
 		if seen[x.Code+"|"+x.Message] && x.Level != "error" {
 			if x.Level != "info" { // notes are said once, not carried as open problems
 				open = append(open, x)
@@ -1153,7 +1201,7 @@ func (e *editEnv) applyAdd(c *Ctx) ([]string, string, error) {
 			return nil, "", Errf(ExitUsage, "bad-range", "write a range as start-end in source time, e.g. 12.0-20.5", "%v", err)
 		}
 		id := e.tl.Insert(s.ID, a, b, pos, orStr(reason, "add "+c.Args[1]))
-		e.dur[s.ID] = s.Facts.Duration
+		e.dur[s.ID] = s.Facts.End()
 		return []string{fmt.Sprintf("added %s %s–%s as %s %s", s.ID, clock(a), clock(b), id, where)}, fmt.Sprintf("edit add %s %s", s.ID, c.Args[1]), nil
 	}
 	if !(c.Has("text") || (c.Has("from") && c.Has("to"))) {

@@ -171,7 +171,7 @@ func runLook(c *Ctx) (*Result, error) {
 		return nil, err
 	}
 	rate := sourceRate(s)
-	dur := s.Facts.Duration
+	dur := s.Facts.End()
 	src := p.Abs(s)
 	var words []speech.Word
 	if t, err := speech.Load(cacheDir(p), s.ID); err == nil {

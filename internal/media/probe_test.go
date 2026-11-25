@@ -84,3 +84,19 @@ func TestL04_DetectLateFirstFrame(t *testing.T) {
 		t.Fatalf("video start %.4f, av offset %.4f, warnings %v", f.Video.Start, f.AVOffset, f.Warnings)
 	}
 }
+
+// A container longer than its streams (a metadata track past the end): edits end where both picture
+// and sound exist, and inspect says so (found on real phone footage in T3).
+func TestFactsEndIsTheShortestStream(t *testing.T) {
+	f := &Facts{Duration: 60.4, Video: &Video{Start: 0, Duration: 60.1667}, Audio: &Audio{Start: 0, Duration: 60.0093}}
+	if math.Abs(f.End()-60.0093) > 1e-9 {
+		t.Fatalf("end %.4f", f.End())
+	}
+	if !warned(&Facts{Duration: f.Duration, Video: f.Video, Audio: f.Audio, Warnings: warnings(f)}, "short-streams") {
+		t.Fatal("no short-streams note")
+	}
+	audioOnly := &Facts{Duration: 90, Audio: &Audio{Duration: 89.5}}
+	if audioOnly.End() != 90 {
+		t.Fatalf("an audio-only source ends at its own duration, got %.3f", audioOnly.End())
+	}
+}

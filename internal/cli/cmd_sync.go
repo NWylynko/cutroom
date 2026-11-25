@@ -188,8 +188,32 @@ func renderSources(p *project.Project) map[string]render.Source {
 	return srcs
 }
 
+// heardWords puts, for each video source whose sound in the edit comes from a synced recorder, the
+// recorder's words (a close microphone: the better transcript, and the sound viewers hear) on the
+// camera's clock in place of the camera's own transcript. Word matching, joins, retake warnings and
+// check then follow what the render actually says.
+func heardWords(p *project.Project, tl *timeline.Timeline, tr timeline.Transcripts, dur map[string]float64) {
+	if tl == nil {
+		return
+	}
+	rs := renderSources(p)
+	for _, v := range p.IDs() {
+		s := p.Sources[v]
+		if s.Facts == nil || s.Facts.Video == nil {
+			continue
+		}
+		a, _, err := render.AudioFor(tl, rs, v)
+		if err != nil || a == "" || a == v || tr[a] == nil || p.Sources[a] == nil || p.Sources[a].Sync == nil || p.Sources[a].Sync.To != v {
+			continue
+		}
+		sy := p.Sources[a].Sync
+		tr[v] = tr[a].MapTo(v, func(r float64) float64 { return (r - sy.Offset) / (1 + sy.Drift) }, dur[v])
+	}
+}
+
 func (e *editEnv) validate() []timeline.Issue {
-	is := append(e.audioIssues(), e.tl.Validate(e.dur, e.tr)...)
+	is := append(append([]timeline.Issue{}, e.notes...), e.audioIssues()...)
+	is = append(is, e.tl.Validate(e.dur, e.tr)...)
 	is = append(is, e.safeZoneIssues()...)
 	for i := range is { // decided by the editor: listed, not open
 		if ok, _ := e.tl.IsAccepted(is[i]); ok && is[i].Level == "warn" {

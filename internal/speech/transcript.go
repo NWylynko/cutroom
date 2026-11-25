@@ -41,6 +41,36 @@ type Transcript struct {
 	Suspects  []Suspect `json:"suspects"`
 	Key       string    `json:"key"`
 	Algorithm int       `json:"algorithm"`
+	From      string    `json:"from,omitempty"` // set on a recorder's words mapped onto a camera's clock
+}
+
+// MapTo is this transcript (a recorder's) re-timed onto another source's clock (the camera it is
+// synced to): toRef converts a time of this transcript to that source's time. Words and suspects
+// outside 0–dur are dropped; word numbers are renumbered.
+func (t *Transcript) MapTo(src string, toRef func(float64) float64, dur float64) *Transcript {
+	m := *t
+	m.Source, m.From, m.Duration, m.Words, m.Suspects = src, t.Source, dur, nil, nil
+	for _, w := range t.Words {
+		w.Start, w.End = toRef(w.Start), toRef(w.End)
+		if w.Start < 0 || w.End > dur {
+			continue
+		}
+		w.I = len(m.Words)
+		m.Words = append(m.Words, w)
+	}
+	for _, s := range t.Suspects {
+		s.Start, s.End = toRef(s.Start), toRef(s.End)
+		if s.Start < 0 || s.End > dur {
+			continue
+		}
+		rel := s.Related
+		s.Related = nil
+		for _, r := range rel {
+			s.Related = append(s.Related, toRef(r))
+		}
+		m.Suspects = append(m.Suspects, s)
+	}
+	return &m
 }
 
 // Algorithm bumps invalidate cached transcripts.

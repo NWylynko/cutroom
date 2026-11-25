@@ -12,6 +12,13 @@
 - **Caching.** The video is rendered in ~45 s chunks split at cuts. Re-rendering after an edit only
   redoes the chunks that changed; with no changes a render takes about a second.
 
+## Output size
+The final renders at the timeline's size, which starts as the source's: a 4K phone video renders 4K.
+For a 1080p video set it first — `cutroom edit frame --size 1080p` (or `render --size 1080p`, which
+saves the same change; both are undoable). `720p`, `1440p`, `2160p` and `WxH` work too; a vertical
+timeline gets 1080x1920 for `1080p`. Overlays, captions and zoom follow the size. `render --dry-run`
+prints the size before you spend the time.
+
 ## Handled for you
 - Cuts land on whole frames and on the exact matching audio sample; audio and video stay in sync
   even for variable-frame-rate phone footage and sources whose audio starts late.
