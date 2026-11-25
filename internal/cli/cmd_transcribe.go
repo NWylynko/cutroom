@@ -351,7 +351,7 @@ func runTranscript(c *Ctx) (*Result, error) {
 	}
 	var lines []string
 	trunc := func(note string) {
-		if !c.Bool("all") && len(lines) > maxLines {
+		if !c.Bool("all") && len(lines) > maxLines && !c.Has("range") && !c.Has("from") && !c.Has("to") { // a range asked for is printed whole
 			n := len(lines) - maxLines
 			lines = append(lines[:maxLines], fmt.Sprintf("… %d more lines (%s, or --all)", n, note))
 		}
@@ -359,6 +359,15 @@ func runTranscript(c *Ctx) (*Result, error) {
 	head := fmt.Sprintf("%s — %d words, %s  (%s, %d pass(es))", t.Source, len(t.Words), clock(t.Duration), t.Model, t.Passes)
 	if t.From != "" {
 		head += fmt.Sprintf("\nwords from recorder %s (the sound the edit uses for %s), on %s's clock — quote these in edits; --camera shows what the camera's own microphone heard", t.From, t.Source, t.Source)
+	}
+	if src := p.Sources[t.Source]; src != nil && src.Sync != nil && src.Sync.To != "" && t.From == "" && !c.Has("file") {
+		// a recorder: its times are its own clock; edits quote the camera's view of the same words
+		cam := src.Sync.To
+		if tl != nil && (tl.AudioFor[cam] == t.Source || (tl.Audio == t.Source && tl.AudioFor[cam] == "")) {
+			head += fmt.Sprintf("\nthese times are %s's own clock; the edit uses this sound for %s, so `cutroom transcript %s` shows these same words on %s's clock — quote those (or these words) in edits", t.Source, cam, cam, cam)
+		} else {
+			head += fmt.Sprintf("\nthese times are %s's own clock (synced to %s); after `cutroom edit audio %s --for %s`, `cutroom transcript %s` shows these words on %s's clock", t.Source, cam, t.Source, cam, cam, cam)
+		}
 	}
 	if id == "" && !c.Has("file") {
 		if o := otherTranscripts(p, t.Source); len(o) > 0 {

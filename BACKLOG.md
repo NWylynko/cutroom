@@ -20,6 +20,17 @@ Move done items to the journal, not here.
 ## M1 — perceive
 
 ## NEXT
+- [friction T3 r50] sec: "the `timeline` header still says 'sound from sec-take1'" after `edit audio mic1/mic2
+  --for` — name each take's sound source in the header.
+- [friction T3 r50] sec: "camera vs mic word times are in different clocks; I converted by hand" — the
+  recorder's transcript view should say that after `edit audio`, `cutroom transcript <camera>` shows
+  these same words on the camera's clock (quote those in edits).
+- [friction T3 r50] mps: "make `ends-mid-speech` suggest moving a pickup that completes the sentence
+  when one exists" (the editor found the earlier take that continues it and moved it to the end).
+- [friction T3 r50] started: `transcript --words --from/--to` still capped at 40 lines; a range should
+  print in full.
+- [friction T3 r50] deploy: "$5 a month" transcribed as "a$5" — normalise currency so check doesn't
+  warn on it (seen in r48 and r50).
 - [friction r6] Orientation/HDR evidence: "print one explicit 'upright: yes' line backed by an image
   path I can look at" (phone-footage-sonnet; also phone-footage-haiku, hdr-phone-haiku).
 - [friction r6] `listen`: mark low-confidence words in the isolated re-transcription (tighten-haiku:

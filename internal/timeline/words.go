@@ -116,9 +116,13 @@ func (t *Timeline) quietest(src string, lo, hi, def float64) float64 {
 	if len(ts) == 0 || len(db) != len(ts) {
 		return def
 	}
-	best := 0
+	min := db[0]
+	for _, v := range db {
+		min = math.Min(min, v)
+	}
+	best := -1 // among the quietest (within 1 dB), the one nearest def: the least change
 	for i := range ts {
-		if db[i] < db[best] {
+		if db[i] <= min+1 && (best < 0 || math.Abs(ts[i]-def) < math.Abs(ts[best]-def)) {
 			best = i
 		}
 	}
@@ -430,6 +434,7 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 		}
 	}
 	is = append(is, t.edgeIssues(durations, tr)...)
+	is = append(is, t.soundEdgeIssues(durations, tr)...)
 	is = append(is, t.overlayIssues()...)
 	return is
 }
@@ -730,4 +735,85 @@ func srcFlag(tr Transcripts, id string) string {
 		return " --source " + id
 	}
 	return ""
+}
+
+// soundEdgeIssues: a segment edge in loud sound with a much quieter point just inside the segment
+// (end: up to 150 ms before it; start: up to 150 ms after) is a cut through a word the transcript
+// places later than it is spoken — its onsets run late, so a time-range cut 20 ms "before" a word
+// keeps 80 ms of it (T3 r50: "with a PIN | and…", "meaning | you…"). Needs the edit's sound levels
+// (Quiet); the fix trims the edge to the quiet point.
+func (t *Timeline) soundEdgeIssues(durations map[string]float64, tr Transcripts) []Issue {
+	if t.Quiet == nil {
+		return nil
+	}
+	const reach, loud = 0.15, 18.0 // loud: dB above the pauses within ±0.4 s
+	var is []Issue
+	for k, g := range t.Segments {
+		d := durations[g.Source]
+		for _, end := range []bool{false, true} {
+			at := g.In
+			lo, hi := g.In, math.Min(g.In+reach, g.Out)
+			if end {
+				at, lo, hi = g.Out, math.Max(g.Out-reach, g.In), g.Out
+			}
+			if at <= 1/t.fpsNum || (d > 0 && at >= d-1/t.fpsNum) || hi-lo < 2/t.fpsNum {
+				continue // the recording's own edge
+			}
+			// joined to the same source's next frame (a split): no cut there
+			if end && k+1 < len(t.Segments) && t.Segments[k+1].Source == g.Source && math.Abs(t.Segments[k+1].In-g.Out) < 1e-6 {
+				continue
+			}
+			if !end && k > 0 && t.Segments[k-1].Source == g.Source && math.Abs(t.Segments[k-1].Out-g.In) < 1e-6 {
+				continue
+			}
+			lv := t.Quiet(g.Source, []float64{at})
+			if len(lv) != 1 {
+				continue
+			}
+			// the room around the cut: the level of the pauses within ±0.4 s (5th percentile)
+			var around []float64
+			for x := math.Max(0, at-0.4); x <= at+0.4 && (d == 0 || x <= d); x += 0.01 {
+				around = append(around, x)
+			}
+			var vals []float64
+			for _, v := range t.Quiet(g.Source, around) {
+				if v > -100 { // digital silence (an edit in the file, padding) is not the room
+					vals = append(vals, v)
+				}
+			}
+			if len(vals) < 10 {
+				continue
+			}
+			sort.Float64s(vals)
+			floor := vals[len(vals)/20] // the pauses' level (5th percentile): robust to a stray frame
+			if lv[0]-floor < loud {
+				continue // the cut is in a pause, or as quiet as the room gets here
+			}
+			q := t.quietest(g.Source, lo, hi, at)
+			ql := t.Quiet(g.Source, []float64{q})
+			trim := len(ql) == 1 && q != at && lv[0]-ql[0] >= 8
+			name, cut, out := "starts", fmt.Sprintf("%.3f-%.3f", g.In, q), g.OutStart
+			if end {
+				name, cut, out = "ends", fmt.Sprintf("%.3f-%.3f", q, g.Out), g.OutStart+g.Out-g.In
+			}
+			word := ""
+			if tx := tr[g.Source]; tx != nil {
+				for _, w := range tx.Words {
+					if w.Start-0.12 < at && at < w.End {
+						word = fmt.Sprintf(" (near %q)", w.Text)
+						break
+					}
+				}
+			}
+			iss := Issue{Level: "warn", Code: "edge-in-sound", At: math.Round(out*1000) / 1000, Segment: g.ID,
+				Message: fmt.Sprintf("segment %s %s in speech%s: %.0f dB at the cut, %.0f dB above the pauses around it — a piece of a word will be heard (the transcript's word starts run late)", g.ID, name, word, lv[0], lv[0]-floor),
+				Fix:     fmt.Sprintf("there is no pause within %.0f ms: cut by words (`cutroom edit cut --text/--from/--to` places cuts in the measured gap), or `cutroom listen` it", reach*1000)}
+			if trim {
+				iss.Message = fmt.Sprintf("segment %s %s in speech%s: %.0f dB at the cut, %.0f dB above the pauses around it; %.0f dB at %.3f, %.0f ms away — a piece of a word will be heard (the transcript's word starts run late)", g.ID, name, word, lv[0], lv[0]-floor, ql[0], q, math.Abs(q-at)*1000)
+				iss.Fix = fmt.Sprintf("move the edge to the quiet point: `cutroom edit cut %s%s`; or `cutroom listen` it", cut, srcFlag(tr, g.Source))
+			}
+			is = append(is, iss)
+		}
+	}
+	return is
 }

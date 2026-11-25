@@ -9,6 +9,7 @@ import (
 	"strings"
 
 	"github.com/cutroom/cutroom/internal/project"
+	"github.com/cutroom/cutroom/internal/render"
 	"github.com/cutroom/cutroom/internal/speech"
 	"github.com/cutroom/cutroom/internal/timecode"
 	"github.com/cutroom/cutroom/internal/timeline"
@@ -910,7 +911,7 @@ func runTimeline(c *Ctx) (*Result, error) {
 		srcTotal = d
 	}
 	lines = append(lines, fmt.Sprintf("timeline: %d segment(s), %s output (%s fps, %dx%d), from %s of %s; sound from %s",
-		len(tl.Segments), secs(tl.Duration()), fpsStr(tl.FPS), tl.Width, tl.Height, secs(srcTotal), tl.Video, orNone(tl.Audio)))
+		len(tl.Segments), secs(tl.Duration()), fpsStr(tl.FPS), tl.Width, tl.Height, secs(srcTotal), tl.Video, e.soundFrom()))
 	if c.Bool("joins") {
 		js := tl.Joins(e.tr)
 		if len(js) == 0 {
@@ -1322,4 +1323,30 @@ func (e *editEnv) applyReplace(c *Ctx) ([]string, string, error) {
 		fmt.Sprintf("cut %s %s–%s: %q", src, clock(r.From), clock(r.To), ellipsize(r.Text, 100)),
 		fmt.Sprintf("in its place: %s %s–%s as %s: %q", with, clock(a), clock(b), id, ellipsize(text, 100)),
 	}, fmt.Sprintf("edit replace %q with %s", ellipsize(text, 50), with), nil
+}
+
+// soundFrom names the sound each take in the edit uses: "mic" for one source, "mic1 (for take1),
+// mic2 (for take2)" when takes differ (T3 r50: the header said "sound from sec-take1" after both
+// takes were mapped to their recorders).
+func (e *editEnv) soundFrom() string {
+	rs := renderSources(e.p)
+	var parts, seen []string
+	for _, g := range e.tl.Segments {
+		if contains(seen, g.Source) {
+			continue
+		}
+		seen = append(seen, g.Source)
+		a, _, err := render.AudioFor(e.tl, rs, g.Source)
+		if err != nil || a == "" {
+			a = "none"
+		}
+		parts = append(parts, a+" (for "+g.Source+")")
+	}
+	switch {
+	case len(parts) == 0:
+		return orNone(e.tl.Audio)
+	case len(parts) == 1:
+		return strings.SplitN(parts[0], " (", 2)[0]
+	}
+	return strings.Join(parts, ", ")
 }

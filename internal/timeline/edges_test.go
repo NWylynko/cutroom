@@ -103,3 +103,41 @@ func TestMappedWordCutOffByCameraEndIsKept(t *testing.T) {
 		t.Fatal("no edge-in-word with a runnable cut for the cut-off word")
 	}
 }
+
+// T3 r50 (sec): a time-range cut ended 20 ms "before" the transcript's "and", which really began
+// 80 ms earlier: the edge sat in speech. edge-in-sound flags it with the trim to the quiet point;
+// an edge in a pause, and a recording's own end, are left alone.
+func TestEdgeInSound(t *testing.T) {
+	tl := New("60", 1280, 720, "cam", "cam", 0, 10)
+	tl.Cut("cam", 5.0, 6.0, "cut", true) // edges at 5.000 (in speech) and 6.000 (in a pause)
+	tl.Quiet = func(src string, ts []float64) []float64 {
+		db := make([]float64, len(ts))
+		for i, x := range ts {
+			switch {
+			case x >= 4.6 && x <= 4.88: // "PIN"
+				db[i] = -44
+			case x >= 4.92 && x < 5.3: // "and they" (its real onset 4.92)
+				db[i] = -44
+			default: // the room: pauses, and the gap before "and"
+				db[i] = -70
+			}
+		}
+		return db
+	}
+	ws := []speech.Word{{Text: "PIN", Start: 4.6, End: 5.0}, {Text: "and", Start: 5.0, End: 5.15}}
+	var got []Issue
+	for _, is := range tl.Validate(map[string]float64{"cam": 10}, Transcripts{"cam": {Source: "cam", Words: ws}}) {
+		if is.Code == "edge-in-sound" {
+			got = append(got, is)
+		}
+	}
+	if len(got) != 1 || !strings.Contains(got[0].Fix, "cutroom edit cut 4.917-5.000") || !strings.Contains(got[0].Message, `near "and"`) {
+		t.Fatalf("want one edge-in-sound at the 5.000 edge with a trim to the quiet frame nearest it (4.917, the last quiet frame before the onset at 4.92), near \"and\"; got %+v", got)
+	}
+	tl.Quiet = nil // no levels known: nothing is guessed
+	for _, is := range tl.Validate(map[string]float64{"cam": 10}, nil) {
+		if is.Code == "edge-in-sound" {
+			t.Fatalf("flagged without levels: %s", is.Message)
+		}
+	}
+}

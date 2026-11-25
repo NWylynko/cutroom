@@ -21,9 +21,13 @@ by your first edit as the whole first video source. Sources are never touched.
   `--from` must be unique: if it repeats you get a numbered list, then add `--occurrence N` or
   `--near <source time>`, or quote more words. `--to` is the first match after `--from`.
 - Cuts by words land inside the pauses: 0.22 s is kept after the previous word, 0.10 s before the
-  next (word endings trail off; this keeps joins natural). A warning means a cut is inside
-  continuous speech — listen to it.
-- `cutroom edit cut 16.9-17.4` cuts a source time range (for sounds, not words).
+  next (word endings trail off; this keeps joins natural). Where words run together with no pause,
+  the cut goes to the quietest frame of the measured sound near the word boundary. A warning means
+  a cut is inside continuous speech — listen to it.
+- `cutroom edit cut 16.9-17.4` cuts a source time range (for sounds, not words). Prefer words: the
+  transcript's word starts run 20–80 ms late, so a range ending "just before" a word keeps a piece
+  of it. `edge-in-sound` flags any segment edge that sits in speech, with the cut that moves it to
+  the quiet point.
 - `cutroom edit keep --from "…" --to "…"` keeps only that span (e.g. to start a short).
 - Explicit cuts are pinned: a later `tighten` never moves them. `cutroom edit pin s3 [--in|--out]`
   pins edges you set some other way (`--unpin` releases them).
