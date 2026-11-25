@@ -1,4 +1,4 @@
-module github.com/cutroom/cutroom
+module github.com/NWylynko/cutroom
 
 go 1.27.4
 

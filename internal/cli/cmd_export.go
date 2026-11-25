@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/export"
-	"github.com/cutroom/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/export"
+	"github.com/NWylynko/cutroom/internal/render"
 )
 
 func init() {

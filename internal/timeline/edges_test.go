@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cutroom/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/speech"
 )
 
 func sayWords(start float64, text string) []speech.Word {

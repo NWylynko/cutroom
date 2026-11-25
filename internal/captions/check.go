@@ -6,7 +6,7 @@ import (
 	"strings"
 	"unicode/utf8"
 
-	"github.com/cutroom/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/speech"
 )
 
 // Issue is one check result.

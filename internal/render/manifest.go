@@ -5,8 +5,8 @@ import (
 	"os"
 	"time"
 
-	"github.com/cutroom/cutroom/internal/align"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/align"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 // Manifest records exactly what a render contains, so `check` can verify the file independently

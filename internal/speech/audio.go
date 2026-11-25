@@ -9,7 +9,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/deps"
 )
 
 const (

@@ -8,11 +8,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/project"
-	"github.com/cutroom/cutroom/internal/render"
-	"github.com/cutroom/cutroom/internal/speech"
-	"github.com/cutroom/cutroom/internal/timecode"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/project"
+	"github.com/NWylynko/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/timecode"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 var editOps = []string{"cut", "keep", "add", "replace", "move", "split", "pin", "zoom", "frame", "tighten", "audio", "undo", "redo", "history", "reset"}

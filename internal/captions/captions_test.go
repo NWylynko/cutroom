@@ -5,8 +5,8 @@ import (
 	"testing"
 	"unicode/utf8"
 
-	"github.com/cutroom/cutroom/internal/speech"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 // words makes evenly spaced words (0.3 s each, 0.05 s apart) from a sentence; "|" marks a cut

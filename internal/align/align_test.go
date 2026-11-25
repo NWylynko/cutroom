@@ -6,8 +6,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/cutroom/cutroom/internal/deps"
-	"github.com/cutroom/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/speech"
 )
 
 // L05 on the recorder fixture: started 1.700 s before the camera, clock +50 ppm

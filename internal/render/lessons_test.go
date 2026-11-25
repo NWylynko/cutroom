@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 // Guards for LESSONS invariants about the render pipeline. The ones that need ffmpeg make their own

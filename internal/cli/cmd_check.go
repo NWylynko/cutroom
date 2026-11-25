@@ -2,14 +2,14 @@ package cli
 
 import (
 	"fmt"
-	"github.com/cutroom/cutroom/internal/captions"
+	"github.com/NWylynko/cutroom/internal/captions"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/deps"
-	"github.com/cutroom/cutroom/internal/render"
-	"github.com/cutroom/cutroom/internal/verify"
+	"github.com/NWylynko/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/verify"
 )
 
 func init() {

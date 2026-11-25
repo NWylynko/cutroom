@@ -6,7 +6,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/speech"
 )
 
 // Transcripts maps source id → transcript (only sources that have one).

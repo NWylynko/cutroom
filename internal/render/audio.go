@@ -10,7 +10,7 @@ import (
 	"regexp"
 	"strconv"
 
-	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/deps"
 )
 
 // VoiceChain is the default audio chain from published videos (L44): rumble cut, gentle compression,

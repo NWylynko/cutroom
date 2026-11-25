@@ -3,7 +3,7 @@ package main
 import (
 	"os"
 
-	"github.com/cutroom/cutroom/internal/cli"
+	"github.com/NWylynko/cutroom/internal/cli"
 )
 
 func main() {

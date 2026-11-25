@@ -16,11 +16,11 @@ import (
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
 
-	"github.com/cutroom/cutroom/internal/captions"
-	"github.com/cutroom/cutroom/internal/deps"
-	"github.com/cutroom/cutroom/internal/media"
-	"github.com/cutroom/cutroom/internal/raster"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/captions"
+	"github.com/NWylynko/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/media"
+	"github.com/NWylynko/cutroom/internal/raster"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 // CardVersion changes whenever card drawing changes, so cached cards are redrawn.

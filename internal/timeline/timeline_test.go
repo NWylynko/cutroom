@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cutroom/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/speech"
 )
 
 func near(a, b float64) bool { return math.Abs(a-b) < 1e-6 }

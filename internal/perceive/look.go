@@ -13,11 +13,11 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/cutroom/cutroom/internal/deps"
-	"github.com/cutroom/cutroom/internal/media"
-	"github.com/cutroom/cutroom/internal/raster"
-	"github.com/cutroom/cutroom/internal/speech"
-	"github.com/cutroom/cutroom/internal/timecode"
+	"github.com/NWylynko/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/media"
+	"github.com/NWylynko/cutroom/internal/raster"
+	"github.com/NWylynko/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/timecode"
 	xdraw "golang.org/x/image/draw"
 )
 

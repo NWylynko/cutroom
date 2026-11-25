@@ -7,9 +7,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/project"
-	"github.com/cutroom/cutroom/internal/speech"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/project"
+	"github.com/NWylynko/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 // Short-form defaults (L41): tight pads at cuts, pauses down to about 0.2 s, a vertical frame.

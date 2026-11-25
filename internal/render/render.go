@@ -18,10 +18,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cutroom/cutroom/internal/align"
-	"github.com/cutroom/cutroom/internal/deps"
-	"github.com/cutroom/cutroom/internal/media"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/align"
+	"github.com/NWylynko/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/media"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 // Version is part of every cache key; bump when output would change.

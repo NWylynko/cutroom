@@ -6,8 +6,8 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/timecode"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/timecode"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 // pickIssue finds the warning a `code[@time]` names.

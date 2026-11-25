@@ -14,7 +14,7 @@ import (
 	"strings"
 )
 
-// Version is set at build time with -ldflags "-X github.com/cutroom/cutroom/internal/cli.Version=…".
+// Version is set at build time with -ldflags "-X github.com/NWylynko/cutroom/internal/cli.Version=…".
 var Version = "0.0.0-dev"
 
 // Exit codes (SPEC.md rule 4).

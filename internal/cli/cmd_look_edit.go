@@ -2,20 +2,20 @@ package cli
 
 import (
 	"fmt"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/timeline"
 	"math"
 	"os"
 	"path/filepath"
 	"sort"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/deps"
-	"github.com/cutroom/cutroom/internal/media"
-	"github.com/cutroom/cutroom/internal/perceive"
-	"github.com/cutroom/cutroom/internal/raster"
-	"github.com/cutroom/cutroom/internal/render"
-	"github.com/cutroom/cutroom/internal/speech"
-	"github.com/cutroom/cutroom/internal/timecode"
+	"github.com/NWylynko/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/media"
+	"github.com/NWylynko/cutroom/internal/perceive"
+	"github.com/NWylynko/cutroom/internal/raster"
+	"github.com/NWylynko/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/timecode"
 )
 
 // outputWords maps every kept transcript word to output time.

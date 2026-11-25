@@ -12,8 +12,8 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/align"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/align"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 // Source is what export needs to know about a source.

@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/guide"
+	"github.com/NWylynko/cutroom/internal/guide"
 )
 
 func init() {

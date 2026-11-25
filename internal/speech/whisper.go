@@ -7,7 +7,7 @@ import (
 	"strings"
 	"unicode"
 
-	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/deps"
 )
 
 // DisfluencyPrompt nudges whisper to transcribe false starts and fillers it otherwise smooths over (L29).

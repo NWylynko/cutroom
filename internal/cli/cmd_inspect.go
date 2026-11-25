@@ -8,9 +8,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/media"
-	"github.com/cutroom/cutroom/internal/project"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/media"
+	"github.com/NWylynko/cutroom/internal/project"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 func init() {

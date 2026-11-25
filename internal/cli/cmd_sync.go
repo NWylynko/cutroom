@@ -3,16 +3,16 @@ package cli
 import (
 	"errors"
 	"fmt"
-	"github.com/cutroom/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/render"
 	"math"
 	"os"
 	"path/filepath"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/align"
-	"github.com/cutroom/cutroom/internal/project"
-	"github.com/cutroom/cutroom/internal/speech"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/align"
+	"github.com/NWylynko/cutroom/internal/project"
+	"github.com/NWylynko/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 func init() {

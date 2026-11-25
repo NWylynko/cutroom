@@ -8,9 +8,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cutroom/cutroom/internal/captions"
-	"github.com/cutroom/cutroom/internal/render"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/captions"
+	"github.com/NWylynko/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 func init() {

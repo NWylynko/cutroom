@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/deps"
 )
 
 func TestParseWhisperMergesTokensAndPunctuation(t *testing.T) {

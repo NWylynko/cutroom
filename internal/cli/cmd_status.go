@@ -9,10 +9,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cutroom/cutroom/internal/render"
-	"github.com/cutroom/cutroom/internal/speech"
-	"github.com/cutroom/cutroom/internal/timeline"
-	"github.com/cutroom/cutroom/internal/verify"
+	"github.com/NWylynko/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/verify"
 )
 
 func init() {

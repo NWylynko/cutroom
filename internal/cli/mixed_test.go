@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cutroom/cutroom/internal/speech"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 // A take's own sound next to the main one: a note when levels and room match, a warning that tells

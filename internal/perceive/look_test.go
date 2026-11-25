@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cutroom/cutroom/internal/raster"
+	"github.com/NWylynko/cutroom/internal/raster"
 )
 
 // fit once looped forever: it cut 2 bytes and appended a 3-byte ellipsis.

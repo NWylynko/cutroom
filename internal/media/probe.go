@@ -13,7 +13,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/deps"
 )
 
 type Video struct {

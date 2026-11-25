@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 func writePNG(t *testing.T, p string, c color.Color) {

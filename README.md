@@ -16,7 +16,13 @@ modified, cuts land on whole frames and audio samples, and video is encoded once
 You need Go 1.27 or newer, ffmpeg, whisper.cpp and a whisper speech model.
 
 ```bash
-git clone <this repository> cutroom && cd cutroom
+go install github.com/NWylynko/cutroom/cmd/cutroom@latest
+```
+
+or from a clone:
+
+```bash
+git clone https://github.com/NWylynko/cutroom.git && cd cutroom
 go install ./cmd/cutroom
 ```
 

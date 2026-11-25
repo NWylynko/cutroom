@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/cutroom/cutroom/internal/align"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/align"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 func srcs() map[string]Source {

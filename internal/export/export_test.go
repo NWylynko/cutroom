@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/cutroom/cutroom/internal/align"
-	"github.com/cutroom/cutroom/internal/timeline"
+	"github.com/NWylynko/cutroom/internal/align"
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 func fixture() (*timeline.Timeline, map[string]Source) {

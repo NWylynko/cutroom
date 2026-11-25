@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/cutroom/cutroom/internal/align"
-	"github.com/cutroom/cutroom/internal/media"
+	"github.com/NWylynko/cutroom/internal/align"
+	"github.com/NWylynko/cutroom/internal/media"
 )
 
 const File = "cutroom.json"

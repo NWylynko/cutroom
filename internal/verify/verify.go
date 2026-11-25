@@ -7,7 +7,7 @@ package verify
 import (
 	"bytes"
 	"fmt"
-	"github.com/cutroom/cutroom/internal/align"
+	"github.com/NWylynko/cutroom/internal/align"
 	"math"
 	"os"
 	"os/exec"
@@ -18,10 +18,10 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/cutroom/cutroom/internal/deps"
-	"github.com/cutroom/cutroom/internal/media"
-	"github.com/cutroom/cutroom/internal/render"
-	"github.com/cutroom/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/media"
+	"github.com/NWylynko/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/speech"
 )
 
 type Item struct {

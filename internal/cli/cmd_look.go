@@ -10,13 +10,13 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/cutroom/cutroom/internal/deps"
-	"github.com/cutroom/cutroom/internal/perceive"
-	"github.com/cutroom/cutroom/internal/project"
-	"github.com/cutroom/cutroom/internal/raster"
-	"github.com/cutroom/cutroom/internal/render"
-	"github.com/cutroom/cutroom/internal/speech"
-	"github.com/cutroom/cutroom/internal/timecode"
+	"github.com/NWylynko/cutroom/internal/deps"
+	"github.com/NWylynko/cutroom/internal/perceive"
+	"github.com/NWylynko/cutroom/internal/project"
+	"github.com/NWylynko/cutroom/internal/raster"
+	"github.com/NWylynko/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/speech"
+	"github.com/NWylynko/cutroom/internal/timecode"
 )
 
 func init() {
