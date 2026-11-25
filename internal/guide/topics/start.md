@@ -32,4 +32,5 @@ from the sources. You don't need to manage any of that.
 2. Look at images cutroom gives you (frames, contact sheets, spectrograms) before judging visuals.
 3. Test small first: `render --preview --range` before a full render.
 
-Topics: run `cutroom guide <topic>`; `cutroom guide --all` prints everything.
+Topics: run `cutroom guide <topic>`. For most edits read `workflow`, then `edit` and `verify`
+(~1,500 words); the others when a task needs them (`cutroom guide --all` prints all ~4,000 words).

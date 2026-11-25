@@ -271,11 +271,16 @@ func runListen(c *Ctx) (*Result, error) {
 			return nil, err
 		}
 	} else {
+		// like transcript: the edit's main video, else the longest video (not a short pickup that
+		// sorts first)
+		var have []string
 		for _, id := range p.IDs() {
-			if _, err := speech.Load(cacheDir(p), id); err == nil {
-				s = p.Sources[id]
-				break
+			if _, err := speech.Load(cacheDir(p), id); err == nil && p.Sources[id].Facts.Audio != nil {
+				have = append(have, id)
 			}
+		}
+		if len(have) > 0 {
+			s = p.Sources[defaultTranscript(p, have)]
 		}
 		if s == nil {
 			for _, id := range p.IDs() {

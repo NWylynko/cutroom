@@ -269,3 +269,42 @@ func TestAcceptedSurvivesMovingTimes(t *testing.T) {
 		t.Fatal("a different warning of the same code was treated as accepted")
 	}
 }
+
+func TestUndoPreviewRedo(t *testing.T) {
+	dir, cache := t.TempDir(), t.TempDir()
+	tl := New("30", 1280, 720, "v", "v", 0, 10)
+	must := func(err error) {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	must(Checkpoint(dir, cache, "create"))
+	must(tl.Save(dir))
+	must(Checkpoint(dir, cache, "cut 2-4"))
+	tl.Cut("v", 2, 4, "x", true)
+	must(tl.Save(dir))
+	op, prev, err := UndoPreview(cache)
+	if err != nil || op != "cut 2-4" || prev == nil || !near(prev.Duration(), 10) {
+		t.Fatalf("preview: %q %v %v", op, prev, err)
+	}
+	if now, _ := Load(dir); !near(now.Duration(), 8) {
+		t.Fatal("preview changed the timeline")
+	}
+	if op, _ := Undo(dir, cache); op != "cut 2-4" {
+		t.Fatal(op)
+	}
+	if r := Redoable(cache); len(r) != 1 || r[0] != "cut 2-4" {
+		t.Fatalf("redoable %v", r)
+	}
+	if op, err := Redo(dir, cache); err != nil || op != "cut 2-4" {
+		t.Fatal(op, err)
+	}
+	if now, _ := Load(dir); !near(now.Duration(), 8) || len(History(cache)) != 2 {
+		t.Fatalf("redo didn't restore the cut (%d history)", len(History(cache)))
+	}
+	Undo(dir, cache)
+	must(Checkpoint(dir, cache, "another edit")) // a new edit clears redo
+	if r := Redoable(cache); len(r) != 0 {
+		t.Fatalf("redo survived a new edit: %v", r)
+	}
+}

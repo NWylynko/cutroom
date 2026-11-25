@@ -41,7 +41,7 @@ when the file is stale).
 
 `cutroom captions --burn` draws captions into the video itself (and writes the subtitle file in the
 same call; `--output` names it), the short-form way: 1–3 words at a
-time (≤ 20 characters), never ending on a weak word, never leaving a lone short word (L48), white on a
+time (≤ 20 characters; a 4th word only when it avoids ending on "is", "the" and the like), never ending on a weak word, never leaving a lone short word (L48), white on a
 dark box low in the frame (on vertical video, above the platform's buttons). They are one overlay
 over the whole edit: the groups are made from the cut at render time, so they follow every re-cut.
 `cutroom look --output <time>` shows them (`+cc`); `cutroom check` samples groups on screen and the

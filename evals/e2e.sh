@@ -387,5 +387,16 @@ expect "render's own project found"    '^PASS out/short\.mp4'               cutr
 expect "look range to the file end"    'of out/short\.mp4 at 0:00\.000–'   sh -c 'cutroom look --file out/short.mp4 0-30 --count 4'
 popd >/dev/null
 
+# r10: undo --dry-run changes nothing; redo; moved warnings still match; listen's default source
+U="$W/undo"; mkdir -p "$U"; cp $FIX/talk.mp4 $FIX/pickup.mp4 "$U/"; pushd "$U" >/dev/null
+cutroom init talk.mp4 pickup.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+cutroom edit cut --from "By the way" --to "keyboard." >/dev/null
+expect "undo --dry-run previews"      'would undo: edit cut .*DRY RUN'    sh -c 'cutroom edit undo --dry-run | tr "\n" " "'
+expect "dry run changed nothing"      '17\.[0-9]+ s output'               cutroom timeline
+expect "undo then redo"               'redid: edit cut'                   sh -c 'cutroom edit undo >/dev/null; cutroom edit redo'
+expect "moved warning still accepted" 'accepted retake-kept'              cutroom timeline --accept retake-kept@19.5 --reason "kept on purpose"
+expect "listen defaults to the talk"  'talk 0:16\.500–0:17\.800'           cutroom listen 16.5-17.8
+popd >/dev/null
+
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -162,7 +162,7 @@ func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64, o caption
 		verb = "would burn in"
 	}
 	existing := e.tl.Captions()
-	lines = append(lines, fmt.Sprintf("%s captions: %d groups of 1–3 words (≤ 20 chars), %d words over %s", verb, len(gs), len(ws), clock(dur)))
+	lines = append(lines, fmt.Sprintf("%s captions: %d groups of 1–3 words (≤ 20 chars; a 4th only to avoid a weak ending), %d words over %s", verb, len(gs), len(ws), clock(dur)))
 	show := len(gs)
 	if !c.Bool("all") && show > 12 {
 		show = 10

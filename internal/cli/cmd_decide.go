@@ -55,7 +55,14 @@ func pickIssue(issues []timeline.Issue, spec string, wantLevel ...string) (timel
 		}
 	}
 	if bd > 0.5 {
-		return timeline.Issue{}, Errf(ExitUsage, "no-such-warning", "`cutroom timeline` lists the warnings with their output times", "no %q warning near output %s (nearest at %s)", code, clock(at), clock(best.At))
+		if len(cands) == 1 { // the only one of its kind: an earlier edit moved it — it's this one
+			return best, nil
+		}
+		var ats []string
+		for _, x := range cands {
+			ats = append(ats, fmt.Sprintf("%s@%.2f", code, x.At))
+		}
+		return timeline.Issue{}, Errf(ExitUsage, "no-such-warning", "edits move warnings in output time; they are now: "+strings.Join(ats, ", "), "no %q warning near output %s", code, clock(at))
 	}
 	return best, nil
 }

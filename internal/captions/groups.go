@@ -5,7 +5,7 @@ import (
 	"unicode/utf8"
 )
 
-// Group is a burned-in caption: 1–3 words shown together (L48).
+// Group is a burned-in caption: 1–3 words shown together (a 4th only to avoid a weak ending; L48).
 type Group struct {
 	Start float64 `json:"start"`
 	End   float64 `json:"end"`

@@ -14,12 +14,12 @@ import (
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
-var editOps = []string{"cut", "keep", "add", "replace", "move", "zoom", "frame", "tighten", "audio", "undo", "history", "reset"}
+var editOps = []string{"cut", "keep", "add", "replace", "move", "zoom", "frame", "tighten", "audio", "undo", "redo", "history", "reset"}
 
 func init() {
 	Register(&Command{
 		Name:     "edit",
-		Args:     "<cut|keep|add|replace|move|zoom|tighten|audio|undo|history|reset> [factor|segment] [range|source]",
+		Args:     "<cut|keep|add|replace|move|zoom|frame|tighten|audio|undo|redo|history|reset> [factor|segment] [range|source]",
 		MinArgs:  1,
 		MaxArgs:  3,
 		Category: "edit",
@@ -46,7 +46,7 @@ Every edit is checked afterwards and problems are printed. Use --dry-run to prev
   edit audio mic                                 take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
   edit audio mic2 --for take2                    multi-take: segments from take2 use recorder mic2
                                                  (unmapped takes use their own sound; timeline warns)
-  edit undo | edit history | edit reset [--source id]
+  edit undo | edit redo | edit history | edit reset [--source id]
   edit <sub> --help                              just one subcommand and its flags
 
 Words are matched ignoring case, punctuation and um/uh. --from must match once (add --near <time>
@@ -111,8 +111,10 @@ Never moves pinned edges (your explicit cuts). Prints the sounds inside removed 
 			"audio": {Usage: `  edit audio mic                take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
   edit audio mic2 --for take2   multi-take: segments from take2 use recorder mic2`,
 				Flags: []string{"for", "dry-run"}},
-			"undo": {Usage: `  edit undo      put the timeline back as it was before the last edit (repeat to go further back)
-See what each step did first with ` + "`cutroom edit history`" + `.`},
+			"undo": {Usage: `  edit undo            put the timeline back as it was before the last edit (repeat to go further back)
+  edit undo --dry-run  say what it would undo and the timeline it would leave, change nothing
+` + "`cutroom edit redo`" + ` puts an undone edit back (until the next edit). ` + "`cutroom edit history`" + ` lists both.`, Flags: []string{"dry-run"}},
+			"redo":    {Usage: `  edit redo   put back the edit the last undo took away (repeat for earlier undos; a new edit clears them)`, Flags: []string{"dry-run"}},
 			"history": {Usage: `  edit history   every edit in order, newest last (what edit undo would undo next)`},
 			"reset": {Usage: `  edit reset [--source id]   start over: the timeline becomes the whole video source again
 (undo-able: edit undo brings the old timeline back)`,
@@ -221,6 +223,20 @@ func runEdit(c *Ctx) (*Result, error) {
 	}
 	switch op {
 	case "undo":
+		if c.Bool("dry-run") { // say what it would restore; change nothing
+			what, restores, err := timeline.UndoPreview(cacheDir(p))
+			if err != nil {
+				return nil, Errf(ExitInvalid, "nothing-to-undo", "`cutroom edit history` lists edits", "%v", err)
+			}
+			text := "would undo: " + what
+			if restores != nil {
+				text += fmt.Sprintf("\ntimeline would be: %s, %s", plural(len(restores.Segments), "segment"), secs(restores.Duration()))
+			} else {
+				text += "\nthere would be no timeline (the undone edit created it)"
+			}
+			text += "\nDRY RUN: nothing was changed; `cutroom edit undo` does it (and `cutroom edit redo` puts it back)"
+			return &Result{Text: text, Data: map[string]any{"would_undo": what}, Next: []string{"cutroom edit undo"}}, nil
+		}
 		what, err := timeline.Undo(p.Dir, cacheDir(p))
 		if err != nil {
 			return nil, Errf(ExitInvalid, "nothing-to-undo", "`cutroom edit history` lists edits", "%v", err)
@@ -232,6 +248,22 @@ func runEdit(c *Ctx) (*Result, error) {
 			text += "\nno timeline now (the undone edit created it)"
 		}
 		return &Result{Text: text, Data: map[string]string{"undone": what}, Next: []string{"cutroom timeline"}}, nil
+	case "redo":
+		if c.Bool("dry-run") {
+			if r := timeline.Redoable(cacheDir(p)); len(r) > 0 {
+				return &Result{Text: "would redo: " + r[0] + "\nDRY RUN: nothing was changed", Next: []string{"cutroom edit redo"}}, nil
+			}
+			return nil, Errf(ExitInvalid, "nothing-to-redo", "redo puts back what `cutroom edit undo` took away, until the next edit", "nothing to redo")
+		}
+		what, err := timeline.Redo(p.Dir, cacheDir(p))
+		if err != nil {
+			return nil, Errf(ExitInvalid, "nothing-to-redo", "redo puts back what `cutroom edit undo` took away, until the next edit", "%v", err)
+		}
+		text := "redid: " + what
+		if tl, err := timeline.Load(p.Dir); err == nil {
+			text += fmt.Sprintf("\ntimeline: %d segments, %s", len(tl.Segments), secs(tl.Duration()))
+		}
+		return &Result{Text: text, Data: map[string]string{"redone": what}, Next: []string{"cutroom timeline"}}, nil
 	case "history":
 		h := timeline.History(cacheDir(p))
 		var lines []string
@@ -240,6 +272,9 @@ func runEdit(c *Ctx) (*Result, error) {
 		}
 		if len(lines) == 0 {
 			lines = []string{"no edits yet"}
+		}
+		if r := timeline.Redoable(cacheDir(p)); len(r) > 0 {
+			lines = append(lines, fmt.Sprintf("undone (`cutroom edit redo` puts back, next first): %s", strings.Join(r, "; ")))
 		}
 		return &Result{Text: strings.Join(lines, "\n"), Data: h}, nil
 	}

@@ -2,6 +2,21 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 43 · 2026-11-24 · r10: undo --dry-run previews, edit redo, moved warnings, listen's default
+Did: (1) bug: `edit undo --dry-run` ran the undo (the undo branch returned before the dry-run
+handling). Now it previews: "would undo: <op>; timeline would be: N segments, D" and changes
+nothing. (2) `edit redo`: undo keeps the undone edit (op + the timeline it produced) on a redo
+stack in .cutroom/history/redo; redo checkpoints and restores it; any new edit clears the stack;
+`edit history` lists what redo would put back. (3) `--accept/--apply code@time` with a time an edit
+has since moved: the only warning of that code is taken; with several, the error lists their
+current times. (4) `listen` with no source uses the edit's main video, else the longest video —
+it picked the 2.6 s pickup (first alphabetically) and failed "range too short". (5) guide: burned
+caption groups are 1–3 words, a 4th only to avoid a weak ending (matches the output); the topic
+index points at a ~1,500-word reading path (workflow, edit, verify) instead of `--all` (~4,000).
+Tests: TestUndoPreviewRedo; e2e 233/233 (+5).
+Next: golden criteria 1 (export OTIO/EDL; SPEC rows), 2 (lesson guard audit), 4 (T3 reviewer),
+5 (README/install/doctor).
+
 ### 42 · 2026-11-24 · eval round 10: sonnet 12/12, haiku 12/12 — golden criterion 3 met
 Did: all 12 tasks × 2 models; every run PASS. Second consecutive 100% sonnet round (9, 10): golden
 criterion 3 holds. Asides: agents with pause-only briefs accepted the new warning with a reason,

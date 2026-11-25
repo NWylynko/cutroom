@@ -417,8 +417,16 @@ type HistoryEntry struct {
 
 func histDir(cache string) string { return filepath.Join(cache, "history") }
 
-// Checkpoint stores the current timeline file before an edit, labelled with the op.
+func redoDir(cache string) string { return filepath.Join(cache, "history", "redo") }
+
+// Checkpoint stores the current timeline file before an edit, labelled with the op. A new edit
+// clears what could be redone.
 func Checkpoint(dir, cache, op string) error {
+	os.RemoveAll(redoDir(cache))
+	return checkpoint(dir, cache, op)
+}
+
+func checkpoint(dir, cache, op string) error {
 	b, err := os.ReadFile(Path(dir))
 	if errors.Is(err, os.ErrNotExist) {
 		b = []byte("null")
@@ -457,9 +465,8 @@ func History(cache string) []HistoryEntry {
 	return out
 }
 
-// Undo restores the timeline from before the last edit. Returns the undone op.
-func Undo(dir, cache string) (string, error) {
-	ents, _ := os.ReadDir(histDir(cache))
+func lastEntry(dir string) (string, bool) {
+	ents, _ := os.ReadDir(dir)
 	var names []string
 	for _, e := range ents {
 		if strings.HasSuffix(e.Name(), ".json") {
@@ -467,27 +474,125 @@ func Undo(dir, cache string) (string, error) {
 		}
 	}
 	if len(names) == 0 {
-		return "", errors.New("nothing to undo")
+		return "", false
 	}
 	sort.Strings(names)
-	last := filepath.Join(histDir(cache), names[len(names)-1])
-	b, err := os.ReadFile(last)
+	return filepath.Join(dir, names[len(names)-1]), true
+}
+
+type histRec struct {
+	Op     string          `json:"op"`
+	Time   string          `json:"time,omitempty"`
+	Before json.RawMessage `json:"before,omitempty"`
+	After  json.RawMessage `json:"after,omitempty"`
+}
+
+func readRec(p string) (histRec, error) {
+	var r histRec
+	b, err := os.ReadFile(p)
+	if err != nil {
+		return r, err
+	}
+	return r, json.Unmarshal(b, &r)
+}
+
+// UndoPreview says what undo would do, without doing it: the op it undoes and the timeline it
+// would restore (nil when the undone edit created the timeline).
+func UndoPreview(cache string) (op string, restores *Timeline, err error) {
+	last, ok := lastEntry(histDir(cache))
+	if !ok {
+		return "", nil, errors.New("nothing to undo")
+	}
+	r, err := readRec(last)
+	if err != nil {
+		return "", nil, err
+	}
+	if string(r.Before) == "null" {
+		return r.Op, nil, nil
+	}
+	t := &Timeline{}
+	if err := json.Unmarshal(r.Before, t); err != nil {
+		return r.Op, nil, err
+	}
+	t.init()
+	t.Recompute()
+	return r.Op, t, nil
+}
+
+// Undo restores the timeline from before the last edit, and keeps the edit for Redo. Returns the
+// undone op.
+func Undo(dir, cache string) (string, error) {
+	last, ok := lastEntry(histDir(cache))
+	if !ok {
+		return "", errors.New("nothing to undo")
+	}
+	r, err := readRec(last)
 	if err != nil {
 		return "", err
 	}
-	var rec struct {
-		Op     string          `json:"op"`
-		Before json.RawMessage `json:"before"`
-	}
-	if err := json.Unmarshal(b, &rec); err != nil {
+	cur, err := os.ReadFile(Path(dir))
+	if errors.Is(err, os.ErrNotExist) {
+		cur = []byte("null")
+	} else if err != nil {
 		return "", err
 	}
-	if string(rec.Before) == "null" {
+	if string(r.Before) == "null" {
 		os.Remove(Path(dir))
-	} else if err := os.WriteFile(Path(dir), rec.Before, 0o644); err != nil {
+	} else if err := os.WriteFile(Path(dir), r.Before, 0o644); err != nil {
 		return "", err
 	}
-	return rec.Op, os.Remove(last)
+	// keep it for redo: the op and the timeline it had produced
+	os.MkdirAll(redoDir(cache), 0o755)
+	n := 1
+	if p, ok := lastEntry(redoDir(cache)); ok {
+		fmt.Sscanf(filepath.Base(p), "%05d.json", &n)
+		n++
+	}
+	out, _ := json.Marshal(histRec{Op: r.Op, After: json.RawMessage(cur)})
+	if err := os.WriteFile(filepath.Join(redoDir(cache), fmt.Sprintf("%05d.json", n)), out, 0o644); err != nil {
+		return "", err
+	}
+	return r.Op, os.Remove(last)
+}
+
+// Redo puts back the last undone edit. Returns its op.
+func Redo(dir, cache string) (string, error) {
+	last, ok := lastEntry(redoDir(cache))
+	if !ok {
+		return "", errors.New("nothing to redo")
+	}
+	r, err := readRec(last)
+	if err != nil {
+		return "", err
+	}
+	if err := checkpoint(dir, cache, r.Op); err != nil {
+		return "", err
+	}
+	if string(r.After) == "null" {
+		os.Remove(Path(dir))
+	} else if err := os.WriteFile(Path(dir), r.After, 0o644); err != nil {
+		return "", err
+	}
+	return r.Op, os.Remove(last)
+}
+
+// Redoable lists the undone edits that redo would put back, next first.
+func Redoable(cache string) []string {
+	ents, _ := os.ReadDir(redoDir(cache))
+	var names []string
+	for _, e := range ents {
+		if strings.HasSuffix(e.Name(), ".json") {
+			names = append(names, e.Name())
+		}
+	}
+	sort.Sort(sort.Reverse(sort.StringSlice(names)))
+	var ops []string
+	for _, n := range names {
+		if r, err := readRec(filepath.Join(redoDir(cache), n)); err == nil {
+			ops = append(ops, r.Op)
+		}
+	}
+	return ops
 }
 
 func rate(s string) float64 {
