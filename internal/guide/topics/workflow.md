@@ -16,7 +16,9 @@ every render (current or stale, checked or not) and the next step.
 4. **Edit the timeline.** `cutroom edit tighten`, then `cutroom edit cut --from "…" --to "…"` for
    retakes and asides; check `cutroom timeline` and `cutroom timeline --joins`. See `cutroom guide edit`.
    Text cards and images: `cutroom overlay add …` (see `cutroom guide overlays`).
-5. **Render.** `cutroom render --preview`, check it, then `cutroom render`. See `cutroom guide render`.
+5. **Render.** `cutroom render --preview`, check it, then `cutroom render`. The output size is the
+   source's (4K sources render 4K, slowly): for 1080p run `cutroom edit frame --size 1080p` first,
+   or `cutroom render --size 1080p`. See `cutroom guide render`.
 6. **Verify.** `cutroom check` measures the render: frames, sync, every word, stray sounds,
    loudness. Fix what fails, re-render, check again. See `cutroom guide verify`.
 7. **Captions** (optional): `cutroom captions` writes out/captions.srt. See `cutroom guide captions`.

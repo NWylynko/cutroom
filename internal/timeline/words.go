@@ -51,12 +51,13 @@ func (t *Timeline) CutWords(src string, words []speech.Word, i, j int, reason st
 		}
 	}
 	var a, b float64
+	var contStart, contEnd bool
 	if prev >= 0 && segI != nil && words[prev].End >= segI.In {
 		p := words[prev]
 		a = clamp(p.End+t.PadAfter, p.End, wi.Start)
 		if wi.Start-p.End < 0.12 {
 			a = t.Boundary(src, p.End, wi.Start, a)
-			r.Warnings = append(r.Warnings, fmt.Sprintf("the cut starts inside continuous speech right after %q — `cutroom listen` the join", p.Text))
+			contStart = true
 		}
 	} else if segI != nil {
 		a = segI.In
@@ -68,7 +69,7 @@ func (t *Timeline) CutWords(src string, words []speech.Word, i, j int, reason st
 		b = clamp(n.Start-t.PadBefore, wj.End, n.Start)
 		if n.Start-wj.End < 0.12 {
 			b = t.Boundary(src, wj.End, n.Start, b)
-			r.Warnings = append(r.Warnings, fmt.Sprintf("the cut ends inside continuous speech right before %q — `cutroom listen` the join", n.Text))
+			contEnd = true
 		}
 	} else if segJ != nil {
 		b = segJ.Out
@@ -76,6 +77,21 @@ func (t *Timeline) CutWords(src string, words []speech.Word, i, j int, reason st
 		b = wj.End + t.PadAfter
 	}
 	r.From, r.To = t.Snap(a), t.Snap(b)
+	// a cut moved to the quiet point can take a word the recogniser squeezed in next to the quoted
+	// ones (T3 r51: "to create" also took a 40 ms "up"): say what it really removes
+	for prev >= 0 && prev < i && (words[prev].Start+words[prev].End)/2 >= r.From {
+		i, prev = prev, prevKept(t, src, words, prev)
+	}
+	for next >= 0 && (words[next].Start+words[next].End)/2 < r.To {
+		j, next = next, nextKept(t, src, words, next)
+	}
+	r.Text = speech.Text(words, i, j)
+	if contStart && prev >= 0 {
+		r.Warnings = append(r.Warnings, fmt.Sprintf("the cut starts inside continuous speech right after %q — `cutroom listen` the join", words[prev].Text))
+	}
+	if contEnd && next >= 0 {
+		r.Warnings = append(r.Warnings, fmt.Sprintf("the cut ends inside continuous speech right before %q — `cutroom listen` the join", words[next].Text))
+	}
 	r.Removed = t.Cut(src, a, b, reason, true)
 	if prev >= 0 {
 		r.Before = speech.Text(words, max(0, prev-3), prev)
@@ -816,4 +832,22 @@ func (t *Timeline) soundEdgeIssues(durations map[string]float64, tr Transcripts)
 		}
 	}
 	return is
+}
+
+func prevKept(t *Timeline, src string, words []speech.Word, k int) int {
+	for k--; k >= 0; k-- {
+		if t.keptWord(src, words[k]) {
+			return k
+		}
+	}
+	return -1
+}
+
+func nextKept(t *Timeline, src string, words []speech.Word, k int) int {
+	for k++; k < len(words); k++ {
+		if t.keptWord(src, words[k]) {
+			return k
+		}
+	}
+	return -1
 }

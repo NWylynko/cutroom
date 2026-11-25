@@ -73,6 +73,7 @@ cutroom edit undo >/dev/null
 expect "cut retake by words"        'removed\): "The first thing you need is, UM, the first thing\."' cutroom edit cut --from "The first thing you need is, um" --to "the first thing."
 expect "join pause is real"         'join: .*\(pause 0\.[23][0-9] s\)'  cutroom edit cut --from "By the way" --to "keyboard." --dry-run
 expect "--to = --from cuts that phrase" 'removed\): "By the way' cutroom edit cut --from "By the way" --to "By the way" --dry-run
+expect "--from with a time → range"  'is a time, not words' cutroom edit cut --from 12.5 --to 14 --dry-run
 expect "dry run not saved"          'my cat'                          cutroom timeline
 expect "cut aside"                  'removed\): "By the way'           cutroom edit cut --from "By the way" --to "keyboard."
 expect "clean timeline"             'no problems found'               cutroom timeline

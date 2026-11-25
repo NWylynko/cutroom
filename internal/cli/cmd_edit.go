@@ -672,6 +672,11 @@ func (e *editEnv) applySpan(c *Ctx, op string) ([]string, string, error) {
 	if n != 1 {
 		return nil, "", Errf(ExitUsage, "bad-span", `give exactly one of: a range (`+"`cutroom edit "+op+" 6.3-9.2`"+`), --text "words", or --from "words" --to "words"`, "%s needs one span", op)
 	}
+	for _, f := range []string{"from", "to", "text"} {
+		if v := c.Str(f); v != "" && isTimeish(v) {
+			return nil, "", Errf(ExitUsage, "bad-span", fmt.Sprintf("--%s takes quoted words; for times give a range: `cutroom edit %s %s-<end>`", f, op, v), "--%s %q is a time, not words", f, v)
+		}
+	}
 	if hasFrom && !(c.Has("from") && c.Has("to")) {
 		return nil, "", Errf(ExitUsage, "bad-span", `use both --from "first words" and --to "last words" (or --text for a short phrase)`, "--from and --to go together")
 	}
@@ -850,7 +855,15 @@ func (e *editEnv) resolve(c *Ctx, phrase string, keptOnly bool, afterSrc string,
 			opts = append(opts, fmt.Sprintf("  %d: %s %s  …%s [%s] %s…", k+1, h.src, clock(h.m.Start),
 				speech.Text(w, max(0, h.m.First-4), h.m.First-1), h.m.Text, speech.Text(w, h.m.Last+1, min(len(w)-1, h.m.Last+4))))
 		}
-		return "", 0, 0, Errf(ExitUsage, "ambiguous-text", "add --occurrence N or --near <time>, or quote more words",
+		fix := "add --occurrence N or --near <time>, or quote more words"
+		srcs := map[string]bool{}
+		for _, h := range hits {
+			srcs[h.src] = true
+		}
+		if len(srcs) > 1 && c.Str("source") == "" {
+			fix = "the words are in more than one source: add --source <id> (" + strings.Join(e.p.IDs(), ", ") + "), or --occurrence N / --near <time>"
+		}
+		return "", 0, 0, Errf(ExitUsage, "ambiguous-text", fix,
 			"%q occurs %d times:\n%s", phrase, len(hits), strings.Join(opts, "\n"))
 	}
 	return hits[0].src, hits[0].m.First, hits[0].m.Last, nil
@@ -1349,4 +1362,18 @@ func (e *editEnv) soundFrom() string {
 		return strings.SplitN(parts[0], " (", 2)[0]
 	}
 	return strings.Join(parts, ", ")
+}
+
+// isTimeish: "12.5", "0:12.5", "1:02:03" — a time given where words were expected.
+func isTimeish(v string) bool {
+	v = strings.TrimSpace(v)
+	if v == "" {
+		return false
+	}
+	for _, r := range v {
+		if !(r >= '0' && r <= '9' || r == '.' || r == ':') {
+			return false
+		}
+	}
+	return strings.ContainsAny(v, "0123456789")
 }
