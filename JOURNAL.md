@@ -2,6 +2,26 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 48 · 2026-11-25 · T3 round r48: 3/4 accepted; fixes for the reject and the friction
+Did: T3 on the four real-footage excerpts (deploy, started, mps, sec): a sonnet editor per excerpt
+(cutroom guide only) wrote EDIT.md + FRICTION.md, then a reviewer (strongest model) judged each edit
+from transcripts, joins, contact sheets and `listen`. Verdicts: deploy ACCEPT, mps ACCEPT, sec ACCEPT,
+started REJECT — it ended on "Those are much better.", the first words of a sentence the recording
+cuts off, contradicting the line before it; its last segment also ran past the source's end
+(out-of-source error, yet check passed). Fixes (commit 01eae8c): segments are clamped to where the
+source's picture and sound really end (INFO trimmed-to-source-end); new WARN ends-mid-speech /
+starts-mid-speech when the edit opens or closes within 0.3 s of the recording's edge with speech
+there, with a runnable fix (end on the sentence before); the L14 short-chunk error now says re-running
+won't help and how to find the real end; out-of-source fix no longer says `undo`; output size is
+shown at render time and settable with `render --size 1080p` (two of four editors rendered 4K by
+accident, 157–267 s); recorder transcripts mapped onto the camera clock for word anchors.
+Measured: make check green; e2e 253/253. Re-opening r48/started: `timeline` now raises
+ends-mid-speech on exactly the reviewer's complaint with the fix the reviewer proposed; the accepted
+retake-kept stays accepted and is not listed as "still open" after later edits.
+Surprises: a camera file's container duration can exceed its last video frame by ~0.1 s (started:
+60.10 vs 60.009) — durations must come from the streams, not the container.
+Next: T3 round r49 on all four excerpts with fresh editors, then final eval round 11.
+
 ### 47 · 2026-11-24 · Golden 5: README, go install + doctor on a clean PATH, a fresh agent follows it
 Did: README.md (what cutroom is, install, doctor, quick start, deciding warnings, agents → `cutroom
 guide`, development, license). `GOBIN=… go install ./cmd/cutroom` with PATH=/usr/bin:/bin and an empty
