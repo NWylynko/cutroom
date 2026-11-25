@@ -50,6 +50,9 @@ func runExport(c *Ctx) (*Result, error) {
 		}
 	}
 	name := c.Str("name")
+	if name == "" || strings.ContainsAny(name, `/\`) || strings.HasPrefix(name, ".") {
+		return nil, Errf(ExitUsage, "bad-name", "a plain file name, e.g. --name final_cut (files go in out/)", "--name %q is not a plain file name", name)
+	}
 	outDir := filepath.Join(e.p.Dir, "out")
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
 		return nil, err

@@ -9,7 +9,6 @@ Move done items to the journal, not here.
 ## NOW
 - export: validate the .otio with the real OpenTimelineIO reader once it can be installed (it isn't
   a declared dependency); today's guarantee is the round-trip tests.
-- Golden 2: audit LESSONS.md — every INVARIANT has a TestLxx guard, every DETECT a fixture.
 - Golden 4: T3 reviewer pass on the local real-footage excerpts.
 - Golden 5: README + install; `go install` + `doctor` on a clean PATH; a fresh agent follows the README.
 - Golden 1 is code-complete (iteration 45); confirm with an eval round that exercises the new
@@ -18,7 +17,6 @@ Move done items to the journal, not here.
 - Fixtures on Linux: espeak-ng path untested.
 
 ## M1 — perceive
-- `inspect`: multi-take concat pts offset (first frame pts ≠ 0) fixture. [L04]
 
 ## NEXT
 - [friction r6] Orientation/HDR evidence: "print one explicit 'upright: yes' line backed by an image

@@ -423,5 +423,13 @@ expect "pin by words"                 'pinned both edges of s[0-9]+'      cutroo
 expect "move by words"                'moved s[0-9]+ to the start'         cutroom edit move --text "Then install" --after start
 popd >/dev/null
 
+
+# L04: a source whose picture starts 43 ms after its sound renders in sync
+L="$W/late"; mkdir -p "$L"; cp $FIX/talk-late.mp4 "$L/"; pushd "$L" >/dev/null
+expect "late first frame reported"    'sound track starts 0\.043 s before the picture'  cutroom inspect talk-late.mp4
+cutroom init talk-late.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+cutroom render --preview >/dev/null 2>&1
+expect "late picture renders in sync" '^PASS'                              cutroom check out/preview.mp4
+popd >/dev/null
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

@@ -72,3 +72,15 @@ func TestAudioOnlySource(t *testing.T) {
 		t.Fatalf("%+v", f)
 	}
 }
+
+// L04: a source whose first frame isn't at 0 (a joined take that lost its edit list) is reported:
+// the picture's start and the offset to the sound, with no fix needed (cuts follow timestamps).
+func TestL04_DetectLateFirstFrame(t *testing.T) {
+	f, err := Probe(fixture(t, "talk-late.mp4"), Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if math.Abs(f.Video.Start-0.043) > 0.001 || math.Abs(f.AVOffset+0.043) > 0.001 || !warned(f, "av-offset") {
+		t.Fatalf("video start %.4f, av offset %.4f, warnings %v", f.Video.Start, f.AVOffset, f.Warnings)
+	}
+}

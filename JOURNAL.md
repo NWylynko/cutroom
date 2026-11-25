@@ -2,6 +2,28 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 46 · 2026-11-24 · Golden 2: every INVARIANT guarded, every DETECT on a fixture (two real fixes)
+Did: audited docs/LESSONS.md — 26 INVARIANT/DETECT rows, 15 had no TestLxx. Wrote guards:
+render L10 (a chunk holds only overlays visible in it), L11 (key = content), L12 (encoded from
+sources, joined by stream copy — joinArgs extracted), L13, L14 (a short chunk errors and isn't
+cached), L15 (one input per overlay, no split), L17, L27+L43 (−30 dB tone → −16 LUFS ±1, TP ≤ −1,
+48 kHz out), L47 (no drawtext/subtitles; cards drawn in Go); verify L03 (frame reads across the VFR
+fixture's dropped frames keep the gap); speech L46 (brown-noise rumble louder than the voice: the
+pause is still found); cli L55 (a whole session with the source folder read-only leaves it
+byte-for-byte unchanged; render over a source → would-overwrite-source; export --name with a path
+refused); media L04 on a new fixture talk-late.mp4 (picture 43 ms after sound) + e2e that it
+renders and checks PASS. L09 was already in the L07/L08 test (renamed).
+Fixed (the guards found them): L13 — Plan could end a chunk inside an overlay's fade, so the next
+chunk drew it without the fade (a seam); now a boundary inside a fade waits for the next segment.
+L17 — the audio cache key included chunk keys (which hash overlays/zoom/framing), so any picture
+change re-ran the audio; it now hashes the range's audio pieces only. writeTarget guards render and
+captions outputs against overwriting a source (L55).
+Measured: each new guard fails on a mutation of the code it protects (L13, L17, L03, L46 checked by
+hand). make check green; e2e 253/253; grader selftest 26/26.
+Surprises: a 10 Hz sine is a bad rumble for an envelope test — a 10 ms frame catches it near zero
+and the floor reads low with or without the high-pass; brown noise behaves like the real thing.
+Next: Golden 5 (README, go install, doctor on a clean PATH), then an eval round on the new commands.
+
 ### 45 · 2026-11-24 · the last SPEC rows: split, pin, retakes, output transcript, look --overlays, validate
 Did: `edit split <time> | --text "words"` (Timeline.Split: the segment holding that source time
 becomes two at a frame, nothing removed, both new edges pinned; with --text it splits in the pause

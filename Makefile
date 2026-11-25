@@ -9,7 +9,7 @@ check:
 	go test ./...
 
 fixtures:
-	test -f evals/work/fixtures/terminal.json || go run ./evals/fixtures -out evals/work/fixtures
+	test -f evals/work/fixtures/talk-late.json || go run ./evals/fixtures -out evals/work/fixtures
 
 e2e: build fixtures
 	PATH="$(CURDIR)/bin:$$PATH" evals/e2e.sh

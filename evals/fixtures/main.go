@@ -167,6 +167,17 @@ func main() {
 		"-c:a", "aac", "-b:a", "128k", path("terminal.mp4"))
 	writeManifest(m)
 
+	// 8. talk-late.mp4 — the picture starts 43 ms after the sound, as when camera takes are joined by
+	// stream copy and the HEVC reorder delay's edit list is dropped. In sync by timestamps. [L04]
+	m = base
+	m.Name, m.File = "talk-late", "talk-late.mp4"
+	m.Description = "Same talk; the first video frame's pts is 0.043 s, audio starts at 0 (in sync by timestamps)."
+	m.Facts = map[string]any{"fps": "30", "video_start": 0.043, "audio_start": 0.0}
+	ff("-itsoffset", "0.043", "-i", path("talk.mp4"), "-i", path("talk.mp4"), "-map", "0:v", "-map", "1:a",
+		"-c", "copy", "-video_track_timescale", "90000", path("talk-late.mp4"))
+	m.Facts["video_start_stream"] = probeStart(path("talk-late.mp4"), "v:0")
+	writeManifest(m)
+
 	os.RemoveAll(tmp)
 	fmt.Println("fixtures in", out)
 }

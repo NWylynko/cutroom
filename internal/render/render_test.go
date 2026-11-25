@@ -19,7 +19,7 @@ func srcs() map[string]Source {
 }
 
 // L07: never -itsoffset on a seeked read. L08: restamp after concat. L09: early seek + spare frames.
-func TestL07_L08_ChunkCommandInvariants(t *testing.T) {
+func TestL07_L08_L09_ChunkCommandInvariants(t *testing.T) {
 	tl := timeline.New("30", 1280, 720, "cam", "cam", 0.0637, 30)
 	tl.Cut("cam", 6, 9, "x", true)
 	c := Plan(tl, srcs(), Options{Target: 45, CacheDir: t.TempDir()})[0]

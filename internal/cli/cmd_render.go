@@ -115,6 +115,9 @@ func runRender(c *Ctx) (*Result, error) {
 	if !strings.HasSuffix(strings.ToLower(out), ".mp4") {
 		return nil, Errf(ExitUsage, "bad-output", "name the output something.mp4", "output must be .mp4")
 	}
+	if err := writeTarget(e.p, out); err != nil {
+		return nil, err
+	}
 	res, err := render.Render(e.tl, srcs, out, o)
 	if err != nil {
 		return nil, Errf(ExitExternal, "render-failed", "re-run the same command (finished chunks are kept); if it repeats, `cutroom timeline` and `cutroom doctor`", "%v", err)

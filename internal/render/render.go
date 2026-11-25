@@ -189,7 +189,8 @@ func Plan(tl *timeline.Timeline, srcs map[string]Source, o Options) []Chunk {
 		f := tl.Frames(g)
 		cur.Frames += f
 		acc += float64(f) / tl.Rate()
-		if acc >= o.Target {
+		end := int64(math.Round(cur.Start*tl.Rate())) + cur.Frames
+		if acc >= o.Target && !inFade(o.Overlays, end, tl.Rate()) {
 			flush()
 		}
 	}
@@ -339,6 +340,29 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 	return args
 }
 
+// inFade says whether output frame boundary b falls inside an overlay's fade in or fade out, where a
+// chunk boundary would show as a seam (L13).
+func inFade(ps []Placement, b int64, fps float64) bool {
+	for _, p := range ps {
+		if p.Fade <= 0 {
+			continue
+		}
+		nf := int64(math.Max(1, math.Round(p.Fade*fps)))
+		pa, pb := int64(math.Round(p.Start*fps)), int64(math.Round(p.End*fps))
+		if (b > pa && b < pa+nf) || (b > pb-nf && b < pb) {
+			return true
+		}
+	}
+	return false
+}
+
+// joinArgs joins encoded chunks by stream copy and muxes the finished audio — no second encode (L12).
+func joinArgs(list, audio, out string) []string {
+	return []string{"-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", list,
+		"-i", audio, "-map", "0:v", "-map", "1:a", "-c", "copy", "-movflags", "+faststart", out}
+}
+
+// renderChunk encodes one chunk from the sources and checks its frame count (L14).
 func renderChunk(tl *timeline.Timeline, srcs map[string]Source, c *Chunk, preview bool) error {
 	if err := ensureDir(c.file); err != nil {
 		return err
@@ -492,8 +516,7 @@ func Render(tl *timeline.Timeline, srcs map[string]Source, out string, o Options
 		return nil, err
 	}
 	tmp := out + ".tmp.mp4"
-	if _, err := deps.Run("ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", list,
-		"-i", res.Audio.File, "-map", "0:v", "-map", "1:a", "-c", "copy", "-movflags", "+faststart", tmp); err != nil {
+	if _, err := deps.Run("ffmpeg", joinArgs(list, res.Audio.File, tmp)...); err != nil {
 		return nil, err
 	}
 	if err := os.Rename(tmp, out); err != nil {
@@ -629,8 +652,9 @@ func renderAudio(tl, vtl *timeline.Timeline, srcs map[string]Source, chunks, all
 			return AudioResult{}, err
 		}
 	}
-	// gain is measured on the whole timeline even for a range render (L17)
-	rkey := hash([]any{key, chunkKeys(chunks)})
+	// gain is measured on the whole timeline even for a range render; the key holds audio inputs only,
+	// so a picture change (overlay, zoom, framing) never re-runs the audio (L17)
+	rkey := hash([]any{key, pieces(vtl, chunks)})
 	m4a := filepath.Join(cache, "audio-"+rkey+".m4a")
 	meta := m4a + ".json"
 	if b, err := os.ReadFile(meta); err == nil {
@@ -660,14 +684,6 @@ func renderAudio(tl, vtl *timeline.Timeline, srcs map[string]Source, chunks, all
 	b, _ := json.Marshal(r)
 	os.WriteFile(meta, b, 0o644)
 	return r, nil
-}
-
-func chunkKeys(cs []Chunk) []string {
-	var k []string
-	for _, c := range cs {
-		k = append(k, c.Key)
-	}
-	return k
 }
 
 // --- timing history → estimates (SPEC rule 8) ------------------------------------------------

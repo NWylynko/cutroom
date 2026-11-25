@@ -94,6 +94,9 @@ func runCaptions(c *Ctx) (*Result, error) {
 	} else {
 		cues = captions.Build(ws, o, dur)
 		out = captionPath(c, e)
+		if err := writeTarget(e.p, out); err != nil {
+			return nil, err
+		}
 		minD, maxD := 1e9, 0.0
 		for _, q := range cues {
 			minD, maxD = min(minD, q.End-q.Start), max(maxD, q.End-q.Start)
@@ -192,6 +195,9 @@ func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64, o caption
 	}
 	// the sidecar file comes with it: burned captions for muted viewers, the file for YouTube
 	side := captionPath(c, e)
+	if err := writeTarget(e.p, side); err != nil {
+		return nil, err
+	}
 	cues := captions.Build(ws, o, dur)
 	if c.Bool("dry-run") {
 		lines = append(lines, fmt.Sprintf("would also write %s (%d cues; the subtitle file for YouTube — name it with --output)", relToCwd(side), len(cues)))

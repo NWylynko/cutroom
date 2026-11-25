@@ -415,6 +415,21 @@ func takeFileArg(c *Ctx) {
 
 // userPath resolves a path given on the command line the way any CLI does: relative to the shell's
 // current folder (also when --project points elsewhere).
+// writeTarget refuses to write over a source file (L55: sources are read-only); renders, captions
+// and exports go anywhere else the user names.
+func writeTarget(p *project.Project, out string) error {
+	st, err := os.Stat(out)
+	if err != nil {
+		return nil // nothing there yet
+	}
+	for id, s := range p.Sources {
+		if ss, err := os.Stat(p.Abs(s)); err == nil && os.SameFile(st, ss) {
+			return Errf(ExitUsage, "would-overwrite-source", "write to out/ (the default) or another new path", "%s is source %q; cutroom never writes over a source", relToCwd(out), id)
+		}
+	}
+	return nil
+}
+
 func userPath(p string) string {
 	if filepath.IsAbs(p) {
 		return p
