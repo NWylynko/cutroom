@@ -3,6 +3,7 @@ package timeline
 import (
 	"fmt"
 	"math"
+	"strings"
 )
 
 // Overlay is a text card, image or clip shown over the edit. It is anchored to a moment of a source
@@ -94,6 +95,15 @@ func (t *Timeline) overlayIssues() []Issue {
 			is = append(is, Issue{Level: "warn", Code: "overlay-orphaned", Message: fmt.Sprintf("overlay %s (%s %q) won't show: %s", o.ID, o.Kind, ovName(o), why),
 				Fix: fmt.Sprintf("anchor it to words the edit keeps: `cutroom overlay rm %s` then `cutroom overlay add …`", o.ID)})
 			continue
+		}
+		if o.Kind == "text" {
+			words := len(strings.Fields(o.Text + " " + o.Sub))
+			need := math.Max(1.5, 0.9+0.3*float64(words)) // reading time
+			if b-a < need-0.05 {
+				is = append(is, Issue{Level: "warn", Code: "overlay-short", At: round6(a),
+					Message: fmt.Sprintf("overlay %s %q is on screen %.2f s: too short to read %d word(s) (needs ~%.1f s: 0.9 s + 0.3 s a word)", o.ID, o.Text, b-a, words, need),
+					Fix:     fmt.Sprintf("`cutroom overlay set %s --duration %.1f`", o.ID, need)})
+			}
 		}
 		for _, w := range ws {
 			if w.o.Kind == "captions" || o.Kind == "captions" {

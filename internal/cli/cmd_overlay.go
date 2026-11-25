@@ -13,7 +13,7 @@ import (
 func init() {
 	Register(&Command{
 		Name:     "overlay",
-		Args:     "<add|list|rm> [text|image] [content|id]",
+		Args:     "<add|set|list|rm> [text|image|id] [content]",
 		MinArgs:  1,
 		MaxArgs:  3,
 		Category: "edit",
@@ -23,6 +23,7 @@ words). It is anchored to the words, not to a time, so later cuts never move it 
   overlay add text "Install Linux" --at "Then install" --duration 3
   overlay add text "Nick Wylie" --sub "Builds personal software" --at "Hi, today" --to "home server."
   overlay add image logo.png --at "Finally" --duration 4 --layout corner --size 0.2
+  overlay set o2 --duration 2.2   change one in place (also --to, --at, --layout, --text, --sub, --fade, --size)
   overlay list                    every overlay with its output time, or why it won't show
   overlay rm o2
 Layouts: lower-third (default for text), title, top, corner (default for images), center.
@@ -39,9 +40,16 @@ Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rend
 			{Name: "near", Kind: "string", Help: "Pick the --at match closest to this source time when words repeat"},
 			{Name: "occurrence", Kind: "int", Help: "Pick the Nth --at match when words repeat"},
 			{Name: "source", Kind: "string", Help: "Only match words in this source"},
+			{Name: "text", Kind: "string", Help: "set: new text for a text overlay"},
 			{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"},
 		},
 		Subs: map[string]Sub{
+			"set": {Usage: `  overlay set o2 --duration 2.2        keep it on screen 2.2 s
+  overlay set o2 --to "on it."         … or until these words end
+  overlay set o2 --at "Then install"   move it to other words
+  overlay set o2 --layout top --text "Step 2" --sub "…" --fade 0
+Changes only what you give; the id stays.`,
+				Flags: []string{"duration", "to", "at", "near", "occurrence", "source", "layout", "text", "sub", "fade", "size", "dry-run"}},
 			"add": {Usage: `  overlay add text "Install Linux" --at "Then install" [--duration 3 | --to "on it."] [--sub "…"]
   overlay add image logo.png --at "Finally" --duration 4 [--layout corner] [--size 0.2]`,
 				Flags: []string{"at", "to", "duration", "sub", "layout", "size", "fade", "near", "occurrence", "source", "dry-run"}},
@@ -55,10 +63,10 @@ Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rend
 func runOverlay(c *Ctx) (*Result, error) {
 	op := c.Args[0]
 	switch op {
-	case "add", "list", "rm":
+	case "add", "set", "list", "rm":
 	default:
-		fix := "ops: add, list, rm"
-		if s := suggest(op, []string{"add", "list", "rm"}); s != "" {
+		fix := "ops: add, set, list, rm"
+		if s := suggest(op, []string{"add", "set", "list", "rm"}); s != "" {
 			fix = fmt.Sprintf("did you mean `cutroom overlay %s`? (%s)", s, fix)
 		}
 		return nil, Errf(ExitUsage, "unknown-op", fix, "no overlay op %q", op)
@@ -84,6 +92,35 @@ func runOverlay(c *Ctx) (*Result, error) {
 		e.tl.Overlays = append(e.tl.Overlays[:k], e.tl.Overlays[k+1:]...)
 		label = "overlay rm " + o.ID
 		lines = append(lines, fmt.Sprintf("removed %s (%s %q)", o.ID, o.Kind, ovDesc(o)))
+	case "set":
+		if len(c.Args) != 2 {
+			return nil, Errf(ExitUsage, "bad-args", "`cutroom overlay set o1 --duration 3` (ids: `cutroom overlay list`)", "overlay set takes one id")
+		}
+		k := e.tl.OverlayByID(c.Args[1])
+		if k < 0 {
+			return nil, Errf(ExitUsage, "no-overlay", "`cutroom overlay list` shows the ids", "no overlay %q", c.Args[1])
+		}
+		before := e.tl.Overlays[k]
+		o, changed, err := e.overlaySet(c, before)
+		if err != nil {
+			return nil, err
+		}
+		if len(changed) == 0 {
+			return nil, Errf(ExitUsage, "nothing-to-set", "give what to change, e.g. --duration 3, --to \"…\", --at \"…\", --layout top, --text \"…\"", "overlay set %s: nothing to change", o.ID)
+		}
+		e.tl.Overlays[k] = o
+		a0, b0, ok0, _ := e.tl.Window(before)
+		a, b, ok, why := e.tl.Window(o)
+		if !ok {
+			return nil, Errf(ExitUsage, "overlay-not-shown", "anchor it to words the edit keeps (`cutroom timeline` shows them)", "the overlay wouldn't show: %s", why)
+		}
+		was := "not shown"
+		if ok0 {
+			was = fmt.Sprintf("%s–%s", clock(a0), clock(b0))
+		}
+		label = fmt.Sprintf("overlay set %s %s", o.ID, strings.Join(changed, " "))
+		lines = append(lines, fmt.Sprintf("set %s: %s; now output %s–%s (%s), was %s", o.ID, strings.Join(changed, ", "), clock(a), clock(b), secs(b-a), was))
+		lines = append(lines, fmt.Sprintf("look at it: `cutroom look --output %.2f`", (a+b)/2))
 	case "add":
 		o, err := e.overlayFromFlags(c)
 		if err != nil {
@@ -232,4 +269,84 @@ func overlayList(e *editEnv) *Result {
 		lines = append(lines, fmt.Sprintf("%-4s %-5s %q%s  %s  %s  on %q (%s %s)", o.ID, o.Kind, ovDesc(o), sub, o.Layout, when, o.AnchorText, o.Source, clock(o.At)))
 	}
 	return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"overlays": rows}, Next: []string{"cutroom look --output <time>   (see one)"}}
+}
+
+// overlaySet applies the given flags to an overlay; changed lists what changed.
+func (e *editEnv) overlaySet(c *Ctx, o timeline.Overlay) (timeline.Overlay, []string, error) {
+	var ch []string
+	if o.Kind == "captions" {
+		return o, nil, Errf(ExitUsage, "bad-kind", "burned-in captions follow the cut; remove them with `cutroom overlay rm "+o.ID+"`", "captions have nothing to set")
+	}
+	if c.Has("at") {
+		src, i, _, err := e.resolve(c, c.Str("at"), true, "", 0, 0)
+		if err != nil {
+			return o, nil, err
+		}
+		o.Source, o.At, o.AnchorText = src, e.tr[src].Words[i].Start, c.Str("at")
+		if o.Until > 0 && o.Until <= o.At { // its old end is before the new start
+			o.Until, o.Duration = 0, 4
+		}
+		ch = append(ch, fmt.Sprintf("--at %q", o.AnchorText))
+	}
+	if c.Has("to") && c.Has("duration") {
+		return o, nil, Errf(ExitUsage, "bad-flags", "give --to or --duration, not both", "--to and --duration both given")
+	}
+	if c.Has("to") {
+		ws := e.tr[o.Source].Words
+		first := 0
+		for first < len(ws) && ws[first].Start < o.At {
+			first++
+		}
+		_, _, j, err := e.resolve(c, c.Str("to"), true, o.Source, first, first)
+		if err != nil {
+			return o, nil, err
+		}
+		o.Until, o.Duration = ws[j].End, 0
+		ch = append(ch, fmt.Sprintf("--to %q", c.Str("to")))
+	}
+	if c.Has("duration") {
+		if c.Float("duration") <= 0 {
+			return o, nil, Errf(ExitUsage, "bad-flag-value", "--duration in seconds, e.g. 3", "--duration must be > 0")
+		}
+		o.Duration, o.Until = c.Float("duration"), 0
+		ch = append(ch, fmt.Sprintf("--duration %g", o.Duration))
+	}
+	if c.Has("layout") {
+		if !contains(render.Layouts, c.Str("layout")) {
+			return o, nil, Errf(ExitUsage, "bad-layout", "layouts: "+strings.Join(render.Layouts, ", "), "no layout %q", c.Str("layout"))
+		}
+		o.Layout = c.Str("layout")
+		ch = append(ch, "--layout "+o.Layout)
+	}
+	if c.Has("text") || c.Has("sub") {
+		if o.Kind != "text" {
+			return o, nil, Errf(ExitUsage, "bad-flag", "--text/--sub are for text overlays", "%s is an image overlay", o.ID)
+		}
+		if c.Has("text") {
+			if strings.TrimSpace(c.Str("text")) == "" {
+				return o, nil, Errf(ExitUsage, "bad-flag-value", `--text "new text"`, "empty --text")
+			}
+			o.Text = c.Str("text")
+			ch = append(ch, fmt.Sprintf("--text %q", o.Text))
+		}
+		if c.Has("sub") {
+			o.Sub = c.Str("sub")
+			ch = append(ch, fmt.Sprintf("--sub %q", o.Sub))
+		}
+	}
+	if c.Has("fade") {
+		if f := c.Float("fade"); f < 0 || f > 2 {
+			return o, nil, Errf(ExitUsage, "bad-flag-value", "--fade 0–2 seconds", "--fade %.2f out of range", f)
+		}
+		o.Fade = c.Float("fade")
+		ch = append(ch, fmt.Sprintf("--fade %g", o.Fade))
+	}
+	if c.Has("size") {
+		if o.Kind != "image" {
+			return o, nil, Errf(ExitUsage, "bad-flag", "--size is for image overlays", "%s is a text overlay", o.ID)
+		}
+		o.Size = c.Float("size")
+		ch = append(ch, fmt.Sprintf("--size %g", o.Size))
+	}
+	return o, ch, nil
 }

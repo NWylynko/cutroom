@@ -36,5 +36,6 @@ automatically. Never point the timeline at another source's audio without `sync`
    cuts the edit's version and puts the pickup's in its place.
 3. `cutroom edit move s5 --after s2` reorders. `cutroom timeline` shows which take each segment is from.
 4. Sound: each take uses its own sound unless a recorder is mapped to it —
-   `cutroom sync mic2 --to take2` then `cutroom edit audio mic2 --for take2`. `timeline` warns
-   (`audio-mixed`) where takes use different microphones; `check` measures sync per segment.
+   `cutroom sync mic2 --to take2` then `cutroom edit audio mic2 --for take2`. `timeline` compares the
+   takes' speech level and room tone (`audio-mixed`): a note when they match, a warning with the
+   numbers when they differ; `check` measures sync per segment.

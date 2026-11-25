@@ -2,6 +2,25 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 34 · 2026-11-24 · r7 friction: burn + SRT in one call, `overlay set`, audio-mixed numbers, VFR stated
+Did: (1) `captions --burn` also writes the subtitle file (`--output` names it); guide shows
+`--output out/final.srt`. (2) `overlay set <id>` changes --duration/--to/--at/--layout/--text/--sub/
+--fade/--size in place, id kept (sub-help; refuses captions with the rm fix). New `overlay-short`
+warning: a text card needs ~0.9 s + 0.3 s a word (≥ 1.5 s) — the titles-haiku card ended with its
+words at 1.43 s. (3) `audio-mixed` quotes both sources' speech level and room tone (from the
+transcripts): matching (< 3 dB / < 4 dB) → an INFO note with a `listen --output` across the join, not
+an open warning; speech and room moved together → "same setup, N dB louder/quieter"; their gap
+changed → "different room or microphone". Info notes aren't carried as "still open". (4) render says
+"variable frame rate (11 gaps): placed by timestamp on a constant 30 fps grid … can't drift" and
+"sound starts +0.064 s from its picture; kept as recorded"; check's sync line names the offset.
+(5) init points at `cutroom sync <id>` for an audio-only source. (6) check's words line names the
+model and says when it is the transcript's own ("confirms the cut, not the recogniser").
+Tests: TestAudioMixedClassifies; e2e 180/180 (+11).
+Surprises: the e2e take made 12 dB quieter was first called "different room or microphone":
+gain moves speech and room tone together, so the speech-to-room gap, not the room level, is what
+tells a different setup apart. The test caught it before any agent saw it.
+Next: apply/accept a suggested fix (`timeline --apply`/`--accept`), then clip overlays (M4).
+
 ### 33 · 2026-11-24 · eval round 7: sonnet 10/10, haiku 10/10 (titles + social tasks)
 Did: grader learned cards, burned captions and SRT (tile-robust frame matching only for tasks with
 overlays, so earlier tasks keep their tuned thresholds; ground-truth line times from the fixture

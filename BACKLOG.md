@@ -7,13 +7,6 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- [friction r7] `captions --burn` also writes the sidecar SRT; guide shows `--output out/final.srt`
-  (social-sonnet: "assumed `captions` could write to out/final.srt directly").
-- [friction r7] `overlay set <id> --duration/--to/--at/--layout/--text` (titles-haiku).
-- [friction r7] audio-mixed: report speech level and room tone of each source so it's decidable (pickup ×2).
-- [friction r7] render/check state VFR → constant fps and the audio offset applied (vfr ×2, r5, r6).
-- [friction r7] init: next step `cutroom sync <id>` when an audio-only source is added (recorder-sonnet).
-- [friction r7] check words line names the re-transcription model (tighten-haiku).
 - M4: clip overlays (a video inset / B-roll over the speaker), anchored like text/image overlays.
 - Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
   T3 review, doctor/README.

@@ -808,7 +808,9 @@ func splitIssues(now, before []timeline.Issue) (fresh, open []timeline.Issue) {
 	}
 	for _, x := range now {
 		if seen[x.Code+"|"+x.Message] && x.Level != "error" {
-			open = append(open, x)
+			if x.Level != "info" { // notes are said once, not carried as open problems
+				open = append(open, x)
+			}
 		} else {
 			fresh = append(fresh, x)
 		}

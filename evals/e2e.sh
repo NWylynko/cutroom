@@ -23,6 +23,7 @@ expect "json envelope"        '"ok": true'                          cutroom guid
 P="$W/proj"; mkdir -p "$P"; cp $FIX/talk.mp4 $FIX/talk-vfr.mp4 $FIX/talk-rot.mov $FIX/recorder.wav "$P/"
 pushd "$P" >/dev/null
 expect "init adds sources"     'talk-vfr .*\(added\)'               cutroom init talk.mp4 talk-vfr.mp4 talk-rot.mov --source mic=recorder.wav
+expect "init: recorder needs sync" 'mic is audio only .*cutroom sync mic' cutroom init talk.mp4
 expect "init is idempotent"    '^project updated'                    cutroom init talk.mp4
 expect "no duplicate source"   '^\{|"unchanged": \[\s*$|"talk"'     cutroom init talk.mp4 --json
 n=$(python3 -c 'import json;print(len(json.load(open("cutroom.json"))["sources"]))')
@@ -198,7 +199,9 @@ cutroom init talk.mp4 take2.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/
 expect "first edit uses longest take" 'created timeline from talk .*longest video' cutroom edit tighten
 cutroom edit cut --from "Then install" --to "on it." >/dev/null
 expect "add another take's line"   'added take2 .* after s3: "Then install Linux on it\."' cutroom edit add --source take2 --text "Then install Linux on it." --after s3
-expect "mixed sound warned"        'WARN\[audio-mixed\].*take2 use take2.s own sound' cutroom timeline
+expect "same-mic take is a note"    'INFO\[audio-mixed\].*take2 use take2.s own sound next to talk; they match' cutroom timeline
+ffmpeg -v error -y -i take2.mp4 -c:v copy -af volume=-12dB -c:a aac take3.mp4; cutroom init take3.mp4 >/dev/null; cutroom transcribe take3 --passes 1 >/dev/null
+expect "quieter take warned"       'WARN\[audio-mixed\].*take3 .*differ \(speech .* dB.*louder/quieter' cutroom edit add --source take3 --text "Then install Linux on it." --dry-run
 expect "recorder for wrong take refused" 'not been aligned to take2' cutroom edit audio talk --for take2 --dry-run
 expect "move a segment"            'moved s1 to the end'               cutroom edit move s1 --before end
 cutroom edit undo >/dev/null
@@ -259,6 +262,10 @@ expect "overlay add image"         'added o2: image "logo.png", corner'  cutroom
 expect "overlay add needs --at"    'overlay add needs --at'              cutroom overlay add text "x"
 expect "overlay bad layout"        'layouts: lower-third'                cutroom overlay add text "x" --at "Finally" --layout side
 expect "overlay list"              'o2 +image "logo.png" +corner'        cutroom overlay list
+expect "overlay set duration"      'set o1: --duration 1; now output .*\(1\.000 s\)' cutroom overlay set o1 --duration 1
+expect "short card warned"         'overlay-short.*o1.*overlay set o1 --duration' cutroom timeline
+expect "overlay set keeps the id"  'set o1: --duration 2\.5'               cutroom overlay set o1 --duration 2.5
+expect "overlay set nothing"       'nothing to change'                   cutroom overlay set o1
 expect "overlay sub-help"          'cutroom overlay add'                 sh -c 'cutroom overlay add --help | head -1'
 t1=$(cutroom overlay list --json | python3 -c 'import json,sys;o=json.load(sys.stdin)["result"]["overlays"][0];print(round((o["output_start"]+o["output_end"])/2,2))')
 expect "look --output shows overlay" 'with overlay\(s\) o1 drawn as rendered' cutroom look --output $t1
@@ -274,7 +281,8 @@ python3 -c 'import json;m=json.load(open("out/final.mp4.cutroom.json"));m["outpu
 expect "check: overlay missing"    'FAIL overlay +o1 .*not visible'      cutroom check out/bare.mp4
 cutroom edit undo >/dev/null; cutroom edit undo >/dev/null
 expect "overlay back after undo"   'o1 +text'                            cutroom overlay list
-expect "captions --burn"           'burning in captions: [0-9]+ groups of 1–3 words' cutroom captions --burn
+expect "captions --burn"           'burning in captions: [0-9]+ groups of 1–3 words' cutroom captions --burn --output out/final.srt
+expect "burn wrote the srt too"    '^1$'                                 sh -c 'head -1 out/final.srt' 
 expect "captions --burn twice"     'already on \(o3\)'                 cutroom captions --burn
 expect "look shows captions"       'o3 \(burned-in captions, \+cc\)'    cutroom look --output 1
 expect "render with captions"      '^wrote out/final\.mp4'               cutroom render
@@ -286,6 +294,15 @@ cutroom edit undo >/dev/null
 cutroom edit cut --text "Then install Linux on it." >/dev/null
 expect "orphaned overlay warned"   'overlay-orphaned.*o1'                cutroom timeline
 expect "list says not shown"       'NOT SHOWN: its anchor "Then install"' cutroom overlay list
+popd >/dev/null
+
+# VFR source with an audio offset: render and check say how both were handled
+V="$W/vfr"; mkdir -p "$V"; cp $FIX/talk-vfr.mp4 "$V/"; pushd "$V" >/dev/null
+cutroom init talk-vfr.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+expect "render states VFR handled"  'variable frame rate \(11 gaps\).*constant 30 fps grid' cutroom render --preview
+expect "render states audio offset" "talk-vfr's sound starts \+0\.064 s from its picture" cutroom render --preview
+expect "check states the offset"    'audio starts at \+0\.064 s, and that offset is in the render' cutroom check out/preview.mp4
+expect "check names the model"      're-transcribed with base\.en, the model the transcript used' cutroom check out/preview.mp4
 popd >/dev/null
 
 echo "e2e: $pass passed, $fail failed"

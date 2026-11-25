@@ -28,8 +28,10 @@ Examples:
   cutroom captions --vtt                 out/captions.vtt (WebVTT)
   cutroom captions --check out/captions.srt   check a file (e.g. after editing it by hand) against the timeline
   cutroom captions --dry-run             show the cues and checks, write nothing
+  cutroom captions --output out/final.srt   name the file
   cutroom captions --burn                burn short captions into the video (1–3 words at a time,
-                                         as on shorts); they follow the cut. Remove: cutroom overlay rm <id>`,
+                                         as on shorts) and write the subtitle file too, in one call;
+                                         they follow the cut. Remove: cutroom overlay rm <id>`,
 		Flags: []Flag{
 			{Name: "vtt", Kind: "bool", Help: "WebVTT instead of SRT"},
 			{Name: "output", Kind: "string", Help: "Path (default out/captions.srt or .vtt)"},
@@ -73,7 +75,7 @@ func runCaptions(c *Ctx) (*Result, error) {
 	}
 	dur := e.tl.Duration()
 	if c.Bool("burn") {
-		return burnCaptions(c, e, ws, dur)
+		return burnCaptions(c, e, ws, dur, o)
 	}
 	var lines []string
 	var cues []captions.Cue
@@ -93,16 +95,7 @@ func runCaptions(c *Ctx) (*Result, error) {
 		lines = append(lines, fmt.Sprintf("%s: %d cues, checked against the timeline (%d words, %s)", relToCwd(out), len(cues), len(ws), clock(dur)))
 	} else {
 		cues = captions.Build(ws, o, dur)
-		ext := ".srt"
-		if c.Bool("vtt") {
-			ext = ".vtt"
-		}
-		out = filepath.Join(e.p.Dir, "out", "captions"+ext)
-		if c.Has("output") {
-			if out = c.Str("output"); !filepath.IsAbs(out) {
-				out = filepath.Join(e.p.Dir, out)
-			}
-		}
+		out = captionPath(c, e)
 		minD, maxD := 1e9, 0.0
 		for _, q := range cues {
 			minD, maxD = min(minD, q.End-q.Start), max(maxD, q.End-q.Start)
@@ -152,14 +145,9 @@ func runCaptions(c *Ctx) (*Result, error) {
 		return &Result{Text: strings.Join(lines, "\n"), Data: data, Next: next}, nil
 	}
 	if !c.Bool("dry-run") {
-		if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		if err := writeCaptionFile(e, out, cues, len(ws)); err != nil {
 			return nil, err
 		}
-		if err := os.WriteFile(out, []byte(captions.Format(cues, strings.HasSuffix(strings.ToLower(out), ".vtt"))), 0o644); err != nil {
-			return nil, err
-		}
-		b, _ := json.MarshalIndent(captionsMeta{TimelineHash: render.CutHash(e.tl), Cues: len(cues), Words: len(ws), WrittenAt: time.Now().UTC().Truncate(time.Second)}, "", "  ")
-		os.WriteFile(captionsMetaPath(out), b, 0o644)
 	}
 	next := []string{"cutroom status"}
 	if c.Bool("dry-run") {
@@ -168,7 +156,7 @@ func runCaptions(c *Ctx) (*Result, error) {
 	return &Result{Text: strings.Join(lines, "\n"), Data: data, Next: next}, nil
 }
 
-func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64) (*Result, error) {
+func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64, o captions.Options) (*Result, error) {
 	gs := captions.Groups(ws, captions.DefaultGroups, dur)
 	var lines []string
 	verb := "burning in"
@@ -204,10 +192,49 @@ func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64) (*Result,
 		}
 		lines = append(lines, fmt.Sprintf("added %s: burned-in captions over the whole edit (lower thirds move up above them); remove with `cutroom overlay rm %s`", id, id))
 	}
+	// the sidecar file comes with it: burned captions for muted viewers, the file for YouTube
+	side := captionPath(c, e)
+	cues := captions.Build(ws, o, dur)
+	if c.Bool("dry-run") {
+		lines = append(lines, fmt.Sprintf("would also write %s (%d cues; the subtitle file for YouTube — name it with --output)", relToCwd(side), len(cues)))
+	} else {
+		if err := writeCaptionFile(e, side, cues, len(ws)); err != nil {
+			return nil, err
+		}
+		lines = append(lines, fmt.Sprintf("also wrote %s (%d cues; the subtitle file for YouTube — name it with --output, e.g. --output out/final.srt)", relToCwd(side), len(cues)))
+	}
 	mid := 0.0
 	if len(gs) > 0 {
 		mid = (gs[0].Start + gs[0].End) / 2
 	}
-	return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"groups": gs, "overlay": id},
+	return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"groups": gs, "overlay": id, "file": relToCwd(side)},
 		Next: []string{fmt.Sprintf("cutroom look --output %.2f   (see them)", mid), "cutroom render --preview"}}, nil
+}
+
+// writeCaptionFile writes cues as SRT (or VTT by extension) with the sidecar status reads.
+func writeCaptionFile(e *editEnv, out string, cues []captions.Cue, words int) error {
+	if err := os.MkdirAll(filepath.Dir(out), 0o755); err != nil {
+		return err
+	}
+	if err := os.WriteFile(out, []byte(captions.Format(cues, strings.HasSuffix(strings.ToLower(out), ".vtt"))), 0o644); err != nil {
+		return err
+	}
+	b, _ := json.MarshalIndent(captionsMeta{TimelineHash: render.CutHash(e.tl), Cues: len(cues), Words: words, WrittenAt: time.Now().UTC().Truncate(time.Second)}, "", "  ")
+	return os.WriteFile(captionsMetaPath(out), b, 0o644)
+}
+
+// captionPath: --output, else out/captions.srt (.vtt with --vtt).
+func captionPath(c *Ctx, e *editEnv) string {
+	if c.Has("output") {
+		if out := c.Str("output"); filepath.IsAbs(out) {
+			return out
+		} else {
+			return filepath.Join(e.p.Dir, out)
+		}
+	}
+	ext := ".srt"
+	if c.Bool("vtt") {
+		ext = ".vtt"
+	}
+	return filepath.Join(e.p.Dir, "out", "captions"+ext)
 }

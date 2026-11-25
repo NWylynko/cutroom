@@ -169,6 +169,12 @@ func runRender(c *Ctx) (*Result, error) {
 				lines = append(lines, fmt.Sprintf("  WARN picture: %s is HDR (%s) but this ffmpeg can't tone-map: the render looks washed out (`cutroom doctor`)", id, strings.ToUpper(f.Video.HDR)))
 			}
 		}
+		if f != nil && f.Video != nil && f.Video.VFR && used {
+			lines = append(lines, fmt.Sprintf("  picture: %s has a variable frame rate (%d gaps): each frame was placed by its timestamp on a constant %s fps grid, so sound and picture can't drift apart (L02)", id, f.Video.Gaps, strings.TrimSuffix(e.tl.FPS, "/1")))
+		}
+		if f != nil && f.Video != nil && f.Audio != nil && used && math.Abs(f.AVOffset) >= 0.005 {
+			lines = append(lines, fmt.Sprintf("  audio: %s's sound starts %+.3f s from its picture; kept as recorded, so lip sync is as the camera captured it", id, f.AVOffset))
+		}
 		if f != nil && f.Video != nil && f.Video.Rotation != 0 && used {
 			v := f.Video
 			lines = append(lines, fmt.Sprintf("  picture: %s's %d° display rotation is baked into the pixels; the file has no rotation metadata (upright in every player)", id, v.Rotation))

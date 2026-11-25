@@ -2,7 +2,7 @@
 # Captions
 
 `cutroom captions` writes the edit's words as a caption file in **output** time: `out/captions.srt`
-(`--vtt` for WebVTT). Upload it next to the video (YouTube, Vimeo) — it is not burned into the picture.
+(`--vtt` for WebVTT; `--output out/final.srt` to name it). Upload it next to the video (YouTube, Vimeo) — it is not burned into the picture.
 
 ```
 $ cutroom captions
@@ -39,7 +39,8 @@ when the file is stale).
 
 ## Burned-in captions (in the picture)
 
-`cutroom captions --burn` draws captions into the video itself, the short-form way: 1–3 words at a
+`cutroom captions --burn` draws captions into the video itself (and writes the subtitle file in the
+same call; `--output` names it), the short-form way: 1–3 words at a
 time (≤ 20 characters), never ending on a weak word, never leaving a lone short word (L48), white on a
 dark box low in the frame (on vertical video, above the platform's buttons). They are one overlay
 over the whole edit: the groups are made from the cut at render time, so they follow every re-cut.

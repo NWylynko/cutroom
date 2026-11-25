@@ -158,9 +158,7 @@ func (e *editEnv) audioIssues() []timeline.Issue {
 			continue
 		}
 		if own {
-			is = append(is, timeline.Issue{Level: "warn", Code: "audio-mixed", Segment: g.ID, At: g.OutStart,
-				Message: fmt.Sprintf("segments from %s use %s's own sound while the rest use %s; if they were recorded on different microphones the change will be audible", g.Source, g.Source, tl.Audio),
-				Fix:     fmt.Sprintf("same microphone (e.g. a pickup on the same camera): fine as it is. If %s has its own recorder: `cutroom sync <recorder> --to %s` then `cutroom edit audio <recorder> --for %s`", g.Source, g.Source, g.Source)})
+			is = append(is, e.mixedIssue(g, tl.Audio))
 			continue
 		}
 		if a == g.Source {
@@ -192,4 +190,33 @@ func renderSources(p *project.Project) map[string]render.Source {
 
 func (e *editEnv) validate() []timeline.Issue {
 	return append(e.audioIssues(), e.tl.Validate(e.dur, e.tr)...)
+}
+
+// mixedIssue: a take using its own sound next to another source's. Its speech level and room tone
+// (measured when transcribing) say whether the change will be heard: matching numbers make it a note.
+func (e *editEnv) mixedIssue(g timeline.Segment, main string) timeline.Issue {
+	is := timeline.Issue{Level: "warn", Code: "audio-mixed", Segment: g.ID, At: g.OutStart}
+	recorderFix := fmt.Sprintf("if %s has its own recorder: `cutroom sync <recorder> --to %s` then `cutroom edit audio <recorder> --for %s`", g.Source, g.Source, g.Source)
+	a, b := e.tr[g.Source], e.tr[main]
+	if a == nil || b == nil || a.SpeechDB == 0 || b.SpeechDB == 0 {
+		is.Message = fmt.Sprintf("segments from %s use %s's own sound while the rest use %s; if they were recorded on different microphones the change will be audible (transcribe both to compare their levels)", g.Source, g.Source, main)
+		is.Fix = "same microphone (e.g. a pickup on the same camera): fine as it is; " + recorderFix
+		return is
+	}
+	ds, dr := a.SpeechDB-b.SpeechDB, a.RoomTone-b.RoomTone
+	nums := fmt.Sprintf("speech %.1f vs %.1f dB, room tone %.1f vs %.1f dB", a.SpeechDB, b.SpeechDB, a.RoomTone, b.RoomTone)
+	if math.Abs(ds) < 3 && math.Abs(dr) < 4 {
+		is.Level = "info"
+		is.Message = fmt.Sprintf("segments from %s use %s's own sound next to %s; they match (%s %s / %s), so the change shouldn't be heard", g.Source, g.Source, main, nums, g.Source, main)
+		is.Fix = fmt.Sprintf("to be sure, listen across the join: `cutroom listen --output %.2f-%.2f`", math.Max(0, g.OutStart-1.5), g.OutStart+1.5)
+		return is
+	}
+	is.Message = fmt.Sprintf("segments from %s use %s's own sound next to %s, and they differ (%s %s / %s): the change will be audible", g.Source, g.Source, main, nums, g.Source, main)
+	switch {
+	case math.Abs(ds-dr) >= 4: // speech above the room changed: another microphone or room
+		is.Fix = fmt.Sprintf("different room or microphone (speech stands %.0f dB above its room here, %.0f dB in %s): listen across the join (`cutroom listen --output %.2f-%.2f`); %s", a.SpeechDB-a.RoomTone, b.SpeechDB-b.RoomTone, main, math.Max(0, g.OutStart-1.5), g.OutStart+1.5, recorderFix)
+	default: // same speech-to-room ratio: the same setup, recorded louder or quieter
+		is.Fix = fmt.Sprintf("same setup, %.1f dB louder/quieter (speech and room tone moved together): the render's loudness pass evens the whole edit, not each take; listen across the join (`cutroom listen --output %.2f-%.2f`); %s", math.Abs(ds), math.Max(0, g.OutStart-1.5), g.OutStart+1.5, recorderFix)
+	}
+	return is
 }

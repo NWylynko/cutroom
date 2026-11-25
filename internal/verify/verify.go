@@ -484,7 +484,11 @@ func syncCheck(rx []float64, get trackFor, m *render.Manifest, r *Report) {
 	}
 	it.Detail = fmt.Sprintf("%d of %d segments measured: the render's sound vs %s at the source moment its picture shows: median %+.0f ms, worst %+.0f ms (limit 45)", len(measured), len(m.Segments), ref, lags[len(lags)/2], worst)
 	if st == "pass" {
-		it.Detail += "; with picture ok, lip sync is as the source plays (its audio start offset included)"
+		off := ""
+		if src, ok := m.Sources[m.Audio]; ok && math.Abs(src.AudioStart) >= 0.005 && src.Sync == nil {
+			off = fmt.Sprintf(" — %s's audio starts at %+.3f s, and that offset is in the render", m.Audio, src.AudioStart)
+		}
+		it.Detail += "; with picture ok, lip sync is as the source plays (its audio start offset included" + off + ")"
 	}
 	r.add(it)
 }
@@ -627,6 +631,19 @@ func wordCheck(renderWav, tmp string, m *render.Manifest, o Options, r *Report) 
 	}
 	flush()
 	matched := int(dp[0][0])
+	// say which model listened, and whether it is the one the transcript used (a shared mishearing
+	// would pass unnoticed)
+	model := speech.ModelName(o.Model)
+	same := false
+	for _, g := range m.Segments {
+		if tr := o.Transcripts[g.Source]; tr != nil && tr.Model == model {
+			same = true
+		}
+	}
+	via := fmt.Sprintf(" (re-transcribed with %s)", model)
+	if same {
+		via = fmt.Sprintf(" (re-transcribed with %s, the model the transcript used: it confirms the cut, not the recogniser — a larger model via `cutroom transcribe --model` checks both)", model)
+	}
 	// a --range render starts/ends mid-speech: words at its own edges are heard in part or misheard
 	edgeNote := ""
 	if lo, hi, ok := rangeEdges(m); ok {
@@ -647,10 +664,10 @@ func wordCheck(renderWav, tmp string, m *render.Manifest, o Options, r *Report) 
 		if edgeNote != "" {
 			d = fmt.Sprintf("%d of %d expected words heard in order%s", matched, n, edgeNote)
 		}
-		r.add(Item{Check: "words", Status: "pass", Detail: d})
+		r.add(Item{Check: "words", Status: "pass", Detail: d + via})
 		return
 	}
-	r.add(Item{Check: "words", Status: "pass", Detail: fmt.Sprintf("%d of %d expected words heard in order; %d difference(s) listed below%s", matched, n, len(gaps), edgeNote)})
+	r.add(Item{Check: "words", Status: "pass", Detail: fmt.Sprintf("%d of %d expected words heard in order; %d difference(s) listed below%s%s", matched, n, len(gaps), edgeNote, via)})
 	for _, g := range gaps {
 		st := "warn"
 		var d string

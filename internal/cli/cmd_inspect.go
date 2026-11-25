@@ -195,6 +195,14 @@ func runInit(c *Ctx) (*Result, error) {
 	if len(todo) == 0 && !created {
 		lines = append(lines, "nothing changed on disk since the last inspect")
 	}
+	// an audio-only source (a separate recorder) can't be used until it is aligned to a video
+	for _, id := range p.IDs() {
+		s := p.Sources[id]
+		if s.Facts != nil && s.Facts.Video == nil && s.Facts.Audio != nil && s.Sync == nil && !contains(resyncs, id) {
+			lines = append(lines, fmt.Sprintf("%s is audio only (a separate recorder?): align it with `cutroom sync %s`, then use it with `cutroom edit audio %s`", id, id, id))
+			next = append([]string{"cutroom sync " + id}, next...)
+		}
+	}
 	for _, id := range resyncs {
 		lines = append(lines, fmt.Sprintf("WARN %s changed, so its alignment was reset: run `cutroom sync %s` again", id, id))
 		next = append([]string{"cutroom sync " + id}, next...)
