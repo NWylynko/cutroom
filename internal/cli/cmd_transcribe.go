@@ -221,15 +221,23 @@ func loadTranscript(p *project.Project, id string) (*speech.Transcript, error) {
 }
 
 // defaultTranscript picks the transcript `transcript` shows with no source named: the edit's main
-// video, else the longest source (a short pickup sorting first must not hide the main take).
+// video, else the longest video, else the longest source (a short pickup sorting first must not
+// hide the main take, and a recorder's clock must not stand in for the camera's).
 func defaultTranscript(p *project.Project, have []string) string {
 	if tl, err := timeline.Load(p.Dir); err == nil && slices.Contains(have, tl.Video) {
 		return tl.Video
 	}
+	// the longest video (a recorder's clock isn't the one edits use), else the longest source
 	best, bestD := have[0], -1.0
-	for _, id := range have {
-		if f := p.Sources[id].Facts; f != nil && f.Duration > bestD {
-			best, bestD = id, f.Duration
+	for _, video := range []bool{true, false} {
+		for _, id := range have {
+			f := p.Sources[id].Facts
+			if f != nil && (f.Video != nil) == video && f.Duration > bestD {
+				best, bestD = id, f.Duration
+			}
+		}
+		if bestD >= 0 {
+			return best
 		}
 	}
 	return best
@@ -262,6 +270,12 @@ func runTranscript(c *Ctx) (*Result, error) {
 		}
 	}
 	var t *speech.Transcript
+	if c.Has("file") && !c.Has("project") {
+		projectFromFile(c, c.Str("file"))
+		if p2, err := needProject(c.Dir); err == nil {
+			p = p2
+		}
+	}
 	if c.Has("file") {
 		if t, err = transcribeFile(p, c.Str("file")); err != nil {
 			return nil, err

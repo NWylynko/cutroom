@@ -463,6 +463,12 @@ func runEdit(c *Ctx) (*Result, error) {
 	lines = append(lines, fmt.Sprintf("timeline: %s, %s (was %s)", plural(len(e.tl.Segments), "segment"), secs(e.tl.Duration()), secs(before)))
 	fresh, open := splitIssues(issues, issuesBefore)
 	lines = append(lines, issueLines(fresh, 6)...)
+	for _, x := range fresh {
+		if x.Level == "warn" {
+			lines = append(lines, "decide each WARN: `cutroom timeline --apply <code>@<time>` runs its suggested edit; `--accept <code>@<time> --reason \"…\"` keeps it")
+			break
+		}
+	}
 	if len(open) > 0 {
 		var cs []string
 		for _, x := range open {

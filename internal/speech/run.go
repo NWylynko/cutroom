@@ -34,7 +34,21 @@ func Load(cacheDir, id string) (*Transcript, error) {
 		return nil, err
 	}
 	t := &Transcript{}
-	return t, json.Unmarshal(b, t)
+	if err := json.Unmarshal(b, t); err != nil {
+		return t, err
+	}
+	// asides are found from the words on load, so transcripts made before them get them too
+	for _, a := range Asides(t.Words) {
+		dup := false
+		for _, x := range t.Suspects {
+			dup = dup || (x.Kind == "aside" && x.Start == a.Start)
+		}
+		if !dup {
+			t.Suspects = append(t.Suspects, a)
+		}
+	}
+	sortSuspects(t.Suspects)
+	return t, nil
 }
 
 // Transcribe produces (or returns the cached) transcript of a source. cached reports a cache hit.

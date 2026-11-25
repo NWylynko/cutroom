@@ -14,6 +14,7 @@ import (
 	"github.com/cutroom/cutroom/internal/perceive"
 	"github.com/cutroom/cutroom/internal/project"
 	"github.com/cutroom/cutroom/internal/raster"
+	"github.com/cutroom/cutroom/internal/render"
 	"github.com/cutroom/cutroom/internal/speech"
 	"github.com/cutroom/cutroom/internal/timecode"
 )
@@ -152,6 +153,7 @@ func runLook(c *Ctx) (*Result, error) {
 	if err := fileArg(c); err != nil {
 		return nil, err
 	}
+	projectFromFile(c, c.Str("file"))
 	if c.Bool("cuts") || c.Bool("output") || c.Has("file") {
 		return lookEdit(c)
 	}
@@ -255,6 +257,7 @@ func runListen(c *Ctx) (*Result, error) {
 	if err := fileArg(c); err != nil {
 		return nil, err
 	}
+	projectFromFile(c, c.Str("file"))
 	if c.Bool("output") || c.Has("file") {
 		return listenFile(c)
 	}
@@ -421,4 +424,29 @@ func orDot(s string) string {
 		return "."
 	}
 	return s
+}
+
+// projectFromFile: when a command is given a render and no --project, work in the project that
+// made it (its manifest says), else the nearest folder above it holding a project. A short
+// rendered to ./out/short.mp4 thus finds shorts/<name>, not the folder it was written to.
+func projectFromFile(c *Ctx, path string) {
+	if c.Has("project") || path == "" {
+		return
+	}
+	abs := userPath(path)
+	if m, err := render.LoadManifest(abs); err == nil && m.Project != "" {
+		if _, err := os.Stat(filepath.Join(m.Project, project.File)); err == nil {
+			c.Dir = m.Project
+			return
+		}
+	}
+	for d := filepath.Dir(abs); ; d = filepath.Dir(d) {
+		if _, err := os.Stat(filepath.Join(d, project.File)); err == nil {
+			c.Dir = d
+			return
+		}
+		if filepath.Dir(d) == d {
+			return
+		}
+	}
 }

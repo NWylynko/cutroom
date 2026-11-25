@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/cutroom/cutroom/internal/captions"
 	"os"
 	"path/filepath"
 	"strings"
@@ -40,6 +41,9 @@ Default file: out/final.mp4 (else out/preview.mp4).`,
 }
 
 func runCheck(c *Ctx) (*Result, error) {
+	if len(c.Args) == 1 {
+		projectFromFile(c, c.Args[0])
+	}
 	e, err := loadEditEnv(c, false)
 	if err != nil {
 		return nil, err
@@ -78,6 +82,7 @@ func runCheck(c *Ctx) (*Result, error) {
 	if err != nil {
 		return nil, Errf(ExitExternal, "check-failed", "make sure the file plays; re-render if it was interrupted", "%v", err)
 	}
+	subtitleCheck(e, file, m, rep)
 	saveCheck(e.p.Dir, file, rep)
 	var lines []string
 	verdict := "PASS"
@@ -124,4 +129,58 @@ func rendersIn(dir string) []string {
 		}
 	}
 	return out
+}
+
+// subtitleCheck: a subtitle file delivered with the render (same name .srt/.vtt, or the project's
+// out/captions.*) is checked against the edit it was rendered from: words in order, timing inside
+// the video, reading limits, sentence seams.
+func subtitleCheck(e *editEnv, file string, m *render.Manifest, rep *verify.Report) {
+	if m.Partial || m.TimelineHash != render.TimelineHash(e.tl) {
+		return // the edit changed or it's a range: the words wouldn't line up
+	}
+	base := strings.TrimSuffix(file, filepath.Ext(file))
+	cands := []string{base + ".srt", base + ".vtt"}
+	cands = append(cands, captionFilesIn(filepath.Join(e.p.Dir, "out"))...)
+	seen := map[string]bool{}
+	ws, missing := captions.OutputWords(e.tl, e.tr)
+	if len(missing) > 0 || len(ws) == 0 {
+		return
+	}
+	for _, f := range cands {
+		if seen[f] {
+			continue
+		}
+		seen[f] = true
+		b, err := os.ReadFile(f)
+		if err != nil {
+			continue
+		}
+		cues, err := captions.Parse(string(b))
+		it := verify.Item{Check: "subtitles"}
+		if err != nil {
+			it.Status, it.Detail = "fail", fmt.Sprintf("%s: %v", relToCwd(f), err)
+			rep.Add(it)
+			continue
+		}
+		var bad []captions.Issue
+		for _, is := range captions.Check(cues, ws, captions.Default, m.Duration) {
+			if is.Status != "pass" && is.Check != "reading" {
+				bad = append(bad, is)
+			}
+		}
+		it.Status = "pass"
+		it.Detail = fmt.Sprintf("%s: %d cues match this edit (words in order, timing inside the video, sentence seams)", relToCwd(f), len(cues))
+		for _, is := range bad {
+			if is.Status == "fail" {
+				it.Status = "fail"
+			} else if it.Status == "pass" {
+				it.Status = "warn"
+			}
+		}
+		if len(bad) > 0 {
+			it.Detail = fmt.Sprintf("%s: %s", relToCwd(f), bad[0].Detail)
+			it.Fix = "`cutroom captions --output " + relToCwd(f) + "` writes it again from the edit"
+		}
+		rep.Add(it)
+	}
 }

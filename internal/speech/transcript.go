@@ -491,3 +491,44 @@ func round3(f float64) float64 { return math.Round(f*1000) / 1000 }
 func IsBreath(peakDB, speechDB, dur float64) bool {
 	return dur < 0.8 && peakDB < speechDB-12
 }
+
+// asideMarkers open a digression: a sentence that starts with one is probably off the topic.
+var asideMarkers = [][]string{{"by", "the", "way"}, {"anyway"}, {"side", "note"}, {"off", "topic"},
+	{"oh", "and"}, {"oops"}, {"sorry"}, {"hold", "on"}, {"random", "thought"}, {"fun", "fact"},
+	{"unrelated"}, {"speaking", "of"}, {"before", "i", "forget"}, {"just", "a", "quick", "note"}}
+
+// Asides flags sentences that open with a digression marker ("By the way, my cat…") as suspects of
+// kind "aside": probably off-topic, worth deciding about (cut it, or keep it on purpose).
+func Asides(words []Word) []Suspect {
+	var out []Suspect
+	for i := range words {
+		if i > 0 && !endsSentenceWord(words[i-1].Text) {
+			continue // only at the start of a sentence
+		}
+		for _, m := range asideMarkers {
+			if i+len(m) > len(words) {
+				continue
+			}
+			ok := true
+			for k, w := range m {
+				ok = ok && Norm(words[i+k].Text) == w
+			}
+			if !ok {
+				continue
+			}
+			j := i
+			for j < len(words)-1 && !endsSentenceWord(words[j].Text) {
+				j++
+			}
+			out = append(out, Suspect{Kind: "aside", Start: words[i].Start, End: words[j].End, Text: Text(words, i, j),
+				Detail: fmt.Sprintf("opens with %q: probably a digression — cut it if it is off-topic, or keep it", strings.Join(m, " "))})
+			break
+		}
+	}
+	return out
+}
+
+func endsSentenceWord(w string) bool {
+	w = strings.TrimRight(w, `"')`)
+	return strings.HasSuffix(w, ".") || strings.HasSuffix(w, "?") || strings.HasSuffix(w, "!")
+}

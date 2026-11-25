@@ -51,6 +51,12 @@ type Report struct {
 	Warnings int       `json:"warnings"`
 }
 
+// Add records a result measured outside this package (e.g. a subtitle file next to the render).
+func (r *Report) Add(it Item) {
+	r.add(it)
+	r.Pass = r.Fails == 0
+}
+
 func (r *Report) add(it Item) {
 	r.Items = append(r.Items, it)
 	switch it.Status {
@@ -101,7 +107,11 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 	if w != m.Width || h != m.Height || rot != 0 {
 		st = "fail"
 	}
-	r.add(Item{Check: "format", Status: st, Detail: fmt.Sprintf("%dx%d, display rotation %d°, colour %s", w, h, rot, orDash(cs))})
+	rotNote := "no rotation tag: upright in any player, including ones that ignore rotation"
+	if rot != 0 {
+		rotNote = fmt.Sprintf("a %d° rotation tag (players that ignore it show it sideways)", rot)
+	}
+	r.add(Item{Check: "format", Status: st, Detail: fmt.Sprintf("%dx%d, display rotation %d° (%s), colour %s", w, h, rot, rotNote, orDash(cs))})
 	if o.CurrentHash != "" && o.CurrentHash != m.TimelineHash {
 		r.add(Item{Check: "stale", Status: "warn", Detail: "the timeline has changed since this file was rendered", Fix: "`cutroom render` again, then check"})
 	}

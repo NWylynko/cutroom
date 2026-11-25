@@ -2,6 +2,24 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 41 · 2026-11-24 · r9 friction: renders find their project, asides flagged, subtitles in check
+Did: (1) the render manifest records its project; `look/listen/transcript --file` and `check <file>`
+without --project use it (else the nearest folder above the file with a project) — a short rendered
+to ./out/short.mp4 is checked against shorts/<name>. (2) bug: `look --file x a-b` with b at/after the
+file's end asked for a frame past it (frame-failed); ranges clamp to the last frame. (3) asides:
+`speech.Asides` flags sentences opening with a digression marker ("by the way", "anyway", "side
+note", "oops", …) as suspects (computed on load, so old transcripts get them); the timeline warns
+`aside-kept` with a ready cut (`--apply`-able) or `--accept`. Asked for since round 6; no false
+positives on the four T3 projects. (4) status: when the only full render is stale, the next step
+says "cutroom render (out/final.mp4 is stale …)". (5) `transcript` with no source and no edit yet
+shows the longest *video* (the recorder's clock isn't the edit's). (6) `check` verifies a subtitle
+file delivered with the render (same name .srt/.vtt, or out/captions.*) against the edit it was
+rendered from: words, timing, seams. (7) check's format line states the rotation tag; edits with
+fresh WARNs end with how to decide them.
+Tests: TestAsidesAtSentenceStarts; e2e 228/228 (+10; two older expectations updated for the new
+aside warning).
+Next: eval round 10 — the second clean sonnet round needed for golden criterion 3.
+
 ### 40 · 2026-11-24 · eval round 9: sonnet 12/12, haiku 12/12
 Did: all 12 tasks × 2 models, fresh agents; every run PASS on the independent grader, broll included
 (the round-8 colour fix holds: frames worst 0.2, cutaway 11/11). 2 cutroom errors in 24 runs, both

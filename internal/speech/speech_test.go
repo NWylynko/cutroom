@@ -225,3 +225,14 @@ func TestSentencesSplitTightEdits(t *testing.T) {
 		t.Fatalf("sentences: %+v", ps)
 	}
 }
+
+func TestAsidesAtSentenceStarts(t *testing.T) {
+	ws := []Word{{Text: "Install", Start: 0, End: 0.3}, {Text: "it.", Start: 0.3, End: 0.5},
+		{Text: "By", Start: 1, End: 1.1}, {Text: "the", Start: 1.1, End: 1.2}, {Text: "way,", Start: 1.2, End: 1.4},
+		{Text: "my", Start: 1.4, End: 1.5}, {Text: "cat.", Start: 1.5, End: 1.8},
+		{Text: "Go", Start: 2, End: 2.2}, {Text: "anyway.", Start: 2.2, End: 2.6}}
+	as := Asides(ws)
+	if len(as) != 1 || as[0].Start != 1 || as[0].End != 1.8 || as[0].Kind != "aside" {
+		t.Fatalf("asides: %+v (want only the sentence opening 'By the way')", as)
+	}
+}

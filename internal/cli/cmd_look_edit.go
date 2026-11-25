@@ -139,17 +139,22 @@ func lookEdit(c *Ctx) (*Result, error) {
 		}
 		var a, b float64
 		isRange := true
-		if len(c.Args) == 0 { // the whole file as a contact sheet
-			fx, err := media.Probe(f, media.Options{})
-			if err != nil || fx.Video == nil {
-				return nil, Errf(ExitUsage, "not-a-video", "give a video file", "%s has no picture", f)
-			}
-			a, b = 0, math.Max(0, fx.Duration-0.5/fps)
+		fx, err := media.Probe(f, media.Options{})
+		if err != nil || fx.Video == nil {
+			return nil, Errf(ExitUsage, "not-a-video", "give a video file", "%s has no picture", f)
+		}
+		last := math.Max(0, fx.Duration-1/fps) // the last frame's time (a range end at the file's end)
+		if len(c.Args) == 0 {                  // the whole file as a contact sheet
+			a, b = 0, last
 		} else {
 			a, b, isRange, err = timeOrRange(c.Args[0])
 			if err != nil {
 				return nil, err
 			}
+			if a > last {
+				return nil, Errf(ExitUsage, "out-of-range", fmt.Sprintf("%s is %.3f s long", relToCwd(f), fx.Duration), "%s is past the end of the file", clock(a))
+			}
+			b = math.Min(b, last)
 		}
 		if !isRange {
 			b = a

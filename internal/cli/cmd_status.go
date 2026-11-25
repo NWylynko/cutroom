@@ -321,7 +321,15 @@ func statusRenderNext(d statusData) []string {
 			preview = r
 		}
 	}
+	stale := ""
+	for _, r := range d.Renders {
+		if !r.Current && !r.Partial && !r.Preview {
+			stale = r.Path
+		}
+	}
 	switch {
+	case full == nil && preview == nil && stale != "":
+		return []string{"cutroom timeline --joins", fmt.Sprintf("cutroom render   (%s is stale: the edit changed after it was rendered)", stale)}
 	case full == nil && preview == nil:
 		return []string{"cutroom timeline --joins", "cutroom render --preview"}
 	case full == nil:

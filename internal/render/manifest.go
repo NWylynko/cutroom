@@ -14,6 +14,7 @@ import (
 type Manifest struct {
 	Version      int                `json:"version"`
 	Output       string             `json:"output"`
+	Project      string             `json:"project,omitempty"` // the project folder it was rendered from
 	Preview      bool               `json:"preview"`
 	FPS          string             `json:"fps"`
 	Width        int                `json:"width"`
@@ -95,7 +96,7 @@ func CutHash(tl *timeline.Timeline) string {
 
 // writeManifest records chunks (planned on vtl) as rendered from the edit tl.
 func writeManifest(tl, vtl *timeline.Timeline, srcs map[string]Source, chunks []Chunk, res *Result, o Options) error {
-	m := Manifest{Version: Version, Output: res.Output, Preview: o.Preview, FPS: tl.FPS, Width: res.Width, Height: res.Height,
+	m := Manifest{Version: Version, Output: res.Output, Project: o.ProjDir, Preview: o.Preview, FPS: tl.FPS, Width: res.Width, Height: res.Height,
 		Audio: tl.Audio, Sources: map[string]MSource{}, Loudness: o.Loudness, TruePeak: o.TruePeak, Chain: o.Chain,
 		Frames: res.Frames, Duration: res.Duration, RangeStart: res.RangeStart, Partial: o.Range[1] > 0, Overlays: res.Overlays,
 		Fill: tl.Fill, FillX: tl.FillX, FillY: tl.FillY,

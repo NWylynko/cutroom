@@ -246,7 +246,7 @@ dn=$(ffmpeg -i .cutroom/look/talk-hdr_12_500.png -i flipped.png -lavfi "[0:v]cro
 awk -v u="$up" -v d="$dn" 'BEGIN{exit !(u > d + 3)}' && ok "look: HDR source upright (psnr $up vs flipped $dn)" || bad "look: HDR source upright" "psnr upright $up, flipped $dn"
 cutroom edit cut 0-0.5 --source talk-hdr >/dev/null 2>&1 || true
 expect "render HDR: rotation baked"  'rotation is baked into the pixels' cutroom render
-expect "check HDR render: SDR, no rotation" 'format +1280x720, display rotation 0°, colour bt709' cutroom check
+expect "check HDR render: SDR, no rotation" 'format +1280x720, display rotation 0° \(no rotation tag.*colour bt709' cutroom check
 expect "check HDR render: picture"   'ok   picture'                      cutroom check
 expect "check HDR render: tone"      'ok   tone +HDR \(HLG\) source tone-mapped' cutroom check
 expect "render says HDR tone-mapped"  'is HDR \(HLG\): tone-mapped to SDR bt709' cutroom render --preview
@@ -312,12 +312,12 @@ expect "timeline says how to decide" 'decide each WARN: .*--apply.*--accept' cut
 expect "status names the apply"     'next: cutroom timeline --apply retake-kept@[0-9.]+ +\(runs: cutroom edit cut' cutroom status
 expect "accept needs a reason"      '--accept needs --reason'            cutroom timeline --accept retake-kept
 expect "unknown code suggests"      'did you mean retake-kept'           cutroom timeline --apply retake
-expect "accept a warning"           'accepted retake-kept .*0 still open' cutroom timeline --accept retake-kept --reason "both takes wanted"
+expect "accept a warning"           'accepted retake-kept .*[0-9]+ still open' cutroom timeline --accept retake-kept --reason "both takes wanted"
 expect "accepted is listed apart"   'accepted \(decided, not open\): retake-kept' cutroom timeline
 expect "accepted survives an edit"  'accepted \(decided, not open\): retake-kept' sh -c 'cutroom edit cut --from "By the way" --to "keyboard." >/dev/null; cutroom timeline'
 cutroom edit undo >/dev/null; cutroom edit undo >/dev/null
 expect "apply runs the fix"         'applying the retake-kept fix: cutroom edit cut .*cut talk 0:06\.200' sh -c 'cutroom timeline --apply retake-kept | tr "\n" " "'
-expect "after apply: no retake"     'no problems found'                  cutroom timeline
+expect "after apply: no retake"     '^none$'                             sh -c 'cutroom timeline | grep -c "WARN\[retake-kept" | grep -q "^0$" && echo none'
 popd >/dev/null
 
 # clip overlays (B-roll): full-frame cutaway and a corner inset from an HDR, rotated phone clip
@@ -363,6 +363,28 @@ expect "retake range = its cut"       'removes the earlier take, source 0:06\.20
 expect "look <source-id> <time>"      'frame 90 of talk at 0:03\.000'    cutroom look talk 3.0
 expect "look a render whole"          '12 frame\(s\) of out/short\.mp4 at 0:00\.000–'  cutroom look --file out/short.mp4 --project shorts/steps
 expect "render transcript by sentence" '^0:0[0-9.]+–0:0[0-9.]+  [Tt]hen install Linux on it' cutroom transcript --file out/short.mp4 --project shorts/steps
+popd >/dev/null
+
+# r9 friction: asides, a render's own project, the look range end, stale renders, subtitles in check
+A="$W/asides"; mkdir -p "$A"; cp $FIX/talk.mp4 $FIX/recorder.wav "$A/"; pushd "$A" >/dev/null
+cutroom init talk.mp4 --source mic=recorder.wav >/dev/null; cutroom transcribe --passes 1 >/dev/null
+expect "transcript defaults to video"  '^talk — '                          cutroom transcript
+expect "aside suspect"                 'aside +opens with "by the way"'   cutroom transcript talk --suspects
+expect "aside-kept warned"             'WARN\[aside-kept\].*cut it: `cutroom edit cut --from "By the way,"' sh -c 'cutroom edit tighten >/dev/null; cutroom timeline'
+expect "aside applied"                 'applying the aside-kept fix'       cutroom timeline --apply aside-kept
+expect "edit says how to decide"       'decide each WARN: `cutroom timeline --apply' sh -c 'cutroom edit reset >/dev/null; cutroom edit cut 1.9-2.9'
+cutroom edit reset >/dev/null
+cutroom edit tighten >/dev/null; cutroom timeline --apply aside-kept >/dev/null; cutroom timeline --apply retake-kept >/dev/null
+cutroom render >/dev/null 2>&1; cutroom captions --output out/final.srt >/dev/null
+expect "check verifies the subtitles"  'ok   subtitles +out/final\.srt: [0-9]+ cues match this edit' cutroom check
+printf '1\n00:00:00,000 --> 00:00:02,000\nBy the way, my cat\n' > out/final.srt
+expect "stale subtitles caught"        '(FAIL|WARN) subtitles +out/final\.srt'  cutroom check
+cutroom edit cut --text "Then install Linux on it." >/dev/null
+expect "status: render is stale"       'cutroom render +\(out/final\.mp4 is stale' cutroom status
+popd >/dev/null
+pushd "$S" >/dev/null
+expect "render's own project found"    '^PASS out/short\.mp4'               cutroom check out/short.mp4
+expect "look range to the file end"    'of out/short\.mp4 at 0:00\.000–'   sh -c 'cutroom look --file out/short.mp4 0-30 --count 4'
 popd >/dev/null
 
 echo "e2e: $pass passed, $fail failed"

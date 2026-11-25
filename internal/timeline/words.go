@@ -359,6 +359,19 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 			switch s.Kind {
 			case "repeat":
 				// grouped into retakes below
+			case "aside":
+				if !t.Kept(src, (s.Start+s.End)/2) {
+					continue
+				}
+				o, _ := t.ToOutput(src, s.Start+0.05)
+				ws := strings.Fields(s.Text)
+				from, to := strings.Join(ws[:min(3, len(ws))], " "), strings.Join(ws[max(0, len(ws)-2):], " ")
+				cmd := fmt.Sprintf("cutroom edit cut --from %q --to %q", from, to)
+				if len(tr) > 1 {
+					cmd += " --source " + src
+				}
+				add("warn", "aside-kept", nil, o, fmt.Sprintf("cut it: `%s`; or keep it on purpose: `cutroom timeline --accept aside-kept@%.2f --reason \"…\"`", cmd, o),
+					"%q (source %.2f–%.2f) %s", ellipsizeWords(s.Text, 12), s.Start, s.End, s.Detail)
 			case "sound":
 				if o, ok := t.ToOutput(src, (s.Start+s.End)/2); ok {
 					add("warn", "kept-sound", nil, o, fmt.Sprintf("`cutroom listen %.2f-%.2f`; cut it with `cutroom edit cut %.2f-%.2f` if unwanted", s.Start-0.5, s.End+0.5, s.Start, s.End),
@@ -577,4 +590,12 @@ func sentenceStart(ws []speech.Word, k int, kept func(int) bool) int {
 func mss(x float64) string {
 	ms := int64(math.Round(x * 1000))
 	return fmt.Sprintf("%d:%02d.%03d", ms/60000, ms/1000%60, ms%1000)
+}
+
+func ellipsizeWords(s string, n int) string {
+	f := strings.Fields(s)
+	if len(f) <= n {
+		return s
+	}
+	return strings.Join(f[:n], " ") + " …"
 }
