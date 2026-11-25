@@ -10,7 +10,8 @@ Move done items to the journal, not here.
 - export: validate the .otio with the real OpenTimelineIO reader once it can be installed (it isn't
   a declared dependency); today's guarantee is the round-trip tests.
 - Golden 4: T3 reviewer pass on the local real-footage excerpts.
-- Golden 5: README + install; `go install` + `doctor` on a clean PATH; a fresh agent follows the README.
+- Golden: final eval round 11 after T3 — all five criteria must hold in the same round (rounds 9–10
+  predate iterations 45–47). Rate friction low/medium/high in the round summary (criterion 3).
 - Golden 1 is code-complete (iteration 45); confirm with an eval round that exercises the new
   commands (split/pin/--retakes/--output/--overlays/validate) before calling it met.
 ## M0 — leftovers

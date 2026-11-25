@@ -2,6 +2,20 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 47 · 2026-11-24 · Golden 5: README, go install + doctor on a clean PATH, a fresh agent follows it
+Did: README.md (what cutroom is, install, doctor, quick start, deciding warnings, agents → `cutroom
+guide`, development, license). `GOBIN=… go install ./cmd/cutroom` with PATH=/usr/bin:/bin and an empty
+HOME: doctor lists each missing tool with its install command and the model download (exit 3); with
+the tools on PATH and CUTROOM_MODELS set: all ok (exit 0). Ran the quick start verbatim: every step
+exit 0, preview and final check PASS. A fresh sonnet agent (README only, fresh HOME/GOBIN): README
+WORKS — install, doctor, the whole quick start, check PASS twice, captions, status "done". Its gaps,
+fixed: how to decide each WARN (one at a time, code@time, apply vs accept), go install needs the
+network once, examples for look/listen.
+Measured: binary 8.3 MB; quick start on the 30 s fixture renders in ~1 s per pass.
+Surprises: re-ran the quick start in zsh with `for c in "init talk.mp4"…; cutroom $c` — zsh doesn't
+word-split, every command failed; bash only for scripted CLI runs (again).
+Next: T3 — reviewer pass on the four real-footage excerpts; then the final eval round.
+
 ### 46 · 2026-11-24 · Golden 2: every INVARIANT guarded, every DETECT on a fixture (two real fixes)
 Did: audited docs/LESSONS.md — 26 INVARIANT/DETECT rows, 15 had no TestLxx. Wrote guards:
 render L10 (a chunk holds only overlays visible in it), L11 (key = content), L12 (encoded from
