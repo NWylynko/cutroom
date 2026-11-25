@@ -2,6 +2,27 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 49 · 2026-11-25 · T3 r49: 3/4 accepted; sec's word fragments found and fixed at the source
+Did: T3 round r49 (fresh sonnet editors, opus reviewer; packs built by evals/local/t3/pack.sh).
+deploy ACCEPT (≈ the channel's own edit: 8.70–14.83 + 41.57–56.50 vs 8.61–14.86 + 41.52–56.65),
+started ACCEPT (the r48 reject: the editor followed the new ends-mid-speech warning), mps ACCEPT,
+sec REJECT: two word fragments — 20 ms of the next "and" at the very end, 40 ms of a cut "you" after
+"access,". Causes and fixes: (1) MapTo dropped recorder words running past the camera's end, so no
+check knew "and" was there → words overlapping the edge are kept, clipped; edge-in-word now gives a
+runnable time-range cut (so `timeline --apply` fixes it). (2) In continuous speech the cut sat on
+whisper's boundary, 50–80 ms late → Timeline.Boundary puts it at the quietest frame boundary from
+120 ms before to 30 ms after, measured in the sound the edit uses (recorder via offset+drift), for
+cut/keep/add/zoom edges; edge-in-word tolerates that window. (3) Both recorder editors hit recorder
+words whisper couldn't place (uncertain-timing, "and" 0.9 s early) → ReconcileTiming takes such a
+word's time from the camera mic's transcript when a neighbour agrees. Friction fixes: --to may equal
+--from; `listen 0 3` is a range; file-not-found lists the media files that are there.
+Measured: sec's replayed add now ends at 13.367 (mic 18.775, −68 dB gap) instead of 13.433 (inside
+"you"); its last segment raises edge-in-word with `edit cut 59.825-59.900 --source sec-take2`.
+make check green; e2e 256/256.
+Surprises: a symmetric ±60 ms search missed the gap — recogniser onsets are biased late, so the
+search must lean earlier.
+Next: T3 r50 on all four (the cut placement changed for every edit), then eval round 11.
+
 ### 48 · 2026-11-25 · T3 round r48: 3/4 accepted; fixes for the reject and the friction
 Did: T3 on the four real-footage excerpts (deploy, started, mps, sec): a sonnet editor per excerpt
 (cutroom guide only) wrote EDIT.md + FRICTION.md, then a reviewer (strongest model) judged each edit
