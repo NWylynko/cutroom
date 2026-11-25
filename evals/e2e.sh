@@ -305,5 +305,20 @@ expect "check states the offset"    'audio starts at \+0\.064 s, and that offset
 expect "check names the model"      're-transcribed with base\.en, the model the transcript used' cutroom check out/preview.mp4
 popd >/dev/null
 
+# deciding warnings: apply a suggested fix, or accept one with a reason
+D="$W/decide"; mkdir -p "$D"; cp $FIX/talk.mp4 "$D/"; pushd "$D" >/dev/null
+cutroom init talk.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null; cutroom edit tighten >/dev/null
+expect "timeline says how to decide" 'decide each WARN: .*--apply.*--accept' cutroom timeline
+expect "status names the apply"     'next: cutroom timeline --apply retake-kept@[0-9.]+ +\(runs: cutroom edit cut' cutroom status
+expect "accept needs a reason"      '--accept needs --reason'            cutroom timeline --accept retake-kept
+expect "unknown code suggests"      'did you mean retake-kept'           cutroom timeline --apply retake
+expect "accept a warning"           'accepted retake-kept .*0 still open' cutroom timeline --accept retake-kept --reason "both takes wanted"
+expect "accepted is listed apart"   'accepted \(decided, not open\): retake-kept' cutroom timeline
+expect "accepted survives an edit"  'accepted \(decided, not open\): retake-kept' sh -c 'cutroom edit cut --from "By the way" --to "keyboard." >/dev/null; cutroom timeline'
+cutroom edit undo >/dev/null; cutroom edit undo >/dev/null
+expect "apply runs the fix"         'applying the retake-kept fix: cutroom edit cut .*cut talk 0:06\.200' sh -c 'cutroom timeline --apply retake-kept | tr "\n" " "'
+expect "after apply: no retake"     'no problems found'                  cutroom timeline
+popd >/dev/null
+
 echo "e2e: $pass passed, $fail failed"
 [ "$fail" -eq 0 ]

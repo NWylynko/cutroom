@@ -189,7 +189,13 @@ func renderSources(p *project.Project) map[string]render.Source {
 }
 
 func (e *editEnv) validate() []timeline.Issue {
-	return append(e.audioIssues(), e.tl.Validate(e.dur, e.tr)...)
+	is := append(e.audioIssues(), e.tl.Validate(e.dur, e.tr)...)
+	for i := range is { // decided by the editor: listed, not open
+		if ok, _ := e.tl.IsAccepted(is[i]); ok && is[i].Level == "warn" {
+			is[i].Level = "accepted"
+		}
+	}
+	return is
 }
 
 // mixedIssue: a take using its own sound next to another source's. Its speech level and room tone

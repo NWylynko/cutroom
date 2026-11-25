@@ -2,6 +2,21 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 35 · 2026-11-24 · deciding warnings: `timeline --apply` and `--accept`
+Did: every WARN can now be decided in one step. `cutroom timeline --apply <code>[@<output time>]` runs
+the warning's own suggested edit (the backticked `cutroom edit|overlay …` in its fix; refused with
+"needs your judgement" when the fix has a <placeholder> or none), `--dry-run` passes through.
+`--accept <code>[@time] --reason "…"` stores {code, key, reason} in timeline.json; the key is the code
+plus the message with its numbers taken out, so it survives edits that move output times but not a
+different warning of the same code. Accepted warnings get level `accepted`: not printed by edits,
+not counted by status, listed apart by `timeline` ("accepted (decided, not open): …"). Errors can't be
+accepted. Unknown codes get did-you-mean; a repeated code without @time lists the choices. `timeline`
+ends with how to decide; `status`'s next step names the first warning's `--apply` and the edit it runs.
+Both go through edit history (undo-able). Answers r5 (recorder-haiku, phone-haiku), r6 (recorder ×2)
+and r7 (titles-sonnet, hdr-sonnet, phone-sonnet).
+Tests: TestAcceptedSurvivesMovingTimes; e2e 189/189 (+9).
+Next: clip overlays (M4), then M5 (short preset + safe zones).
+
 ### 34 · 2026-11-24 · r7 friction: burn + SRT in one call, `overlay set`, audio-mixed numbers, VFR stated
 Did: (1) `captions --burn` also writes the subtitle file (`--output` names it); guide shows
 `--output out/final.srt`. (2) `overlay set <id>` changes --duration/--to/--at/--layout/--text/--sub/

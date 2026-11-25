@@ -283,7 +283,16 @@ func statusNext(d statusData, untranscribed string) []string {
 	}
 	var pre []string
 	if d.Timeline.Warnings > 0 { // open warnings come first: fix each or decide it is fine
-		pre = []string{fmt.Sprintf("cutroom timeline   (%d open warning(s): fix each or decide it is fine)", d.Timeline.Warnings)}
+		pre = []string{fmt.Sprintf("cutroom timeline   (%d open warning(s): fix each — `--apply <code>@<time>` — or keep it — `--accept … --reason`)", d.Timeline.Warnings)}
+		for _, is := range d.Timeline.Issues {
+			if is.Level != "warn" {
+				continue
+			}
+			if m := fixCmd.FindStringSubmatch(is.Fix); m != nil && !strings.Contains(m[1], "<") {
+				pre = append(pre, fmt.Sprintf("cutroom timeline --apply %s@%.2f   (runs: %s)", is.Code, is.At, m[1]))
+			}
+			break
+		}
 	}
 	return append(pre, statusRenderNext(d)...)
 }

@@ -33,6 +33,9 @@ by your first edit as the whole first video source. Sources are never touched.
   frame. Keep the upscale ≤ 1.2× (a 1080p source at 1.3× looks soft; 4K sources can go 2× for a
   1080p output) — edit warns above it. Check the framing with `cutroom look --output <time>`;
   `timeline` shows `[zoom …]` on zoomed segments and `--joins` marks zoom changes (not cuts).
+- Every WARN is decided: fix it, or keep it on purpose. `cutroom timeline --apply retake-kept@4.09`
+  runs the warning's own suggested edit; `cutroom timeline --accept audio-mixed --reason "same mic"`
+  keeps it — still listed, no longer open (status stops pointing at it). Both are undo-able.
 - `--dry-run` previews; `cutroom edit undo` reverts the last edit; `cutroom edit history` lists them;
   `cutroom edit reset` starts over from the whole video (itself undo-able) — the quickest fix when an
   inherited edit is wrong in several places. `cutroom edit <sub> --help` shows one subcommand.

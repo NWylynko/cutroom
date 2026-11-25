@@ -51,8 +51,10 @@ type Timeline struct {
 	// Overlays: text cards and images over the edit, anchored to source words (overlay.go)
 	Overlays    []Overlay `json:"overlays,omitempty"`
 	NextOverlay int       `json:"next_overlay,omitempty"`
-	Modified    time.Time `json:"modified"`
-	fpsNum      float64
+	// Accepted: warnings the editor decided to keep (timeline --accept)
+	Accepted []Accepted `json:"accepted,omitempty"`
+	Modified time.Time  `json:"modified"`
+	fpsNum   float64
 }
 
 var ErrNone = errors.New("no timeline yet")

@@ -3,6 +3,7 @@ package timeline
 import (
 	"fmt"
 	"math"
+	"regexp"
 	"strings"
 )
 
@@ -138,4 +139,29 @@ func ovName(o Overlay) string {
 		return o.Text
 	}
 	return o.Path
+}
+
+// Accepted is a warning the editor decided to keep (`timeline --accept`): it stays listed but no
+// longer counts as an open problem.
+type Accepted struct {
+	Code   string `json:"code"`
+	Key    string `json:"key"`
+	Reason string `json:"reason,omitempty"`
+}
+
+var digits = regexp.MustCompile(`[0-9]+(\.[0-9]+)?`)
+
+// IssueKey identifies a warning across edits: its code and its message with the numbers (times,
+// which move as the edit changes) taken out.
+func IssueKey(is Issue) string { return is.Code + "|" + digits.ReplaceAllString(is.Message, "#") }
+
+// IsAccepted reports whether the warning was accepted, and why.
+func (t *Timeline) IsAccepted(is Issue) (bool, string) {
+	k := IssueKey(is)
+	for _, a := range t.Accepted {
+		if a.Key == k {
+			return true, a.Reason
+		}
+	}
+	return false, ""
 }

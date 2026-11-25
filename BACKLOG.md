@@ -24,15 +24,9 @@ Move done items to the journal, not here.
   "a wrong isolated word looks as authoritative as a correct one").
 - [friction r6] `check`: per-segment sync values and the offset/VFR handling applied (vfr-sync-haiku).
 - [friction r6] timeline: show the words each cut removes (fix-edit-haiku).
-- [friction r7] Apply a suggested fix in one step (`cutroom timeline --apply retake-kept@4.09`), next to
-  acknowledging one (titles-sonnet, hdr-sonnet, phone-sonnet: "have tighten optionally apply the
-  suggested retake cut").
 - [friction r7] Inherited-edit diagnosis: per sentence kept whole / trimmed / retake / aside (fix-edit ×2).
 - [friction r7] HDR: `look --compare` raw vs tone-mapped (hdr-haiku); orientation evidence independent
   of cutroom's own rotation handling (phone-haiku, r6 ×3).
-- [friction r5, r6] Acknowledge a warning you decided to keep (`cutroom timeline --accept retake-kept@4.09`
-  or similar), so status/check show it as decided (recorder-haiku, phone-haiku; r6 recorder ×2: "make
-  the retake decision an explicit choice").
 - [friction r5] `edit cut --phrase N` using `cutroom transcript` phrase numbers (tighten-haiku).
 - [friction r5] tighten: say which removed suspect sounds were never listened to (vfr-haiku).
 - Fixture: add a per-frame marker (frame number box) to talk.mp4 so graders can place frames exactly

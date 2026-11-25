@@ -116,12 +116,21 @@ See what each step did first with ` + "`cutroom edit history`" + `.`},
 		Help: `Default: one line per segment (output time, source range, first and last words) and any problems.
   --joins   every cut point with the words on both sides and the pause across it — read these
             before rendering; a bad join is the most common editing mistake
+Each warning is decided one of two ways:
+  --apply retake-kept@4.09    run the warning's own suggested edit (the time picks one when a code repeats)
+  --accept retake-kept@4.09 --reason "both takes wanted"   keep it as it is: listed, no longer open
 Examples:
   cutroom timeline
-  cutroom timeline --joins`,
+  cutroom timeline --joins
+  cutroom timeline --apply retake-kept
+  cutroom timeline --accept audio-mixed --reason "same mic"`,
 		Flags: []Flag{
 			{Name: "joins", Kind: "bool", Help: "List every join (cut point)"},
 			{Name: "all", Kind: "bool", Help: "Don't truncate"},
+			{Name: "apply", Kind: "string", Help: "Run a warning's suggested edit: <code>[@<output time>]"},
+			{Name: "accept", Kind: "string", Help: "Keep a warning as decided: <code>[@<output time>] (with --reason)"},
+			{Name: "reason", Kind: "string", Help: "accept: why it is fine (stored with the timeline)"},
+			{Name: "dry-run", Kind: "bool", Help: "apply: show the edit without saving"},
 		},
 		Run: runTimeline,
 	})
@@ -447,6 +456,13 @@ func nzIssues(is []timeline.Issue) []timeline.Issue {
 
 func issueLines(is []timeline.Issue, n int) []string {
 	var out []string
+	var shown []timeline.Issue
+	for _, x := range is {
+		if x.Level != "accepted" { // decided: `cutroom timeline` lists them apart
+			shown = append(shown, x)
+		}
+	}
+	is = shown
 	for i, x := range is {
 		if i == n {
 			out = append(out, fmt.Sprintf("… %d more problem(s): `cutroom timeline`", len(is)-n))
@@ -694,6 +710,9 @@ func runTimeline(c *Ctx) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
+	if c.Has("apply") || c.Has("accept") {
+		return decideIssue(c, e)
+	}
 	tl := e.tl
 	issues := e.validate()
 	var lines []string
@@ -761,10 +780,30 @@ func runTimeline(c *Ctx) (*Result, error) {
 		}
 		lines = append(lines, fmt.Sprintf("overlays: %s — `cutroom overlay list`", strings.Join(truncList(ids, 6), ", ")))
 	}
-	if len(issues) == 0 {
+	open, warns := 0, 0
+	var accepted []string
+	for _, x := range issues {
+		switch x.Level {
+		case "accepted":
+			_, why := tl.IsAccepted(x)
+			accepted = append(accepted, fmt.Sprintf("%s at %s (%q)", x.Code, clock(x.At), why))
+		case "warn":
+			warns++
+			open++
+		case "error":
+			open++
+		}
+	}
+	if open == 0 {
 		lines = append(lines, "no problems found")
 	}
 	lines = append(lines, issueLines(issues, 10)...)
+	if len(accepted) > 0 {
+		lines = append(lines, "accepted (decided, not open): "+strings.Join(truncList(accepted, 4), "; "))
+	}
+	if warns > 0 {
+		lines = append(lines, "decide each WARN: fix it (`cutroom timeline --apply <code>@<time>` runs its suggested edit) or keep it (`cutroom timeline --accept <code>@<time> --reason \"…\"`)")
+	}
 	return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"duration": tl.Duration(), "fps": tl.FPS, "width": tl.Width, "height": tl.Height,
 		"video": tl.Video, "audio": tl.Audio, "segments": segs, "issues": nzIssues(issues)}, Next: []string{"cutroom timeline --joins"}}, nil
 }

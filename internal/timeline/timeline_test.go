@@ -252,3 +252,20 @@ func TestL01_TrimIsFrameExact(t *testing.T) {
 		t.Fatalf("past end: %+v", c.Segments)
 	}
 }
+
+// An accepted warning stays accepted when later edits move it in output time.
+func TestAcceptedSurvivesMovingTimes(t *testing.T) {
+	a := Issue{Level: "warn", Code: "retake-kept", At: 4.093, Message: `at output 0:04.093: "the first thing you need is" is still said 2× (source 6.31–9.22)`}
+	b := a
+	b.At, b.Message = 2.5, `at output 0:02.500: "the first thing you need is" is still said 2× (source 6.31–9.22)`
+	tl := New("30", 1280, 720, "v", "v", 0, 10)
+	tl.Accepted = append(tl.Accepted, Accepted{Code: a.Code, Key: IssueKey(a), Reason: "both"})
+	if ok, why := tl.IsAccepted(b); !ok || why != "both" {
+		t.Fatal("accepted warning lost when its output time moved")
+	}
+	c := b
+	c.Message = `at output 0:02.500: "and that's it" is still said 2×`
+	if ok, _ := tl.IsAccepted(c); ok {
+		t.Fatal("a different warning of the same code was treated as accepted")
+	}
+}
