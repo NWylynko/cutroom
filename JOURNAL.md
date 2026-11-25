@@ -2,6 +2,22 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 44 · 2026-11-24 · M6 `export --otio --edl`
+Did: `internal/export`: Events (each segment in frames at the timeline rate: source in, length,
+record in; its sound source, a recorder's start mapped through its sync offset and drift);
+OTIO (Timeline.1 JSON written to the published schema — Stack/Track.1/Clip.2 with media_references,
+Gap.1, RationalTime.1: V1 picture, V2 overlays and V3 burned captions as their image files — text
+and caption cards copied as PNGs to out/<name>_cards/ — A1 the sound); EDL (CMX 3600, NON-DROP,
+record from 01:00:00:00, a B event per segment or V + A when the sound comes from a recorder, reel
+names ≤ 8 A–Z0–9, overlays as comments). `cutroom export --otio --edl [--name]`; guide render +
+workflow. No OTIO reader is installed (not a declared dependency), so correctness rests on
+round-trip tests that parse both files back and compare frame by frame.
+Tests: TestOTIORoundTrip, TestEDLRoundTrip; e2e 238/238 (+5).
+Surprises: overlays added out of time order were dropped from the OTIO overlay track (the first-in
+-list card took the slot and the earlier one looked like an overlap); cards are now sorted by start.
+Next: the remaining SPEC rows (edit split/pin, transcript --retakes/--output, look --overlays/--crop),
+then the lesson-guard audit.
+
 ### 43 · 2026-11-24 · r10: undo --dry-run previews, edit redo, moved warnings, listen's default
 Did: (1) bug: `edit undo --dry-run` ran the undo (the undo branch returned before the dry-run
 handling). Now it previews: "would undo: <op>; timeline would be: N segments, D" and changes

@@ -20,7 +20,8 @@ every render (current or stale, checked or not) and the next step.
 6. **Verify.** `cutroom check` measures the render: frames, sync, every word, stray sounds,
    loudness. Fix what fails, re-render, check again. See `cutroom guide verify`.
 7. **Captions** (optional): `cutroom captions` writes out/captions.srt. See `cutroom guide captions`.
-8. **Shorts** (optional): `cutroom short --from "…" --to "…" --name x` makes a vertical short of a
+8. **Export** (optional): `cutroom export --otio --edl` hands the edit to another editor.
+9. **Shorts** (optional): `cutroom short --from "…" --to "…" --name x` makes a vertical short of a
    span in shorts/x/. See `cutroom guide shorts`.
 
 ## Separate audio recorder (a mic recorded apart from the camera)

@@ -23,3 +23,9 @@
 - Output: H.264 (CRF 18 final, 26 preview), AAC 192 kb/s stereo 48 kHz, bt709 colour tags, faststart.
 
 The render prints its duration next to the timeline's. They must match; if they don't, it says so.
+
+## Handing the edit to another editor
+`cutroom export --otio --edl` writes `out/edit.otio` (OpenTimelineIO: picture, overlays and burned
+captions as their image files, and the sound — a recorder's at its own clock) and `out/edit.edl`
+(CMX 3600: a B event per segment, or V + A when the sound comes from a recorder; overlays only as
+comments). Both are in whole frames of the timeline's rate, referencing sources where they are.

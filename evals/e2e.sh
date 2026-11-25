@@ -140,6 +140,9 @@ expect "check passes synced render"   '^PASS'                           cutroom 
 expect "status: done after check"     'done: out/final\.mp4 is current and passed check' cutroom status
 expect "status: shows recorder sync"  'synced to talk \(\+1\.70[01] s'  cutroom status
 expect "check: camera cross-check"    'ok   sync-camera .*worst [+-]?[0-9] ms' cutroom check
+expect "export edl: recorder as A"    'wrote out/edit\.edl: [0-9]+ events'  cutroom export --edl
+expect "edl has V and A events"       '^002  MIC +A +C'                 cat out/edit.edl
+expect "export needs a format"        'export needs --otio and/or --edl'  cutroom export
 cp cutroom.json cutroom.json.bak
 python3 -c "import json;p=json.load(open('cutroom.json'));p['sources']['mic']['sync']['offset']+=0.1;json.dump(p,open('cutroom.json','w'))"
 cutroom render out/wrongsync.mp4 >/dev/null 2>&1
@@ -286,6 +289,8 @@ expect "burn wrote the srt too"    '^1$'                                 sh -c '
 expect "captions --burn twice"     'already on \(o3\)'                 cutroom captions --burn
 expect "look shows captions"       'o3 \(burned-in captions, \+cc\)'    cutroom look --output 1
 expect "render with captions"      '^wrote out/final\.mp4'               cutroom render
+expect "export otio with overlays"   'wrote out/edit\.otio: [0-9]+ clips, V1 picture, V2/V3 overlays' cutroom export --otio
+expect "otio tracks"                 'V1 V2 overlays V3 captions A1'      python3 -c 'import json;print(" ".join(t["name"] for t in json.load(open("out/edit.otio"))["tracks"]["children"]))'
 expect "check: captions on screen" 'ok   captions +burned-in captions: [0-9]+ groups; [0-9]+ sampled on screen' cutroom check
 cutroom overlay rm o3 >/dev/null; cutroom render out/nocc.mp4 >/dev/null 2>&1
 python3 -c 'import json;m=json.load(open("out/final.mp4.cutroom.json"));m["output"]="out/nocc.mp4";json.dump(m,open("out/nocc.mp4.cutroom.json","w"))'
