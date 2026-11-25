@@ -244,6 +244,16 @@ func runStatus(c *Ctx) (*Result, error) {
 		}
 	}
 
+	// shorts made from this project (cutroom short): each is a project of its own
+	if ms, _ := filepath.Glob(filepath.Join(p.Dir, "shorts", "*", "timeline.json")); len(ms) > 0 {
+		var ss []string
+		for _, m := range ms {
+			if t, err := timeline.Load(filepath.Dir(m)); err == nil {
+				ss = append(ss, fmt.Sprintf("%s (%s)", relToCwd(filepath.Dir(m)), secs(t.Duration())))
+			}
+		}
+		lines = append(lines, fmt.Sprintf("shorts: %s — work on one with --project <dir>", strings.Join(ss, ", ")))
+	}
 	// caption files: current when written from this timeline
 	for _, f := range captionFilesIn(filepath.Join(p.Dir, "out")) {
 		b, err := os.ReadFile(captionsMetaPath(f))

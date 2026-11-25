@@ -109,6 +109,7 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 	// 2. picture: sampled render frames vs source frames (±3)
 	pictureCheck(file, m, fps, r)
 	overlayCheck(file, m, fps, r)
+	safeZoneCheck(m, r)
 	toneCheck(file, m, fps, r)
 
 	// 3. sync per segment + 4. words + 5. edges — all need audio
@@ -234,11 +235,7 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 			sem <- struct{}{}
 			defer func() { <-sem }()
 			path := m.Sources[s.seg.Source].Path
-			crop := ""
-			if s.seg.Zoom > 1.001 { // compare through the same punch-in crop the render used (L40)
-				ax, ay := s.seg.Anchor()
-				crop = render.ZoomCrop(s.seg.Zoom, ax, ay)
-			}
+			crop := m.SegVF(s.seg) // the same punch-in (L40) and frame crop the render used
 			burst, pts := greyBurst(path, crop, s.srcT-4/fps, 9)
 			if len(burst) == 0 {
 				s.skipped = true
@@ -925,9 +922,8 @@ func toneCheck(file string, m *render.Manifest, fps float64, r *Report) {
 		}
 		d := float64(g.Frames) / fps
 		crop := ""
-		if g.Zoom > 1.001 {
-			ax, ay := g.Anchor()
-			crop = render.ZoomCrop(g.Zoom, ax, ay) + ","
+		if vf := m.SegVF(g); vf != "" {
+			crop = vf + ","
 		}
 		os_, or_, ok1 := frameTone(file, g.OutStart+d/2, media.SDR{}, "")
 		ss, sr, ok2 := frameTone(src.Path, g.In+d/2, sdr, crop)
@@ -1074,12 +1070,7 @@ func overlayCheck(file string, m *render.Manifest, fps float64, r *Report) {
 			return 0, false
 		}
 		srcT := seg.In + (float64(f)-math.Round(seg.OutStart*fps))/fps
-		crop := ""
-		if seg.Zoom > 1.001 {
-			ax, ay := seg.Anchor()
-			crop = render.ZoomCrop(seg.Zoom, ax, ay)
-		}
-		burst, _ := greyBurst(m.Sources[seg.Source].Path, crop, srcT-2/fps, 5)
+		burst, _ := greyBurst(m.Sources[seg.Source].Path, m.SegVF(*seg), srcT-2/fps, 5)
 		if len(burst) == 0 {
 			return 0, false
 		}
@@ -1255,3 +1246,45 @@ func clipFrames(file string, m *render.Manifest, p render.Placement, fps float64
 }
 
 func evenInt(x float64) int { return int(math.Round(x/2)) * 2 }
+
+// safeZoneCheck: on a vertical render, every overlay (caption groups included; full-frame clips
+// excepted) stays inside the safe zones (L41).
+func safeZoneCheck(m *render.Manifest, r *Report) {
+	if m.Height <= m.Width || len(m.Overlays) == 0 {
+		return
+	}
+	top, bottom, right := render.SafeZone(m.Width, m.Height)
+	W, H := float64(m.Width), float64(m.Height)
+	var bad []string
+	n := 0
+	for _, p := range m.Overlays {
+		if p.Kind == "clip" && p.Full {
+			continue
+		}
+		boxes := [][4]float64{p.Box}
+		if p.Kind == "captions" {
+			boxes = nil
+			for _, g := range p.Groups {
+				boxes = append(boxes, g.Box)
+			}
+		}
+		for _, b := range boxes {
+			n++
+			x1, y0, y1 := int(b[2]*W), int(b[1]*H), int(b[3]*H)
+			if y0 < top || y1 > bottom || x1 > right {
+				bad = append(bad, fmt.Sprintf("%s spans x ..%d, y %d–%d", p.ID, x1, y0, y1))
+				break
+			}
+		}
+	}
+	it := Item{Check: "safe-zones"}
+	if len(bad) > 0 {
+		it.Status = "warn"
+		it.Detail = fmt.Sprintf("outside the vertical safe zones (y %d–%d, x ≤ %d): %s", top, bottom, right, strings.Join(bad, "; "))
+		it.Fix = "`cutroom timeline` (overlay-unsafe) says which layout to change"
+	} else {
+		it.Status = "pass"
+		it.Detail = fmt.Sprintf("%d overlay box(es) inside the vertical safe zones (y %d–%d, x ≤ %d)", n, top, bottom, right)
+	}
+	r.add(it)
+}

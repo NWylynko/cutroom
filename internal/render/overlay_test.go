@@ -6,6 +6,7 @@ import (
 	"image/png"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/cutroom/cutroom/internal/timeline"
@@ -83,5 +84,35 @@ func TestClipBoxes(t *testing.T) {
 	o.ClipW, o.ClipH, o.Layout, o.Size = 1080, 1920, "corner", 0.5 // a vertical clip is capped by height
 	if r := clipBox(o, 1280, 720); r.Dy() > 720 {
 		t.Errorf("vertical clip overflows: %v", r)
+	}
+}
+
+// L41: on a vertical frame every layout (and burned captions) stays inside the safe zones.
+func TestL41_VerticalLayoutsInSafeZones(t *testing.T) {
+	top, bottom, right := SafeZone(1080, 1920)
+	if top != 260 || bottom != 1490 || right != 960 {
+		t.Fatalf("safe zone %d %d %d, want 260 1490 960", top, bottom, right)
+	}
+	in := func(r image.Rectangle) bool {
+		return r.Min.Y >= top && r.Max.Y <= bottom && r.Max.X <= right && r.Min.X >= 0
+	}
+	dir := t.TempDir()
+	for _, l := range append(Layouts, "lower-third-raised") {
+		o := timeline.Overlay{ID: "t", Kind: "text", Text: "Step 2: Install Linux on the old laptop", Sub: "Ubuntu Server 24.04", Layout: l}
+		if _, r, err := Card(o, dir, 1080, 1920); err != nil || !in(r) {
+			t.Errorf("text %s: %v outside the safe zone (%v)", l, r, err)
+		}
+		c := timeline.Overlay{Kind: "clip", ClipW: 1920, ClipH: 1080, Layout: l, Size: 0.35}
+		if r := clipBox(c, 1080, 1920); !in(r) {
+			t.Errorf("clip %s: %v outside the safe zone", l, r)
+		}
+	}
+	for _, txt := range []string{"I", "the update command", "authentication and"} {
+		if _, r := CaptionCard(txt, 1080, 1920); !in(r) {
+			t.Errorf("caption %q: %v outside the safe zone", txt, r)
+		}
+	}
+	if f := FrameFit(true, 0.6, 0.5, 1080, 1920); !strings.Contains(f, "force_original_aspect_ratio=increase") || !strings.Contains(f, "crop=1080:1920:(iw-ow)*0.600000") {
+		t.Errorf("fill: %s", f)
 	}
 }

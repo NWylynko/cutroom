@@ -157,7 +157,7 @@ var (
 // Card draws an overlay into a transparent w×h image; r is the area it covers.
 func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r image.Rectangle, err error) {
 	img = image.NewNRGBA(image.Rect(0, 0, w, h))
-	H := float64(h)
+	H := float64(min(w, h)) // text scales with the short side: the same look on landscape and vertical
 	margin := int(0.06 * float64(w))
 	switch o.Kind {
 	case "image":
@@ -198,6 +198,10 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 		bf := raster.Face("bold", math.Round(big*H))
 		sf := raster.Face("regular", math.Round(small*H))
 		mw := int(maxW * float64(w))
+		if h > w { // vertical: stay left of the right-hand buttons
+			_, _, right := SafeZone(w, h)
+			mw = min(mw, right-2*margin)
+		}
 		pad := int(0.022 * H)
 		var lines []line
 		for _, l := range wrapText(bf, o.Text, mw) {
@@ -249,8 +253,32 @@ func lineH(f font.Face) int {
 	return int(float64((m.Ascent + m.Descent).Round()) * 1.12)
 }
 
-// place puts a w×h box in the frame for a layout.
+// Vertical safe zones (L41, for 1080×1920; scaled to any vertical frame): the app's own title bar
+// covers the top, its caption, buttons and description cover the bottom and the right edge.
+func SafeZone(W, H int) (top, bottom, right int) {
+	if H <= W {
+		return 0, H, W
+	}
+	return int(math.Ceil(260 * float64(H) / 1920)), int(1490 * float64(H) / 1920), W - int(math.Ceil(120*float64(W)/1080))
+}
+
+// place puts a w×h box in the frame for a layout (inside the safe zones on vertical frames).
 func place(layout string, W, H, w, h, margin int) (int, int) {
+	if H > W {
+		top, bottom, right := SafeZone(W, H)
+		switch layout {
+		case "title", "center": // centred in the safe area
+			return max(0, (right-w)/2), max(top, top+(bottom-top-h)/2)
+		case "top":
+			return max(0, (right-w)/2), top
+		case "corner":
+			return right - w, top
+		case "lower-third-raised":
+			return margin, int(captionTop(W, H)) - int(0.02*float64(H)) - h
+		default: // lower-third: above the bottom zone
+			return margin, bottom - int(0.02*float64(H)) - h
+		}
+	}
 	switch layout {
 	case "title", "center":
 		return (W - w) / 2, (H - h) / 2
@@ -353,6 +381,9 @@ func CaptionCard(text string, w, h int) (*image.NRGBA, image.Rectangle) {
 	padX, padY := int(0.3*captionSize(w, h)), int(0.18*captionSize(w, h))
 	bw, bh := tw+2*padX, (m.Ascent+m.Descent).Round()+2*padY
 	x, y := (w-bw)/2, int(captionBottom(w, h))-bh
+	if _, _, right := SafeZone(w, h); h > w {
+		x = max(0, (right-bw)/2) // vertical: centred left of the right-hand buttons (L41)
+	}
 	r := image.Rect(x, y, x+bw, y+bh)
 	draw.Draw(img, r, image.NewUniform(color.NRGBA{0, 0, 0, 170}), image.Point{}, draw.Over)
 	raster.Text(img, f, x+padX, y+padY+m.Ascent.Round(), color.NRGBA{255, 255, 255, 255}, text)

@@ -137,6 +137,9 @@ func Cells(cells []Cell, cols int) (image.Image, error) {
 			return nil, fmt.Errorf("frame at %.3f of %s: %w", cells[i].T, cells[i].Path, e)
 		}
 	}
+	if b := imgs[0].Bounds(); b.Dy() > b.Dx() { // vertical frames: keep a sheet row ≤ 480 px tall
+		thumbW = min(thumbW, 480*b.Dx()/b.Dy())
+	}
 	th := imgs[0].Bounds().Dy() * thumbW / imgs[0].Bounds().Dx()
 	labelH, pad := 40, 8
 	W := pad + cols*(thumbW+pad)

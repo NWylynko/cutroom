@@ -118,8 +118,8 @@ func lookEdit(c *Ctx) (*Result, error) {
 			lt := l.Out - 0.5/fps
 			rt := r.In + 0.5/fps
 			cells = append(cells,
-				perceive.Cell{Path: src(l.Source), T: lt, Label: fmt.Sprintf("%s %d @%s  before (%s %.2f)", j.Kind, from+k+1, clock(j.At), l.Source, lt), Say: "…" + j.Before, VF: zoomVF(*l)},
-				perceive.Cell{Path: src(r.Source), T: rt, Label: fmt.Sprintf("after (%s %.2f)  pause %.2f s", r.Source, rt, j.Pause), Say: j.After + "…", Cut: true, VF: zoomVF(*r)})
+				perceive.Cell{Path: src(l.Source), T: lt, Label: fmt.Sprintf("%s %d @%s  before (%s %.2f)", j.Kind, from+k+1, clock(j.At), l.Source, lt), Say: "…" + j.Before, VF: segVF(tl, *l)},
+				perceive.Cell{Path: src(r.Source), T: rt, Label: fmt.Sprintf("after (%s %.2f)  pause %.2f s", r.Source, rt, j.Pause), Say: j.After + "…", Cut: true, VF: segVF(tl, *r)})
 		}
 		cols = 4
 		desc = fmt.Sprintf("cuts %d–%d of %d: each pair is the last frame before | first frame after a cut (red bar), with the words either side", from+1, to, len(js))
@@ -235,7 +235,7 @@ func lookEdit(c *Ctx) (*Result, error) {
 				}
 			}
 			cells = append(cells, perceive.Cell{Path: src(g.Source), T: st, Label: label, Over: over,
-				Say: srcWords(g.Source, st), VF: zoomVF(*g),
+				Say: srcWords(g.Source, st), VF: segVF(tl, *g),
 				// a cut, not just a zoom change on continuous picture
 				Cut: prev != "" && prev != g.ID && !(prevSeg != nil && prevSeg.Source == g.Source && math.Abs(prevSeg.Out-g.In) < 1e-6)})
 			prev, prevSeg = g.ID, g
@@ -356,11 +356,9 @@ func listenFile(c *Ctx) (*Result, error) {
 	return &Result{Text: strings.Join(lines, "\n"), Data: L}, nil
 }
 
-// zoomVF is the punch-in crop a segment renders with, so look shows what the render will.
-func zoomVF(g timeline.Segment) string {
-	if z := g.ZoomOf(); z > 1 {
-		ax, ay := g.Anchor()
-		return render.ZoomCrop(z, ax, ay)
-	}
-	return ""
+// segVF is what a segment's picture goes through in the render (punch-in, fill crop), so look shows
+// what the render will.
+func segVF(tl *timeline.Timeline, g timeline.Segment) string {
+	ax, ay := g.Anchor()
+	return render.PictureVF(g.ZoomOf(), ax, ay, tl.Fill, tl.FillX, tl.FillY, tl.Width, tl.Height)
 }

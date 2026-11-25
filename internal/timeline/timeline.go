@@ -51,6 +51,11 @@ type Timeline struct {
 	// Overlays: text cards and images over the edit, anchored to source words (overlay.go)
 	Overlays    []Overlay `json:"overlays,omitempty"`
 	NextOverlay int       `json:"next_overlay,omitempty"`
+	// Fill: the picture is scaled to cover the output frame and cropped around (FillX, FillY) (0–1)
+	// instead of fitted with bars — how a landscape source becomes a vertical short.
+	Fill  bool    `json:"fill,omitempty"`
+	FillX float64 `json:"fill_x,omitempty"`
+	FillY float64 `json:"fill_y,omitempty"`
 	// Accepted: warnings the editor decided to keep (timeline --accept)
 	Accepted []Accepted `json:"accepted,omitempty"`
 	Modified time.Time  `json:"modified"`

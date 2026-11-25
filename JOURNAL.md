@@ -2,6 +2,32 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 37 · 2026-11-24 · M5 shorts: vertical sub-projects, fill framing, safe zones (L41)
+Did: `cutroom short --from … --to … --name x` makes shorts/x/: a project of its own (same sources —
+paths rewritten for the folder — and the parent's transcripts copied), so every command works on it
+with `--project shorts/x`. Defaults (L41): 1080×1920 (--size), pads 0.06/0.16, pauses tightened with
+min-cut 0.1 (~0.2 s left), the span kept from the first to the last quoted word; warns over 60 s and
+when the 9:16 crop is enlarged > 1.5× (720p → 2.7×). New timeline `fill` (+ fill_x/y): the picture is
+scaled to cover the frame and cropped around the anchor (`render.FrameFit`); `PictureVF` = punch-in +
+fill crop is used by render, `look` (segVF) and every `check` comparison (picture, tone, overlay
+windows via Manifest.SegVF), so fill timelines verify like any other. `edit frame --anchor x,y |
+--fill | --fit`. Safe zones (`render.SafeZone`, 260/1490/right 120 of 1080×1920, scaled): vertical
+layouts placed inside them (title centred in the safe area, top below the bar, corner left of the
+buttons, lower thirds and captions above the bottom zone and centred in the safe width); text sizes
+follow the frame's short side (landscape unchanged). `timeline` warns `overlay-unsafe`; `check`
+reports `safe-zones` from the manifest boxes (caption groups included, full-frame clips excepted).
+`status` lists a project's shorts. Contact sheets cap vertical thumbnails at 480 px tall. The argument
+parser splits a `--flag value` that arrives as one word (an unsplit shell variable).
+Tests: TestL41_VerticalLayoutsInSafeZones; e2e 209/209 (+11).
+Measured: a 10.6 s short renders (preview) in 0.6 s; check PASS with picture worst 0.4 through the
+fill crop, 11 overlay boxes inside the zones; an image at --size 0.9 is flagged ("reaches right to x
+1036, safe to 960").
+Surprises: (1) text sized from frame height made a vertical title 163 px tall, wrapping past the
+bottom zone; sizing from the short side gives the same look in both orientations. (2) testing with an
+unsplit `$P` in zsh showed the parser saying "did you mean --project?" for "--project shorts/steps" —
+an agent could hit the same; now it just works.
+Next: eval round 8 (short + B-roll tasks), then M6 (export, README, doctor).
+
 ### 36 · 2026-11-24 · M4 clip overlays (B-roll): cutaways and insets, checked against the clip's frames
 Did: `overlay add clip <video> --at … [--to|--duration] [--clip-in s] [--layout full|corner|… --size]`
 (clip probed on add: duration, displayed size; full by default, no fade, muted). Render: per chunk

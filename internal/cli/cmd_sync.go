@@ -190,6 +190,7 @@ func renderSources(p *project.Project) map[string]render.Source {
 
 func (e *editEnv) validate() []timeline.Issue {
 	is := append(e.audioIssues(), e.tl.Validate(e.dur, e.tr)...)
+	is = append(is, e.safeZoneIssues()...)
 	for i := range is { // decided by the editor: listed, not open
 		if ok, _ := e.tl.IsAccepted(is[i]); ok && is[i].Level == "warn" {
 			is[i].Level = "accepted"
@@ -225,4 +226,56 @@ func (e *editEnv) mixedIssue(g timeline.Segment, main string) timeline.Issue {
 		is.Fix = fmt.Sprintf("same setup, %.1f dB louder/quieter (speech and room tone moved together): the render's loudness pass evens the whole edit, not each take; listen across the join (`cutroom listen --output %.2f-%.2f`); %s", math.Abs(ds), math.Max(0, g.OutStart-1.5), g.OutStart+1.5, recorderFix)
 	}
 	return is
+}
+
+// safeZoneIssues: on a vertical frame, overlays must stay clear of the app's own title bar, buttons
+// and caption area (L41): nothing above y 260, below y 1490 or in the right 120 px of 1080×1920.
+func (e *editEnv) safeZoneIssues() []timeline.Issue {
+	tl := e.tl
+	if tl.Height <= tl.Width || len(tl.Overlays) == 0 {
+		return nil
+	}
+	ps, err := render.Placements(tl, e.tr, e.p.Dir, cacheDir(e.p), tl.Width, tl.Height)
+	if err != nil {
+		return nil // the overlay's own problem is reported elsewhere (render says it)
+	}
+	var is []timeline.Issue
+	for _, p := range ps {
+		if p.Kind == "clip" && p.Full {
+			continue // a full-frame cutaway is the picture itself
+		}
+		boxes := [][4]float64{p.Box}
+		if p.Kind == "captions" {
+			boxes = nil
+			for _, g := range p.Groups {
+				boxes = append(boxes, g.Box)
+			}
+		}
+		if msg := unsafeBox(boxes, tl.Width, tl.Height); msg != "" {
+			fix := fmt.Sprintf("`cutroom overlay set %s --layout <another>` or a smaller --size", p.ID)
+			if p.Kind == "captions" {
+				fix = "shorter caption groups can't be set yet: report it"
+			}
+			is = append(is, timeline.Issue{Level: "warn", Code: "overlay-unsafe", At: p.Start,
+				Message: fmt.Sprintf("overlay %s (%s) %s: the app's own buttons and text cover that part of a vertical video (L41)", p.ID, p.Name, msg), Fix: fix})
+		}
+	}
+	return is
+}
+
+// unsafeBox says how a box breaks the vertical safe zones ("" when it doesn't).
+func unsafeBox(boxes [][4]float64, W, H int) string {
+	top, bottom, right := render.SafeZone(W, H)
+	for _, b := range boxes {
+		x1, y0, y1 := int(b[2]*float64(W)), int(b[1]*float64(H)), int(b[3]*float64(H))
+		switch {
+		case y0 < top:
+			return fmt.Sprintf("reaches up to y %d (safe from %d)", y0, top)
+		case y1 > bottom:
+			return fmt.Sprintf("reaches down to y %d (safe to %d)", y1, bottom)
+		case x1 > right:
+			return fmt.Sprintf("reaches right to x %d (safe to %d)", x1, right)
+		}
+	}
+	return ""
 }

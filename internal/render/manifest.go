@@ -29,6 +29,9 @@ type Manifest struct {
 	RangeStart   float64            `json:"range_start"`
 	Partial      bool               `json:"partial"`
 	Overlays     []Placement        `json:"overlays,omitempty"` // in file time
+	Fill         bool               `json:"fill,omitempty"`
+	FillX        float64            `json:"fill_x,omitempty"`
+	FillY        float64            `json:"fill_y,omitempty"`
 	TimelineHash string             `json:"timeline_hash"`
 	RenderedAt   time.Time          `json:"rendered_at"`
 }
@@ -77,6 +80,9 @@ func TimelineHash(tl *timeline.Timeline) string {
 	if len(tl.Overlays) > 0 { // unchanged for edits without overlays
 		parts = append(parts, tl.Overlays)
 	}
+	if tl.Fill {
+		parts = append(parts, []any{"fill", tl.FillX, tl.FillY})
+	}
 	return hash(parts)
 }
 
@@ -92,6 +98,7 @@ func writeManifest(tl, vtl *timeline.Timeline, srcs map[string]Source, chunks []
 	m := Manifest{Version: Version, Output: res.Output, Preview: o.Preview, FPS: tl.FPS, Width: res.Width, Height: res.Height,
 		Audio: tl.Audio, Sources: map[string]MSource{}, Loudness: o.Loudness, TruePeak: o.TruePeak, Chain: o.Chain,
 		Frames: res.Frames, Duration: res.Duration, RangeStart: res.RangeStart, Partial: o.Range[1] > 0, Overlays: res.Overlays,
+		Fill: tl.Fill, FillX: tl.FillX, FillY: tl.FillY,
 		TimelineHash: TimelineHash(tl), RenderedAt: time.Now().UTC().Truncate(time.Second)}
 	for _, c := range chunks {
 		for _, k := range c.Segments {
@@ -124,4 +131,10 @@ func LoadManifest(out string) (*Manifest, error) {
 	}
 	m := &Manifest{}
 	return m, json.Unmarshal(b, m)
+}
+
+// SegVF is the PictureVF for a manifest segment (what look/check must apply to source frames).
+func (m *Manifest) SegVF(g MSeg) string {
+	ax, ay := g.Anchor()
+	return PictureVF(g.Zoom, ax, ay, m.Fill, m.FillX, m.FillY, m.Width, m.Height)
 }

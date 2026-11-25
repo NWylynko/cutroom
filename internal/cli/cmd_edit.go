@@ -13,7 +13,7 @@ import (
 	"github.com/cutroom/cutroom/internal/timeline"
 )
 
-var editOps = []string{"cut", "keep", "add", "replace", "move", "zoom", "tighten", "audio", "undo", "history", "reset"}
+var editOps = []string{"cut", "keep", "add", "replace", "move", "zoom", "frame", "tighten", "audio", "undo", "history", "reset"}
 
 func init() {
 	Register(&Command{
@@ -40,6 +40,7 @@ Every edit is checked afterwards and problems are printed. Use --dry-run to prev
                                                  swap a line for another take's version of it (cut +
                                                  add in one step; --from/--to for longer spans)
   edit move s5 --after s2 | --before s1 | --after start      reorder a segment
+  edit frame --anchor 0.4,0.5                    where a filled (vertical) frame is cropped; --fill / --fit
   edit tighten [--min-cut 0.4]                   shorten every pause longer than the pads + min-cut
   edit audio mic                                 take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
   edit audio mic2 --for take2                    multi-take: segments from take2 use recorder mic2
@@ -61,14 +62,20 @@ never moves them.`,
 			{Name: "source", Kind: "string", Help: "Source id (for ranges, reset, or to restrict word matching)"},
 			{Name: "reason", Kind: "string", Help: "Why (stored with the edit; shown in the timeline)"},
 			{Name: "min-cut", Kind: "float", Default: "0.4", Help: "tighten: only shorten pauses where at least this much can go"},
-			{Name: "anchor", Kind: "string", Help: "zoom: point to zoom on as x,y in 0–1 (default 0.5,0.4)"},
+			{Name: "anchor", Kind: "string", Help: "zoom: point to zoom on as x,y in 0–1 (default 0.5,0.4); frame: where a filled frame is cropped"},
 			{Name: "for", Kind: "string", Help: "audio: only for segments from this video source (multi-take)"},
 			{Name: "with", Kind: "string", Help: "replace: the source whose version of the words goes in (a pickup or another take)"},
 			{Name: "after", Kind: "string", Help: "add/move: put it after this segment id (or \"start\")"},
 			{Name: "before", Kind: "string", Help: "add/move: put it before this segment id (default for add: at the end)"},
+			{Name: "fill", Kind: "bool", Help: "frame: scale the picture to fill the output frame (crop the rest)"},
+			{Name: "fit", Kind: "bool", Help: "frame: fit the whole picture (bars where shapes differ)"},
 			{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"},
 		},
 		Subs: map[string]Sub{
+			"frame": {Usage: `  edit frame --anchor 0.4,0.5   a filled frame (a vertical short) is cropped around this point of the
+                                source (0–1 across, down): move it onto the speaker
+  edit frame --fill | --fit     fill the output frame (crop) or fit the whole picture (bars)
+Look at the result with ` + "`cutroom look --output <time>`" + `.`, Flags: []string{"anchor", "fill", "fit", "dry-run"}},
 			"cut": {Usage: `  edit cut --text "um, so"                       remove exactly these words (cut lands in the pauses)
   edit cut --from "By the way" --to "keyboard."  remove from the first words through the last words
   edit cut 16.9-17.4 [--source id]               remove a source time range (seconds or m:ss.mmm)
@@ -87,7 +94,8 @@ Warns when it duplicates words already kept (to swap a line, use edit replace).`
   edit replace --from "Then install" --to "on it." --with pickup
 Cuts the edit's version of the words and puts --with's version in the same place, in one step.`,
 				Flags: []string{"with", "text", "from", "to", "near", "occurrence", "source", "reason", "dry-run"}},
-			"move": {Usage: `  edit move s5 --after s2 | --before s1 | --after start      reorder a segment (ids: cutroom timeline)`,
+			"move": {Usage: `  edit move s5 --after s2 | --before s1 | --after start      reorder a segment
+  edit frame --anchor 0.4,0.5                    where a filled (vertical) frame is cropped; --fill / --fit (ids: cutroom timeline)`,
 				Flags: []string{"after", "before", "dry-run"}},
 			"zoom": {Usage: `  edit zoom 1.15 --from "Then install" --to "on it."   punch in on a span
   edit zoom 1.15 12.0-15.5 [--source id]               ... or a source time range
@@ -378,6 +386,32 @@ func runEdit(c *Ctx) (*Result, error) {
 		}
 		label = desc
 		lines = append(lines, res...)
+	case "frame":
+		if !c.Has("anchor") && !c.Bool("fill") && !c.Bool("fit") {
+			return nil, Errf(ExitUsage, "missing-flag", "`cutroom edit frame --anchor 0.4,0.5` (where to crop a filled frame), --fill or --fit", "edit frame needs --anchor, --fill or --fit")
+		}
+		if c.Bool("fill") && c.Bool("fit") {
+			return nil, Errf(ExitUsage, "bad-flags", "give --fill or --fit, not both", "--fill and --fit both given")
+		}
+		if c.Bool("fill") || c.Has("anchor") {
+			e.tl.Fill = true
+		}
+		if c.Bool("fit") {
+			e.tl.Fill = false
+		}
+		if c.Has("anchor") {
+			ax, ay, err := parseAnchor(c.Str("anchor"))
+			if err != nil {
+				return nil, err
+			}
+			e.tl.FillX, e.tl.FillY = ax, ay
+		}
+		label = fmt.Sprintf("edit frame fill=%v anchor %.2f,%.2f", e.tl.Fill, e.tl.FillX, e.tl.FillY)
+		if e.tl.Fill {
+			lines = append(lines, fmt.Sprintf("frame: the picture fills %dx%d, cropped around %.2f,%.2f (0–1 across, down) — check it with `cutroom look --output <time>`", e.tl.Width, e.tl.Height, e.tl.FillX, e.tl.FillY))
+		} else {
+			lines = append(lines, fmt.Sprintf("frame: the whole picture fits %dx%d (bars where the shapes differ)", e.tl.Width, e.tl.Height))
+		}
 	case "move":
 		if len(c.Args) != 2 {
 			return nil, Errf(ExitUsage, "bad-args", "name the segment: `cutroom edit move s5 --after s2` (ids from `cutroom timeline`)", "edit move needs a segment id")

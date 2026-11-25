@@ -7,7 +7,8 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- M5: `short` preset (vertical timeline between two phrases, short-form defaults) + safe-zone check (L41).
+- Eval round 8 (due after M5): add a `short` task (vertical, safe zones, an aside to drop) and a B-roll task.
+- M6: `export --otio --edl`, README + install, `doctor` on a clean PATH.
 - Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
   T3 review, doctor/README.
 ## M0 — leftovers
@@ -55,7 +56,6 @@ Move done items to the journal, not here.
 
 ## M5 — multi-source & shorts
 - Multi-take timelines (segments from several video sources; sync per take). HDR tone-map path. [L23 L24 L25]
-- `short` preset + safe-zone check. [L41]
 
 ## M6 — interchange & polish
 - `export --otio --edl`. README, install, `doctor` on clean PATH. T3 real-footage evals.

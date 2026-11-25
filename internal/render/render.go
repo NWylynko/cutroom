@@ -227,6 +227,9 @@ func Plan(tl *timeline.Timeline, srcs map[string]Source, o Options) []Chunk {
 			ovs = append(ovs, []any{p.Key, from, to, co.FadeIn, co.FadeOut, p.Fade, pa - c0, pb - c0})
 		}
 		parts := []any{Version, tl.FPS, w, h, o.Preview, encArgs(o.Preview), segs, tl.Grid}
+		if tl.Fill { // keys of fitted timelines are unchanged
+			parts = append(parts, []any{"fill", tl.FillX, tl.FillY})
+		}
 		if len(ovs) > 0 { // keys of chunks without overlays are unchanged
 			parts = append(parts, ovs)
 		}
@@ -265,7 +268,7 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 			ax, ay := g.Anchor()
 			chain += "," + ZoomCrop(z, ax, ay)
 		}
-		chain += fmt.Sprintf(",scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1", w, h, w, h)
+		chain += "," + FrameFit(tl.Fill, tl.FillX, tl.FillY, w, h)
 		chain += ",format=yuv420p" + fmt.Sprintf("[v%d]", n)
 		fc = append(fc, chain)
 		labels += fmt.Sprintf("[v%d]", n)
@@ -732,6 +735,29 @@ func round6(f float64) float64 { return math.Round(f*1e6) / 1e6 }
 func round3(f float64) float64 { return math.Round(f*1e3) / 1e3 }
 
 func even(x float64) int { return int(math.Round(x/2)) * 2 }
+
+// FrameFit puts a (zoomed) source picture into the w×h output: fitted with bars, or — fill — scaled
+// to cover it and cropped around (fx, fy) (0–1 across, down), as a vertical short from landscape.
+func FrameFit(fill bool, fx, fy float64, w, h int) string {
+	if !fill {
+		return fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1", w, h, w, h)
+	}
+	return fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d:(iw-ow)*%s:(ih-oh)*%s,setsar=1", w, h, w, h, f6(fx), f6(fy))
+}
+
+// PictureVF is the filter that turns a source frame into what the render shows in a segment, before
+// any final scaling: the punch-in crop, then (fill timelines) the crop to the output's shape.
+// Comparisons (look, check) run source frames through it so they see what the render saw.
+func PictureVF(zoom, ax, ay float64, fill bool, fx, fy float64, w, h int) string {
+	var vf []string
+	if zoom > 1.001 {
+		vf = append(vf, ZoomCrop(zoom, ax, ay))
+	}
+	if fill {
+		vf = append(vf, FrameFit(true, fx, fy, w, h))
+	}
+	return strings.Join(vf, ",")
+}
 
 // ZoomCrop is the crop for a punch-in of z centred on (ax, ay) (normalised display coordinates),
 // clamped inside the frame. Render and check use the same one.

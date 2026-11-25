@@ -303,6 +303,18 @@ func parseArgs(ctx *Ctx, args []string) error {
 		}
 		return n
 	}
+	// "--flag value" passed as one word (an unsplit shell variable) is two words
+	var split []string
+	for _, a := range args {
+		if n, v, ok := strings.Cut(a, " "); ok && strings.HasPrefix(n, "--") && !strings.Contains(n, "=") {
+			if _, known := flags[strings.TrimPrefix(n, "--")]; known {
+				split = append(split, n, v)
+				continue
+			}
+		}
+		split = append(split, a)
+	}
+	args = split
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if a == "--" {
