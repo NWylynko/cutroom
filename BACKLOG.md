@@ -7,13 +7,21 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
+- v1 is golden (2026-11-25, iteration 52): see RELEASE_NOTES.md. Publishing is the maintainer's call.
 - export: validate the .otio with the real OpenTimelineIO reader once it can be installed (it isn't
   a declared dependency); today's guarantee is the round-trip tests.
-- Golden 4: T3 reviewer pass on the local real-footage excerpts.
-- Golden: final eval round 11 after T3 — all five criteria must hold in the same round (rounds 9–10
-  predate iterations 45–47). Rate friction low/medium/high in the round summary (criterion 3).
-- Golden 1 is code-complete (iteration 45); confirm with an eval round that exercises the new
-  commands (split/pin/--retakes/--output/--overlays/validate) before calling it met.
+- [friction r11, low] `short` on a 720p source: default to 720x1280 instead of warning about a 2.7x
+  upscale (short sonnet + haiku).
+- [friction r11, low] `tighten` could offer the retake/aside cuts in one step (broll, tighten, social).
+- [friction r11, low] suggested commands mix output time (`@4.09`) and source time (`--near 6.31`)
+  without labels (resume-haiku, pickup-haiku).
+- [friction r11, low] `timeline` reprints every open WARN on each call; mark which are new.
+- [friction r11, low] av-offset note says "not a lip-sync error" — say what is measured (the edit keeps
+  the source's offset), not more (vfr-haiku).
+- [friction r11, low] one duration per source across inspect/transcript/edit; no "(was …)" on a fresh
+  timeline; `check` prints "-0 ms".
+- [friction r11, low] `overlay add` default duration = reading time; `status` names the edit behind an
+  inherited warning; `doctor` says how to get a larger whisper model.
 ## M0 — leftovers
 - Fixtures on Linux: espeak-ng path untested.
 

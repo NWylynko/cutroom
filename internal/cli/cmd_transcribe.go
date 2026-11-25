@@ -70,6 +70,7 @@ Examples:
 			{Name: "gap", Kind: "float", Default: "0.5", Help: "Pause length (s) that splits phrases"},
 			{Name: "all", Kind: "bool", Help: "Don't truncate long output"},
 			{Name: "file", Kind: "string", Help: "Transcribe and read any file, e.g. your render (cached); times are file times"},
+			{Name: "source", Kind: "string", Help: "Source id (same as giving it first: `cutroom transcript pickup`)"},
 		},
 		Run: runTranscript,
 	})
@@ -268,7 +269,7 @@ func runTranscript(c *Ctx) (*Result, error) {
 	if err != nil {
 		return nil, err
 	}
-	id := ""
+	id := c.Str("source") // `transcript --source pickup` = `transcript pickup` (r11: agents reach for --source)
 	if len(c.Args) == 1 {
 		id = c.Args[0]
 	}

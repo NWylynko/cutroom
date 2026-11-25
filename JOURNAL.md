@@ -2,6 +2,18 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 52 · 2026-11-25 · Golden: eval round 11 24/24, all five criteria in the same round
+Did: eval round 11 — 12 tasks × sonnet + haiku, fresh agents (brief + "Start with `cutroom guide`").
+Sonnet 12/12, haiku 12/12 on the independent grader; every friction item rated low (round summary
+evals/results/2026-11-25-11.md, reports in evals/results/r11/). Same round: T3 r51 4/4 accepted,
+make check green, e2e 257/257, grader selftest 26/26, `go install` + `doctor` on a clean PATH (exit 3
+with each fix) and with tools (exit 0). Added `transcript --source` (an r11 sonnet guess). Wrote
+RELEASE_NOTES.md; r11's low friction to BACKLOG.
+Measured: cutroom errors in 24 runs: 4, each recovered by its fix line at once.
+Surprises: the last real gaps were all in the sound, not the text — transcripts put word onsets late,
+and only measuring the audio at each edge closed them.
+Next: golden — loop stopped; publishing is the maintainer's call.
+
 ### 51 · 2026-11-25 · Golden 4 met: T3 r51 accepts all four real-footage edits
 Did: T3 r51, fresh sonnet editors on all four excerpts, opus reviewer: deploy, started, mps, sec all
 ACCEPT; `check` PASS on all four (sync 0 ms vs each recorder, ≤ 15 ms vs camera sound; −16 to
