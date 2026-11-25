@@ -19,7 +19,7 @@
   14. `cutroom look 2`
 
 - **Errors hit:**
-  - `error[no-render]: /Users/nick/.../out/preview.mp4 not found` / `fix: check the path, or render first`. Cause: `render --preview --range` wrote `out/preview-range.mp4`, not `out/preview.mp4`. The `fix:` line did not say that, and I had to run `check` on the new name to continue. Once I used the right file, check passed. The shell also reported "Exit code 1" for the whole chain, which was confusing because the dry-run output printed first.
+  - `error[no-render]: <project>/out/preview.mp4 not found` / `fix: check the path, or render first`. Cause: `render --preview --range` wrote `out/preview-range.mp4`, not `out/preview.mp4`. The `fix:` line did not say that, and I had to run `check` on the new name to continue. Once I used the right file, check passed. The shell also reported "Exit code 1" for the whole chain, which was confusing because the dry-run output printed first.
 
 - **Guessed wrong:**
   - I assumed `--preview --range` would write `out/preview.mp4`, as the render guide's wording suggests. It writes `out/preview-range.mp4`. The guide does not mention this.

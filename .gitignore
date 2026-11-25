@@ -5,3 +5,5 @@ evals/local/
 /bin/
 .cutroom/
 /grade
+.DS_Store
+.claude/
