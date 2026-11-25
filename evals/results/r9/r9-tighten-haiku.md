@@ -1,0 +1,21 @@
+# Friction report: r9-tighten-haiku
+
+- **Outcome:** done. out/final.mp4 (13.767 s, from 30.261 s) passes `cutroom check` with 0 warnings; it removes the retake ("The first thing you need is, UM, the first thing."), the cat aside, and the long pauses, and keeps all 44 expected words in order.
+- **Commands run:** about 31 cutroom invocations, in order: `guide` (overview), `guide workflow`, `guide perceive`, `guide edit`, `guide render`, `guide verify`, `guide pitfalls`, `doctor`, `init talk.mp4`, `inspect`, `transcribe`, `transcript`, `transcript --suspects`, `transcript --words --from 0 --to 31`, `transcript --words --from 18 --to 31`, `transcript --words --from 40 --to 64` (error), `edit tighten`, `edit cut --from "is, UM" --to "first thing." --dry-run`, `edit cut --from "By the way" --to "keyboard." --dry-run`, `edit cut --from "The first thing you need" --near 6.31 --to "first thing." --dry-run`, `edit cut --from "The first thing you need" --near 6.31 --to "first thing."`, `edit cut --from "By the way" --to "keyboard."`, `timeline`, `timeline --joins`, `render --preview --dry-run`, `render --preview`, `check out/preview.mp4`, `render`, `check out/final.mp4`, `transcript --file out/final.mp4`, `look --cuts`.
+- **Errors hit:**
+  - `error[out-of-range]: --from 40 is past the end of talk` / `fix: talk is 30.261 s long; --from/--to are times in seconds (or m:ss), not word numbers`. The fix line got me unstuck at once, but I had assumed word numbers because the suspects hint showed `--words --from <start> --to <end>` and `guide perceive` shows `--from 6 --to 12`, which look like indices.
+- **Guessed wrong:** I assumed `transcript --words --from/--to` took word indices. It takes seconds. The guide example `--from 6 --to 12` does not say which unit it is.
+- **Confusing output:**
+  - The `retake-kept` warning gives a ready command, but the `--dry-run` I tried first (`--from "is, UM" --to "first thing."`) was a worse cut. It left the fragment "The first thing you need" in place and warned that it "starts inside continuous speech." Only the warning's own suggested command, with the `--near 6.31` anchor, gave a clean removal. I'd have liked the dry-run to show what remains around the cut, not only what is removed.
+  - `timeline` prints "no problems found" after the cuts, and `check` reports 0 warnings, but nothing tells you that the cat aside was removed along with its pause. I only confirmed this from the render transcript.
+  - `render --preview --dry-run` says "~4 s" for a 14 s video, which was accurate (1.7 s).
+- **Missing:**
+  - A way to see the words that a cut leaves behind, without reading the whole timeline and joins output.
+  - A note in `transcript --words` saying that the range is in seconds.
+  - Nothing in `check` says it used base.en for the word check. Its message does say this, but it is long.
+- **Not sure it's right:**
+  - I did not `cutroom listen` the joins. The four joins are 0.30–0.33 s pauses with no warnings, and I looked at the cut frames in `look --cuts`, but I never heard the audio at the joins. The stray sound at 16.97 s was removed by tighten, which `tighten` reported, but I did not `listen` to confirm it is gone.
+  - The word check uses base.en, which is the same model that made the transcript, so it confirms the cut but not the recognition. The retake choice (keep 10.25 s, drop 6.31 s) rests on the transcript's repeat suspect and the word timings, not on listening to both takes.
+  - The test-pattern video means the frames are not useful for judging the speaker, so the visual check only confirms that the cuts land on the right frames.
+- **Best part:** `transcript --suspects` plus the `retake-kept` warning with a ready `edit cut` command, and `check` reporting per-word results. Together they took the task from transcript to verified render in about ten commands.
+- **One change:** make `transcript --words --from/--to` take word numbers, or print the unit in its usage line, so an agent does not mix up the two.

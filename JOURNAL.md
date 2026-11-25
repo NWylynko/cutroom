@@ -2,6 +2,13 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 40 · 2026-11-24 · eval round 9: sonnet 12/12, haiku 12/12
+Did: all 12 tasks × 2 models, fresh agents; every run PASS on the independent grader, broll included
+(the round-8 colour fix holds: frames worst 0.2, cutaway 11/11). 2 cutroom errors in 24 runs, both
+recovered by their fix lines. Results in `evals/results/2026-11-24-9.md`; friction → backlog.
+Next: r9 friction (project from --file paths, the look range bug, aside suspects, stale-render next
+step, transcript default, SRT in check), then round 10 — the second clean sonnet round.
+
 ### 39 · 2026-11-24 · r8 friction: paths relative to the shell, retake range, render transcripts by sentence
 Did: (1) every path typed on the command line resolves against the shell's folder, --project or
 not (render output, captions --output/--check, overlay add image/clip; check/init/look already did);

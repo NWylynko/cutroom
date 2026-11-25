@@ -7,7 +7,14 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- Eval round 9 (after the r8 fixes): all 12 tasks; rounds 9 and 10 must be 100% sonnet (golden 3).
+- [friction r9] `look/transcript --file <render>` use the project the file sits in (short ×2).
+- [friction r9] `look --file x a-b` past the end → frame-failed (bug; short-haiku).
+- [friction r9] Aside suspects: discourse markers ("By the way", "Anyway", "Oh,", …) (broll ×2, short).
+- [friction r9] status: "render is stale — re-render" as the next step (resume ×2).
+- [friction r9] transcript default: a video source before any edit (recorder-haiku).
+- [friction r9] check verifies a subtitle file made for the current cut (social-haiku); format line
+  states the rotation tag; edit outputs point at `timeline --apply` for fresh warnings.
+- Eval round 10: must be 100% sonnet (round 9 was) for golden criterion 3.
 - M6: `export --otio --edl`, README + install, `doctor` on a clean PATH.
 - Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
   T3 review, doctor/README.
