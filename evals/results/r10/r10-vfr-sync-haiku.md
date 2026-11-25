@@ -1,0 +1,23 @@
+# Friction report: r10-vfr-sync-haiku
+
+- **Outcome:** done. The long pauses are tightened, the false start is cut, `out/final.mp4` renders at 17.233 s, and `cutroom check out/final.mp4` passes with 0 failures and 0 warnings, including sync at median and worst -0 ms. I could not watch or listen to the video, so the check is my only evidence.
+- **Commands run:** 27 `cutroom` invocations across 9 shell calls, in order: `cutroom guide`, `guide workflow`, `guide perceive`, `guide edit`, `guide render`, `guide verify`, `guide pitfalls`, `doctor`, `init talk-vfr.mp4`, `inspect`, `transcribe`, `transcript`, `transcript --suspects`, `edit tighten`, `timeline`, `edit cut --from "The first thing you need is, UM" --to "the first thing." --dry-run`, `edit cut ... ` (applied), `timeline --joins`, `timeline --accept aside-kept@11.46` (failed), `timeline`, `timeline --accept aside-kept@8.26`, `render --dry-run`, `render --preview`, `check out/preview.mp4`, `render`, `check out/final.mp4`, `transcript --file out/final.mp4`.
+- **Errors hit:**
+  - `error[no-such-warning]: no "aside-kept" warning near output 0:11.460 (nearest at 0:08.257)` with `fix: cutroom timeline lists the warnings with their output times`. The fix line got me unstuck, but only because I re-ran `timeline`. The cause was my own mistake: I used the output time from the WARN printed before the cut, and the cut shifted it.
+- **Guessed wrong:**
+  - I assumed warning times in `--accept` were stable across edits. They are not, and the WARN text does not say so.
+  - I assumed `--accept` needed the time of the most recent WARN, not the one from before the last edit.
+  - The `retake-kept` suggestion (`--from "The first thing you need" --near 6.31 --to "first thing."`) was not used. I cut with my own `--from "The first thing you need is, UM"` instead, which worked, so the suggestion was not needed.
+- **Confusing output:**
+  - `inspect` and `init` print `handled av-offset: ... cutroom keeps that offset ... not a lip-sync error`. The lip-sync claim cannot be verified by the tool, which only compares the render with the source's own sound. The source's sound starts 0.064 s after its picture. That offset is kept as recorded, and the tool says so, but if the original recording is itself out of sync, the render keeps that error.
+  - The sync line reads `median -0 ms, worst -0 ms`. The `-0` is confusing.
+  - The render transcript begins `Hi!` and then `Today I'm going...`, where the source transcript had one phrase. This is base.en splitting differently, not an error, but it is unexplained.
+- **Missing:**
+  - A way to correct the audio/picture start offset (for example `--av-offset`) when the offset is real and the user wants it fixed. I could not tell whether 64 ms was a lip-sync problem or normal device behaviour.
+  - A note on whether the `aside-kept` and `retake-kept` WARN times refresh after each edit.
+- **Not sure it's right:**
+  - Lip sync: the check passes, but it measures render against source sound, not picture against mouth. The 64 ms source offset may or may not be what the user meant by "out of sync".
+  - I kept the off-topic "By the way, my cat..." aside because the request covered only pauses and the false start. It is a judgement call, and `aside-kept` was accepted with a reason.
+  - Transcript-based cut points rely on base.en. The `words` check confirms the cut against base.en, not against a larger model.
+- **Best part:** `check` gives per-segment sync numbers and a clear PASS/WARN list. With `tighten`, `timeline`, and `edit cut --dry-run`, the whole edit took few steps.
+- **One change:** Make warning times in `timeline` and in `--accept` / `--apply` refresh after each edit, or accept a warning code alone when there is only one. The failed `--accept` cost one call and a wrong time.

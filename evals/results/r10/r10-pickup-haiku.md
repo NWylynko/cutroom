@@ -1,0 +1,21 @@
+# Friction report (r10, pickup, haiku)
+
+- **Outcome:** done — out/final.mp4 uses the pickup's "Then install Linux on it.", drops the "UM" false start, the cat aside and the long pauses, and `cutroom check out/final.mp4` passed with 0 warnings.
+- **Commands run:** 41 cutroom invocations over 16 Bash calls, plus 2 image reads (the listen PNGs). In order: `guide`, `guide workflow edit perceive`, `guide render verify pitfalls`, `doctor`, `init talk.mp4 pickup.mp4`, `inspect`, `transcribe`, `transcript talk`, `transcript talk --suspects`, `transcript pickup`, `transcript pickup --suspects`, `transcript talk --words --from 0:13 --to 0:17`, `listen 16.5-17.8 --json`, `edit replace --help`, `listen 16.5-17.8`, `listen --help`, `listen 16.5-17.8 --source talk`, `listen 0:16.5-0:17.8 --source talk`, `edit tighten`, `timeline`, `edit replace --text ... --with pickup --dry-run`, `edit cut --from "The first thing you need is, UM" --to "the first thing." --dry-run`, `edit replace --text ... --with pickup`, `edit cut ... (false start)`, `edit cut --from "By the way," --to "the keyboard." --dry-run`, `edit cut ... (aside)`, `timeline`, `timeline --joins`, `render --preview --dry-run`, `render --preview`, `check`, `listen --output 4.9-7.9`, `look --cuts`, `render`, `check out/final.mp4`, `transcript --file out/final.mp4`, `status`.
+- **Errors hit:**
+  - `error[range-too-short]: range is -13.87 s` / `fix: use at least 0.2 s (add --pad 1 for context)` from `cutroom listen 16.5-17.8`. The fix line did not help: `--pad` would not change the result. What actually worked was `--source talk`, because the default source was `pickup` (2.6 s long), which is not the first source I had added. The `listen --help` example shows the bare form with no source and does not say the default is the first source with audio.
+- **Guessed wrong:**
+  - I assumed `listen` with no `--source` would use `talk`, the first source I added. It used `pickup`.
+  - I assumed the `retake-kept` warning's suggested `--to "first thing."` was safe. I did not run it; I wrote my own `--to "the first thing."` with `--dry-run` first, which worked.
+- **Confusing output:**
+  - Every `timeline` call re-prints all open WARN lines in full, with long suggested commands. That is useful once, but noisy on every call.
+  - `listen` prints `transcript: (nothing)` and `heard (isolated clip): (nothing)` for a stretch that is only a sound, and the sound is only visible in the PNG. The text summary alone did not say whether the 0.32 s burst at 16.97 was a click or speech; I had to open the PNG.
+- **Missing:**
+  - No way to tell `listen` which source an output-independent range refers to other than `--source`, and no hint in the error about it.
+  - `edit replace` has no preview of the pickup's lead-in or room tone against the talk's, beyond the `audio-mixed` INFO line. I relied on that line plus the spectrogram at the join.
+- **Not sure it's right:**
+  - I judged the join at output 4.9–7.9 from the spectrogram only; I could not listen. The `audio-mixed` note says speech and room tone match (-16.6 vs -16.5 dB, -72.7 vs -72.7 dB), which supports it, but I have not heard it.
+  - The final transcript reads "...laptop, then install Linux on it." with the pickup's words, and `check` says all 44 expected words were heard, but that check uses base.en, the same model that made the transcript, so it confirms the cut rather than the recogniser.
+  - I removed the 0.32 s burst at 16.97 as a stray sound because tighten dropped it; the `stray-sound` check passed on the final, so it is not in the render, but I did not hear it.
+- **Best part:** `cutroom edit replace --text "Then install Linux on it." --with pickup` did the whole pickup swap in one command, with `--dry-run` beforehand. Together with `timeline` listing each open warning and its ready command, the edit took very few steps.
+- **One change:** make `listen` default to the source that contains the range (or error with "default source is pickup (2.6 s); add --source talk"), and fix the `range-too-short` fix line so it stops suggesting `--pad` for a source-length problem.

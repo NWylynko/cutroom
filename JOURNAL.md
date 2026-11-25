@@ -2,6 +2,14 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 42 · 2026-11-24 · eval round 10: sonnet 12/12, haiku 12/12 — golden criterion 3 met
+Did: all 12 tasks × 2 models; every run PASS. Second consecutive 100% sonnet round (9, 10): golden
+criterion 3 holds. Asides: agents with pause-only briefs accepted the new warning with a reason,
+the rest cut it. Results in `evals/results/2026-11-24-10.md`.
+Found: `edit undo --dry-run` performs the undo (a real bug; no redo to recover).
+Next: the r10 bug and friction, then the remaining golden criteria: 1 (SPEC commands — export
+OTIO/EDL first), 2 (lesson guards audit), 4 (T3 reviewer), 5 (README, install, clean-PATH doctor).
+
 ### 41 · 2026-11-24 · r9 friction: renders find their project, asides flagged, subtitles in check
 Did: (1) the render manifest records its project; `look/listen/transcript --file` and `check <file>`
 without --project use it (else the nearest folder above the file with a project) — a short rendered

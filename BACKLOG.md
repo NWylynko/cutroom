@@ -7,7 +7,17 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- Eval round 10: must be 100% sonnet (round 9 was) for golden criterion 3.
+- [bug r10] `edit undo --dry-run` undoes for real; add `edit redo` (fix-edit-haiku).
+- [friction r10] `--accept/--apply code@time`: a moved warning should still match (nearest within the
+  same code when only one exists, or by its text); vfr-haiku.
+- [friction r10] `listen`/`look` default source = the edit's main video, like transcript (pickup-haiku).
+- [friction r10] guide: burned captions are 1–3 words, a 4th only to avoid a weak ending; trim
+  repetition in `guide --all` (8k tokens).
+- Golden 1: SPEC v1 commands — `export --otio --edl`; check SPEC rows (`edit split/pin`,
+  `transcript --retakes/--output`, `look --overlays/--crop`) against what exists.
+- Golden 2: audit LESSONS.md — every INVARIANT has a TestLxx guard, every DETECT a fixture.
+- Golden 4: T3 reviewer pass on the local real-footage excerpts.
+- Golden 5: README + install; `go install` + `doctor` on a clean PATH; a fresh agent follows the README.
 - M6: `export --otio --edl`, README + install, `doctor` on a clean PATH.
 - Golden criterion 3 holds (sonnet clean in rounds 3–6); the remaining gap is spec coverage (M4–M6),
   T3 review, doctor/README.
