@@ -93,7 +93,17 @@ func runExport(c *Ctx) (*Result, error) {
 		for _, p := range ps {
 			switch p.Kind {
 			case "captions":
+				animFrom := -1.0 // entrance frames are left out: the group's card starts where they did
 				for i, g := range p.Groups {
+					if g.Anim {
+						if animFrom < 0 {
+							animFrom = g.Start
+						}
+						continue
+					}
+					if animFrom >= 0 {
+						g.Start, animFrom = animFrom, -1
+					}
 					dst, err := copyCard(g.PNG, fmt.Sprintf("caption_%03d.png", i+1))
 					if err != nil {
 						return nil, err

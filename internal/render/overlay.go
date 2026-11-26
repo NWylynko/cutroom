@@ -47,6 +47,9 @@ type Placement struct {
 	ClipIn  float64 `json:"clip_in,omitempty"`
 	ClipDur float64 `json:"clip_duration,omitempty"`
 	Full    bool    `json:"full,omitempty"` // covers the whole frame
+	// Anim: a card's motion in and out (pop, slide-…; "" or fade = none) over AnimTime seconds
+	Anim     string  `json:"anim,omitempty"`
+	AnimTime float64 `json:"anim_time,omitempty"`
 }
 
 // CapGroup is one burned-in caption group as rendered.
@@ -57,6 +60,7 @@ type CapGroup struct {
 	PNG   string     `json:"png"`
 	Key   string     `json:"key"`
 	Box   [4]float64 `json:"box"`
+	Anim  bool       `json:"anim,omitempty"` // one frame of a group's entrance animation
 }
 
 // Placements resolves every overlay of tl that shows to a card PNG at w×h (cached in cacheDir).
@@ -128,7 +132,8 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 		if o.Kind == "image" {
 			name = o.Path
 		}
-		ps = append(ps, Placement{ID: o.ID, Kind: o.Kind, PNG: png, Key: key, Start: a, End: b, Fade: o.Fade, Box: box, Name: name})
+		cs := CardStyle(tl, o)
+		ps = append(ps, Placement{ID: o.ID, Kind: o.Kind, PNG: png, Key: key, Start: a, End: b, Fade: o.Fade, Box: box, Name: name, Anim: motion(cs.Animate), AnimTime: cs.AnimateTime})
 	}
 	return ps, nil
 }
@@ -380,7 +385,10 @@ func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline
 	}
 	p := Placement{ID: o.ID, Kind: "captions", Start: 0, End: tl.Duration(), Name: "burned-in captions", Key: "captions"}
 	var keys []any
-	add := func(g captions.Group, words []string, active int, a, b float64) error {
+	boxSet := false
+	fps := tl.Rate()
+	nAnim := int(math.Round(st.AnimateTime * fps))
+	add := func(g captions.Group, words []string, active int, a, b float64, animate bool) error {
 		key := hash([]any{CardVersion, "caption", w, h, words, active, l.key})
 		png := filepath.Join(cacheDir, "overlays", key+".png")
 		capMu.Lock()
@@ -402,10 +410,35 @@ func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline
 			}
 		}
 		box := [4]float64{float64(r.Min.X) / float64(w), float64(r.Min.Y) / float64(h), float64(r.Max.X) / float64(w), float64(r.Max.Y) / float64(h)}
+		f0 := math.Round(a * fps)
+		if animate && st.Animate != "none" && nAnim > 0 && math.Round(b*fps)-f0 >= float64(nAnim+1) {
+			// the entrance: nAnim frames drawn from the settled card, then the card itself
+			var full *image.NRGBA
+			for i := range nAnim {
+				akey := hash([]any{key, "anim", st.Animate, i, nAnim})
+				apng := filepath.Join(cacheDir, "overlays", akey+".png")
+				if _, err := os.Stat(apng); err != nil {
+					if full == nil {
+						full, _ = captionCard(words, active, l, w, h)
+					}
+					sc, dx, dy, al := animAt(st.Animate, float64(i+1)/float64(nAnim+1))
+					if err := ensureDir(apng); err != nil {
+						return err
+					}
+					if err := raster.SavePNG(apng, animFrame(full, r, sc, dx, dy, al)); err != nil {
+						return err
+					}
+				}
+				fa, fb := (f0+float64(i))/fps, (f0+float64(i+1))/fps
+				p.Groups = append(p.Groups, CapGroup{Start: fa, End: fb, Text: g.Text, PNG: apng, Key: akey, Box: box, Anim: true})
+				keys = append(keys, []any{akey, fa, fb})
+			}
+			a = (f0 + float64(nAnim)) / fps
+		}
 		p.Groups = append(p.Groups, CapGroup{Start: a, End: b, Text: g.Text, PNG: png, Key: key, Box: box})
 		keys = append(keys, []any{key, a, b})
-		if len(p.Groups) == 1 { // the placement's box covers every group's box
-			p.Box = box
+		if !boxSet { // the placement's box covers every group's box
+			p.Box, boxSet = box, true
 		}
 		p.Box = [4]float64{math.Min(p.Box[0], box[0]), math.Min(p.Box[1], box[1]), math.Max(p.Box[2], box[2]), math.Max(p.Box[3], box[3])}
 		return nil
@@ -413,7 +446,7 @@ func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline
 	for _, g := range captions.Groups(ws, GroupOptions(st), tl.Duration()) {
 		words := strings.Fields(g.Text)
 		if l.highlight == nil || len(words) != g.Last-g.First+1 {
-			if err := add(g, words, -1, g.Start, g.End); err != nil {
+			if err := add(g, words, -1, g.Start, g.End, true); err != nil {
 				return p, err
 			}
 			continue
@@ -430,7 +463,7 @@ func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline
 			if b <= a {
 				continue
 			}
-			if err := add(g, words, k, a, b); err != nil {
+			if err := add(g, words, k, a, b, k == 0); err != nil {
 				return p, err
 			}
 		}
@@ -597,4 +630,34 @@ func ClipCard(p Placement, t float64, cacheDir string, w, h int) (string, error)
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))
 	draw.Draw(img, image.Rect(bx, by, bx+bw, by+bh), src, src.Bounds().Min, draw.Src)
 	return png, raster.SavePNG(png, img)
+}
+
+// animFrame is one frame of an entrance: the card's box r scaled by sc around its centre, moved by
+// (dx, dy) × its size, at opacity al.
+func animFrame(src *image.NRGBA, r image.Rectangle, sc, dx, dy, al float64) *image.NRGBA {
+	b := src.Bounds()
+	out := image.NewNRGBA(b)
+	bw, bh := float64(r.Dx())*sc, float64(r.Dy())*sc
+	cx := float64(r.Min.X+r.Max.X)/2 + dx*float64(r.Dx())
+	cy := float64(r.Min.Y+r.Max.Y)/2 + dy*float64(r.Dy())
+	d := image.Rect(int(math.Round(cx-bw/2)), int(math.Round(cy-bh/2)), int(math.Round(cx+bw/2)), int(math.Round(cy+bh/2)))
+	xdraw.ApproxBiLinear.Scale(out, d, src, r, draw.Src, nil)
+	if al < 1 {
+		d = d.Intersect(b)
+		for y := d.Min.Y; y < d.Max.Y; y++ {
+			for x := d.Min.X; x < d.Max.X; x++ {
+				i := out.PixOffset(x, y) + 3
+				out.Pix[i] = uint8(math.Round(float64(out.Pix[i]) * al))
+			}
+		}
+	}
+	return out
+}
+
+// motion is an animation that moves or scales a card ("" for none or a plain fade).
+func motion(kind string) string {
+	if kind == "none" || kind == "fade" {
+		return ""
+	}
+	return kind
 }

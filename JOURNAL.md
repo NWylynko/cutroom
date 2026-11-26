@@ -2,6 +2,21 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 56 · 2026-11-26 · Animated captions and cards: pop, slide, fade (`style --animate`)
+Did: cards could only alpha-fade, captions only cut in. New style fields `animate` (none | fade | pop |
+slide-up/down/left/right) and `animate-time`. Captions: each group's first frames are drawn as
+scaled/moved/faded copies of its card (pre-rendered PNGs, one frame each, in the same concat list —
+no new filters; karaoke animates once per group); export folds them back into the group's card.
+Cards: cropped to their box (+ shadow room) and moved/scaled per frame with eased ffmpeg expressions
+(overlay x/y and scale with eval=frame, frame number n), in and out; chunk splits avoid them like fades.
+Measured: real short, captions pop (0.15 s), cards slide-up/pop (0.3 s): per-frame card brightness
+44→52 ramps then holds (settled on frame 52 = 0.3 s); `check` PASS (overlays visible over their
+windows, gone before/after; 301 boxes in the safe zones). make check green; e2e 271/271.
+Surprises: two bugs found only by looking — the chunk copied its overlay before the anim flags were
+set (cards rendered static), and the caption union box started from the first *animation* frame's
+zero box, sending a lower third to y 0 (check's safe-zones caught it).
+Next: inset the accent bar on rounded cards; a T2 task that asks for a specific look.
+
 ### 55 · 2026-11-26 · Lower thirds keep clear of where the captions really are
 Did: with burned-in captions a lower third was raised above the *default* caption band; after
 `style captions --y/--size` it could sit on top of the captions, or jump up for no reason. Placements

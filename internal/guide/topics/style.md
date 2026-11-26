@@ -31,6 +31,10 @@ Fields (`cutroom style --help` lists them all; `--x default` unsets one, `--rese
 - **x** / **y**: the centre of the box as a point of the frame (0–1 across, down), like
   `edit frame --anchor`; unset, captions sit in the caption band and cards follow `--layout`.
 - **width**: the widest line as a fraction of the frame width; longer text wraps.
+- **animate**: `none`, `fade`, `pop`, `slide-up`, `slide-down`, `slide-left`, `slide-right`.
+  Captions animate each group as it appears (karaoke: once per group, not per word); cards come in
+  and go out with it, on top of their `--fade` (`overlay set o1 --fade 0` for motion only).
+  **animate-time**: seconds it takes (captions 0.15, cards 0.3).
 
 Look before rendering (`cutroom look --output <time>` draws them as the render will). On vertical
 video `timeline` and `check` warn `overlay-unsafe` when text reaches where the apps draw their own

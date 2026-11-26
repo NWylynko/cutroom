@@ -71,6 +71,8 @@ type ChunkOverlay struct {
 	From, To int64
 	FadeIn   bool `json:"fade_in"`
 	FadeOut  bool `json:"fade_out"`
+	AnimIn   bool `json:"anim_in,omitempty"`
+	AnimOut  bool `json:"anim_out,omitempty"`
 	// Frames: burned-in captions as runs of chunk frames, each showing one card ("" = nothing)
 	Frames []CapRun `json:"frames,omitempty"`
 }
@@ -224,8 +226,9 @@ func Plan(tl *timeline.Timeline, srcs map[string]Source, o Options) []Chunk {
 				c.Overlays = append(c.Overlays, co)
 				continue
 			}
+			co.AnimIn, co.AnimOut = p.Anim != "" && pa >= c0, p.Anim != "" && pb <= c0+c.Frames
 			c.Overlays = append(c.Overlays, co)
-			ovs = append(ovs, []any{p.Key, from, to, co.FadeIn, co.FadeOut, p.Fade, pa - c0, pb - c0})
+			ovs = append(ovs, []any{p.Key, from, to, co.FadeIn, co.FadeOut, p.Fade, pa - c0, pb - c0, p.Anim, p.AnimTime, co.AnimIn, co.AnimOut})
 		}
 		parts := []any{Version, tl.FPS, w, h, o.Preview, encArgs(o.Preview), segs, tl.Grid}
 		if tl.Fill { // keys of fitted timelines are unchanged
@@ -325,6 +328,12 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 		if k == len(c.Overlays)-1 {
 			next = "ovl"
 		}
+		if co.P.Kind != "clip" && (co.AnimIn || co.AnimOut) {
+			crop, ox, oy := cardMotion(co, w, h, tl.Rate())
+			fc = append(fc, chain+crop+fmt.Sprintf("[o%d]", k),
+				fmt.Sprintf("[base%d][o%d]overlay=x='%s':y='%s':eval=frame:eof_action=repeat:enable='between(n,%d,%d)'[%s]", k, k, ox, oy, co.From, co.To-1, next))
+			continue
+		}
 		fc = append(fc, chain+fmt.Sprintf("[o%d]", k),
 			fmt.Sprintf("[base%d][o%d]overlay=%d:%d:eof_action=repeat:enable='between(n,%d,%d)'[%s]", k, k, x0, y0, co.From, co.To-1, next))
 	}
@@ -344,10 +353,14 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 // chunk boundary would show as a seam (L13).
 func inFade(ps []Placement, b int64, fps float64) bool {
 	for _, p := range ps {
-		if p.Fade <= 0 {
+		d := p.Fade
+		if p.Anim != "" {
+			d = math.Max(d, p.AnimTime)
+		}
+		if d <= 0 {
 			continue
 		}
-		nf := int64(math.Max(1, math.Round(p.Fade*fps)))
+		nf := int64(math.Max(1, math.Round(d*fps)))
 		pa, pb := int64(math.Round(p.Start*fps)), int64(math.Round(p.End*fps))
 		if (b > pa && b < pa+nf) || (b > pb-nf && b < pb) {
 			return true
@@ -788,4 +801,44 @@ func (g MSeg) Anchor() (float64, float64) {
 		return 0.5, 0.4
 	}
 	return g.AnchorX, g.AnchorY
+}
+
+// cardMotion is a moving card's filter tail and overlay position: the card is cropped to its box
+// (with room for its shadow), scaled per frame for pop, and placed per frame (x, y expressions in
+// the chunk's frame number n) — easing in over AnimTime after it appears and out before it goes.
+func cardMotion(co ChunkOverlay, w, h int, fps float64) (crop, x, y string) {
+	pad := 0.06 * float64(min(w, h))
+	bx0 := math.Max(0, math.Floor(co.P.Box[0]*float64(w)-pad))
+	by0 := math.Max(0, math.Floor(co.P.Box[1]*float64(h)-pad))
+	bx1 := math.Min(float64(w), math.Ceil(co.P.Box[2]*float64(w)+pad))
+	by1 := math.Min(float64(h), math.Ceil(co.P.Box[3]*float64(h)+pad))
+	cw, ch := int(bx1-bx0), int(by1-by0)
+	bw, bh := (co.P.Box[2]-co.P.Box[0])*float64(w), (co.P.Box[3]-co.P.Box[1])*float64(h)
+	nf := math.Max(1, math.Round(co.P.AnimTime*fps))
+	pin, pout := "1", "1"
+	if co.AnimIn {
+		pin = fmt.Sprintf("clip((n-%d+1)/%g,0,1)", co.From, nf+1)
+	}
+	if co.AnimOut {
+		pout = fmt.Sprintf("clip((%d-n)/%g,0,1)", co.To, nf+1)
+	}
+	P := fmt.Sprintf("min(%s,%s)", pin, pout)
+	E := fmt.Sprintf("(1-pow(1-%s,3))", P)
+	crop = fmt.Sprintf(",crop=%d:%d:%d:%d", cw, ch, int(bx0), int(by0))
+	cx, cy := fmt.Sprintf("%d+(%d-w)/2", int(bx0), cw), fmt.Sprintf("%d+(%d-h)/2", int(by0), ch)
+	switch co.P.Anim {
+	case "pop":
+		S := fmt.Sprintf("(0.6+0.4*(1+2.70158*pow(%[1]s-1,3)+1.70158*pow(%[1]s-1,2)))", P)
+		crop += fmt.Sprintf(",scale=w='max(2,trunc(iw*%[1]s/2)*2)':h='max(2,trunc(ih*%[1]s/2)*2)':eval=frame", S)
+		return crop, cx, cy
+	case "slide-up":
+		return crop, cx, fmt.Sprintf("%s+%g*(1-%s)", cy, 0.6*bh, E)
+	case "slide-down":
+		return crop, cx, fmt.Sprintf("%s-%g*(1-%s)", cy, 0.6*bh, E)
+	case "slide-left":
+		return crop, fmt.Sprintf("%s+%g*(1-%s)", cx, 0.3*bw, E), cy
+	case "slide-right":
+		return crop, fmt.Sprintf("%s-%g*(1-%s)", cx, 0.3*bw, E), cy
+	}
+	return crop, cx, cy
 }

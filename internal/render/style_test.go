@@ -114,3 +114,21 @@ func TestLowerThirdKeepsClearOfStyledCaptions(t *testing.T) {
 		t.Errorf("lower third at y %d–%d overlaps captions from %d", y, y+150, int(0.70*float64(H)))
 	}
 }
+
+func TestAnimFrameScalesAroundCentre(t *testing.T) {
+	l, _ := resolve(CaptionDefaults, "", 1080, 1920)
+	img, r := captionCard([]string{"hello"}, -1, l, 1080, 1920)
+	f := animFrame(img, r, 0.5, 0, 0, 1)
+	// the corner of the settled box is now empty; the centre still drawn
+	if a := f.NRGBAAt(r.Min.X+2, r.Min.Y+2).A; a != 0 {
+		t.Errorf("scaled frame still covers the box corner (alpha %d)", a)
+	}
+	if a := f.NRGBAAt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2).A; a == 0 {
+		t.Errorf("scaled frame lost its centre")
+	}
+	for _, k := range []string{"pop", "slide-up", "fade", "slide-left"} {
+		if s, dx, dy, a := animAt(k, 1); s != 1 || dx != 0 || dy != 0 || a != 1 {
+			t.Errorf("%s at progress 1 must be settled: %g %g %g %g", k, s, dx, dy, a)
+		}
+	}
+}

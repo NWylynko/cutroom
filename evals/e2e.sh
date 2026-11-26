@@ -372,6 +372,8 @@ expect "style fonts lists built-ins" 'built in .*bold, regular, mono'     cutroo
 expect "style one card"              'y +0.3 +set'                        cutroom style o1 --y 0.3 --box "#ffffffee" --color "#101718" --radius 0.4 --project shorts/steps
 expect "style unsafe warned"         'overlay-unsafe.*burned-in captions.*style captions --y' cutroom style captions --y 0.95 --project shorts/steps
 expect "style undo"                  'undid'                              cutroom edit undo --project shorts/steps
+expect "style animate"               'animate +pop +set'                  cutroom style captions --animate pop --project shorts/steps
+expect "style animate cards"         'animate +slide-up +set'             cutroom style cards --animate slide-up --project shorts/steps
 expect "styled render"               '1080x1920'                          cutroom render out/styled.mp4 --project shorts/steps
 expect "styled check: captions"      'ok   captions +burned-in captions: [0-9]+ groups' cutroom check out/styled.mp4 --project shorts/steps
 expect "styled check: safe zones"    'ok   safe-zones'                    cutroom check out/styled.mp4 --project shorts/steps

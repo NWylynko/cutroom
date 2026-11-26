@@ -8,7 +8,7 @@ Move done items to the journal, not here.
 
 ## NOW
 - [style] A rounded card's accent bar sits on the curve of the panel; inset it or follow the corner.
-- [style] Entrance/exit animation for captions and cards (pop, slide, per-word pop-in), not only fades.
+- [style] Per-word pop for karaoke captions (each word bumps as it is said), if asked for.
 - [style] T2 eval task whose brief asks for a specific caption look (font, highlight, position) —
   checks agents find `cutroom style` from the guide.
 - [style] Per-card text formatting beyond title/sub (a third line, an inline accent word).

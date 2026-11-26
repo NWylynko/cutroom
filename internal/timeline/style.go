@@ -35,6 +35,8 @@ type Style struct {
 	X            *float64 `json:"x,omitempty"`             // centre of the box, 0–1 across
 	Y            *float64 `json:"y,omitempty"`             // centre of the box, 0–1 down
 	Width        float64  `json:"width,omitempty"`         // widest line, fraction of the frame width
+	Animate      string   `json:"animate,omitempty"`       // how it comes in and goes out: none | fade | pop | slide-up | slide-down | slide-left | slide-right
+	AnimateTime  float64  `json:"animate_time,omitempty"`  // seconds the animation takes
 	Words        int      `json:"words,omitempty"`         // captions: most words shown at once
 	Chars        int      `json:"chars,omitempty"`         // captions: most characters shown at once
 }
@@ -62,6 +64,8 @@ var StyleFields = []StyleField{
 	{"x", "num", "centre of the box, 0–1 across (default: centred; cards: from --layout)", ""},
 	{"y", "num", "centre of the box, 0–1 down (default: the caption band / the layout's place)", ""},
 	{"width", "num", "widest line as a fraction of the frame width (longer text wraps)", ""},
+	{"animate", "enum:none,fade,pop,slide-up,slide-down,slide-left,slide-right", "how it comes in (and cards go out): captions animate each group as it appears; cards also keep their --fade", ""},
+	{"animate-time", "num", "seconds the animation takes (default 0.15 captions, 0.3 cards)", ""},
 	{"words", "int", "most words shown at once (default 3)", "captions"},
 	{"chars", "int", "most characters shown at once (default 20)", "captions"},
 	{"sub-font", "font", "the second line's font", "cards"},

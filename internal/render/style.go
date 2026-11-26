@@ -17,13 +17,13 @@ import (
 
 // CaptionDefaults is cutroom's caption look: bold white on a translucent black box (L48).
 var CaptionDefaults = timeline.Style{Font: "bold", Size: 0.068, Color: "#ffffff", Box: "#000000aa", Pad: 0.3,
-	Highlight: "none", Outline: "none", Shadow: "none", BoxShadow: "none", Case: "as-is", Align: "center", Words: 3, Chars: 20}
+	Highlight: "none", Outline: "none", Shadow: "none", BoxShadow: "none", Case: "as-is", Align: "center", Words: 3, Chars: 20, Animate: "none", AnimateTime: 0.15}
 
 // CardDefaults is cutroom's text-card look for a layout: white on a dark translucent panel, an amber
 // bar on lower thirds.
 func CardDefaults(layout string) timeline.Style {
 	s := timeline.Style{Font: "bold", SubFont: "regular", Size: 0.055, SubSize: 0.036, Color: "#ffffff", SubColor: "#dcdce1",
-		Box: "#0c0c10be", Accent: "#f59e0b", Outline: "none", Shadow: "none", BoxShadow: "none", Pad: 0.4, Case: "as-is", Align: "left", Width: 0.62}
+		Box: "#0c0c10be", Accent: "#f59e0b", Outline: "none", Shadow: "none", BoxShadow: "none", Pad: 0.4, Case: "as-is", Align: "left", Width: 0.62, Animate: "fade", AnimateTime: 0.3}
 	switch layout {
 	case "title", "center":
 		s.Size, s.SubSize, s.Width, s.Align, s.Accent = 0.085, 0.045, 0.84, "center", "none"
@@ -190,4 +190,29 @@ func (l look) drawBox(img *image.NRGBA, r image.Rectangle) {
 	if l.box != nil {
 		raster.FillRound(img, r, l.radius, l.box)
 	}
+}
+
+// animAt is an animation's state at progress p (0 = not in yet, 1 = settled): scale, offset (as a
+// fraction of the box size) and opacity. Motion eases out with a slight overshoot for pop.
+func animAt(kind string, p float64) (scale, dx, dy, alpha float64) {
+	p = math.Max(0, math.Min(1, p))
+	e := 1 - math.Pow(1-p, 3) // ease out
+	scale, alpha = 1, 1
+	switch kind {
+	case "pop":
+		c := 1.70158 // ease out back
+		b := 1 + (c+1)*math.Pow(p-1, 3) + c*math.Pow(p-1, 2)
+		scale, alpha = 0.6+0.4*b, math.Min(1, 2*p)
+	case "fade":
+		alpha = e
+	case "slide-up":
+		dy, alpha = 0.6*(1-e), math.Min(1, 2*p)
+	case "slide-down":
+		dy, alpha = -0.6*(1-e), math.Min(1, 2*p)
+	case "slide-left":
+		dx, alpha = 0.3*(1-e), math.Min(1, 2*p)
+	case "slide-right":
+		dx, alpha = -0.3*(1-e), math.Min(1, 2*p)
+	}
+	return
 }
