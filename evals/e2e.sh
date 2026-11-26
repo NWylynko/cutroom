@@ -281,6 +281,8 @@ expect "overlay set keeps the id"  'set o1: --duration 2\.5'               cutro
 expect "overlay eyebrow + left"      'text "Two steps", left'             cutroom overlay add text "Two steps" --eyebrow "Step 1" --at "Then install" --duration 1.5 --layout left --dry-run
 expect "eyebrow on an image refused" 'no --sub or --eyebrow'              cutroom overlay add image logo.png --eyebrow "x" --at "Finally" --duration 1 --dry-run
 expect "overlay set eyebrow"         'set o1: --eyebrow "Step 2"'         cutroom overlay set o1 --eyebrow "Step 2" --dry-run
+expect "overlay --y points to style" 'style o1 --y'                        cutroom overlay set o1 --y 0.3
+expect "look --file on a source"     'frame 360 of talk at 0:12'           cutroom look --file talk.mp4 12
 expect "overlay set nothing"       'nothing to change'                   cutroom overlay set o1
 expect "overlay sub-help"          'cutroom overlay add'                 sh -c 'cutroom overlay add --help | head -1'
 t1=$(cutroom overlay list --json | python3 -c 'import json,sys;o=json.load(sys.stdin)["result"]["overlays"][0];print(round((o["output_start"]+o["output_end"])/2,2))')

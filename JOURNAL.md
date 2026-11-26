@@ -2,6 +2,16 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 70 · 2026-11-27 · Eval round 13: 17/17 PASS; four low friction fixes
+Did: T2 round over all 13 tasks with sonnet + 4 with haiku (evals/results/2026-11-27-13.md). The
+account's usage limit stopped every agent mid-run; resumed after the reset, none restarted. All 17
+PASS on the independent grader; sonnet runs hit 0 cutroom errors. Fixed: style flags given to
+`overlay`/`captions` point to `cutroom style <id>`; `look --file <source>` shows that source's frame
+without an edit; "no speaker found" says the picture may have no person; `render` suggests a look at
+the result.
+Measured: make check green; e2e 301/301 (+2).
+Next: backlog friction (short --cut-asides, sync direction sentence) or back to real footage.
+
 ### 69 · 2026-11-26 · `overlay-covers-face`: cards, images and captions that cover the speaker's face
 Did: GRAPHICS.md's first rule is "never cover the face". FindSpeaker now also gives a face box: the
 forehead row (first skin at the centre column) and the median run of skin pixels below it (width ≈

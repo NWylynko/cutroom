@@ -6,6 +6,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/NWylynko/cutroom/internal/timeline"
 	"io"
 	"os"
 	"path/filepath"
@@ -350,6 +351,22 @@ func parseArgs(ctx *Ctx, args []string) error {
 			}
 			if s := suggest(name, names()); s != "" {
 				fix = fmt.Sprintf("did you mean --%s? (`cutroom %s --help` lists all flags)", s, ctx.Cmd.Name)
+			}
+			if ctx.Cmd.Name == "overlay" || ctx.Cmd.Name == "captions" {
+				for _, f := range timeline.StyleFields {
+					if f.Name == name {
+						fix = fmt.Sprintf("--%s is part of the look, set with `cutroom style captions --%s …` (`cutroom guide style`)", name, name)
+						if ctx.Cmd.Name == "overlay" {
+							id := "o1"
+							for _, x := range ctx.Args {
+								if len(x) > 1 && x[0] == 'o' && strings.Trim(x[1:], "0123456789") == "" {
+									id = x
+								}
+							}
+							fix = fmt.Sprintf("--%s is part of the look, set with `cutroom style %s --%s …` (one card) or `cutroom style cards --%s …` (all of them)", name, id, name, name)
+						}
+					}
+				}
 			}
 			return Errf(ExitUsage, "unknown-flag", fix, "%s has no flag --%s", ctx.Cmd.Name, name)
 		}

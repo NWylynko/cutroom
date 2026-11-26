@@ -1,0 +1,31 @@
+# Friction report: r13-styled-short-haiku
+
+- **Outcome:** done, with one caveat: out/short.mp4 passes `cutroom check` with 0 failures and 0 warnings, but its picture is a colour-bar test pattern (magenta/blue/yellow/green bars), not a speaker, because talk.mp4's picture is itself colour bars. The speech, captions and title are correct.
+- **Commands run:** about 36 cutroom invocations. In order: `guide`; `guide workflow`; `guide shorts`; `guide style`; `guide captions`; `guide verify`; `guide overlays`; `init talk.mp4 --json`; `transcribe --json`; `transcript --search "first thing you need"`; `transcript --search "update command"`; `transcript talk`; `transcript talk --suspects`; `short --from "The first thing you need is an" --to "update command." --name steps`; `timeline --project shorts/steps`; `edit cut --from "By the way" --to "across the keyboard." --project shorts/steps`; `timeline --project shorts/steps --joins`; `style --help`; `style captions --color "#FF5FA2" --outline black --outline-width 0.12 --box none --case upper --words 2 --y 0.58 --highlight none --animate none`; `style cards --box "#ffffff" --color "#101718" --radius 0.4 --accent none --animate pop`; `overlay add text "3 steps to a home server" --layout top --at "The first thing" --duration 4`; `overlay list`; `timeline`; `captions --burn`; `look --output 0.5`, `2.5`, `5.0`, `1.0`; `overlay set o1 --y 0.22` (failed); `style o1 --y 0.22`; `timeline`; `render --preview --range 0:00-0:08`; `check out/preview.mp4` (failed); `render --preview`; `check out/preview.mp4` (PASS); `render out/short.mp4 --project shorts/steps`; `check out/short.mp4` (PASS); `look --file talk.mp4 12` (failed); `look --output 12 --project shorts/steps` (failed); `look --output 1 --project shorts/steps`.
+- **Errors hit:**
+  - `error[unknown-flag]: overlay has no flag --y` / `fix: did you mean --at?`. The fix line did not help: `--at` is an anchor word, not a position. I got unstuck by `style o1 --y 0.22`, which the style help lists, but the fix line pointed the wrong way.
+  - `error[no-render]: .../shorts/steps/out/preview.mp4 not found` / `fix: renders here: out/preview-range.mp4`. Unhelpful: the `--range` preview is not what `check` was asked for, and the fix line pointed at a file I did not want. I re-ran a full `render --preview` and the check passed.
+  - `error[no-timeline]: no timeline yet in .` for `look --file talk.mp4 12`. The fix line was reasonable, but I could not view the raw source frame any other way.
+  - `error[out-of-range]: output 0:12.000 is past the end`. Correct, but I only learned it had a 7.5 s edit by trying.
+- **Guessed wrong:**
+  - I assumed `overlay set` takes position flags like `--y`. It does not; per-card position is `style <id> --y`.
+  - I assumed `look --file <source>` works on a raw source without a timeline. It does not, so I could not look at the source picture directly.
+  - Exit code 1 from a chained `&&` command hid which step failed; I had to re-run to find it.
+- **Confusing output:**
+  - `short` printed `WARN[aside-kept]` for the cat aside, and that is the only signal the aside was there. Good, but I had to search the transcript for the timing to build the cut.
+  - The `captions --burn` listing shows 10 groups and "3 more (--all)", so I could not see every group without another call.
+  - `check` says "safe-zones: 14 overlay box(es) inside the vertical safe zones (y 174–993)". The 174 edge is exactly on the boundary, which I only noticed by doing the arithmetic.
+  - `look` draws text settled, so the title card's `animate pop` cannot be seen in a still. The guide says to render and sample frames to see motion; I did not do that.
+- **Missing:**
+  - A way to see the raw source frame before editing. Without it I did not know the picture was colour bars until I looked at the output.
+  - A `--y` for overlays, or a note in `overlay add --help` that position comes from `style <id>`.
+  - Checks that a title card's animation (`pop`) actually plays in the render.
+  - A way to confirm that a card's top edge is clear of the safe zone, beyond the warning.
+- **Not sure it's right:**
+  - The picture: the source is colour bars with no speaker, so the vertical short shows bars. `framing: no speaker found` agrees. This should be raised with the user.
+  - Resolution: I used 720x1280, because `short` advised that 1080x1920 would enlarge a 720p source 2.7x. YouTube Shorts and TikTok usually take 1080x1920, so this may not be the platform's preferred size.
+  - "Pops in": `animate pop` is set on the card, but I did not render frames to confirm the motion.
+  - Caption placement at y 0.58 is "a little below the middle" by my reading of the still frames; I did not measure it against the spec precisely.
+  - Words were checked with base.en, which confirms the cut but not the recogniser's accuracy.
+- **Best part:** `cutroom short` plus `timeline --joins`, the `WARN[aside-kept]` finding, and one `check` that verifies overlays, captions, safe zones, sync and words together.
+- **One change:** make `look` work on a raw source (or print the source picture's mean colour and "no face/person found") so an agent can see that the picture is a test pattern before building a short on it.

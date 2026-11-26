@@ -225,7 +225,7 @@ func runRender(c *Ctx) (*Result, error) {
 	if c.Has("range") {
 		lines = append(lines, rangeNote)
 	}
-	next := []string{"cutroom check " + relToCwd(res.Output)}
+	next := []string{"cutroom check " + relToCwd(res.Output), "cutroom look --file " + relToCwd(res.Output) + "   (see frames of what you made: a contact sheet)"}
 	return &Result{Text: strings.Join(lines, "\n"), Data: res, Next: next}, nil
 }
 

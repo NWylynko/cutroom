@@ -155,6 +155,15 @@ func runLook(c *Ctx) (*Result, error) {
 	if err := fileArg(c); err != nil {
 		return nil, err
 	}
+	// `look --file talk.mp4 12` on one of the project's own sources: that source's frame, no edit needed
+	if c.Has("file") && !c.Bool("cuts") && !c.Bool("output") && !c.Bool("overlays") {
+		if p, err := needProject(c.Dir); err == nil {
+			if s := p.FindByPath(userPath(c.Str("file"))); s != nil {
+				c.vals["source"] = []string{s.ID}
+				delete(c.vals, "file")
+			}
+		}
+	}
 	projectFromFile(c, c.Str("file"))
 	if c.Bool("cuts") || c.Bool("output") || c.Bool("overlays") || c.Has("file") {
 		return lookEdit(c)

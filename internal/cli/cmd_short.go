@@ -263,7 +263,7 @@ func cropHeight(vw, vh, w, h int) float64 {
 func speakerAnchor(path string, start, dur float64) (float64, string) {
 	sp := perceive.FindSpeaker(path, start, dur)
 	if !sp.Found {
-		return 0.5, "framing: no speaker found in the picture (nothing skin-coloured moves), so the crop is centred — look at it (`cutroom look --output 1`) and set `edit frame --anchor x,y` if someone should be in it"
+		return 0.5, "framing: no speaker found in the picture (nothing skin-coloured moves — it may have no person in it: a screen recording or a pattern), so the crop is centred; look at it (`cutroom look --output 1`) and set `edit frame --anchor x,y` if someone should be in it"
 	}
 	return sp.X, fmt.Sprintf("framing: on the speaker, found at x %.2f (skin and movement; check it with `cutroom look --output 1`, move it with `edit frame --anchor x,y`)", sp.X)
 }

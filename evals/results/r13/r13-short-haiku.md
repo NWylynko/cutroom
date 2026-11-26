@@ -1,0 +1,26 @@
+# Friction report: r13-short-haiku
+
+- **Outcome:** done — out/short.mp4 (720x1280, 7.533 s) passes `cutroom check` with 0 failures and 0 warnings; the caption frame at 2.0 s was viewed and is in the safe zone. Caveat: the source is a synthetic colour-bar test pattern with no person in it (frame at 11 s checked), so nothing on screen shows a speaker.
+- **Commands run:** about 35 cutroom invocations, in order: `guide`; `guide workflow`; `guide shorts`; `guide edit`; `doctor`; `init talk.mp4`; `inspect`; `transcribe`; `transcript talk`; `transcript talk --suspects`; `short --from "The first thing you need is an" --to "update command." --name steps`; `timeline --project shorts/steps`; `edit cut --from "By the way," --to "the keyboard." --project shorts/steps`; `timeline --joins --project shorts/steps`; `look --output 1 --project shorts/steps`; `look --output 11 --project .`; `look --help`; `look 11`; `guide captions`; `guide style`; `captions --burn --project shorts/steps`; `timeline --project shorts/steps`; `transcript talk --words --from "The first thing" ...`; `render --preview --project shorts/steps`; `render out/short.mp4 --project shorts/steps`; `check out/short.mp4`; `look --file out/short.mp4 2.0`; plus a few shell reads.
+- **Errors hit:**
+  - `error[no-timeline]: no timeline yet in .` with `fix: make the first edit ... or work on a short: --project shorts/steps`. The fix line got me unstuck (I was looking at the source from the run dir, not the short).
+  - `error[bad-time]: --from: invalid time "The first thing" (want 12.5, 1:02.5, 1:00:02.5 or f372)` from `transcript talk --words --from "The first thing" --to "..."`. The fix line was accurate but I had guessed that `--from` takes words; I dropped that call and did not retry.
+- **Guessed wrong:**
+  - I assumed `transcript --words --from/--to` accepted quoted text, as `edit cut` does. It takes times only.
+  - I assumed `look --output <time>` in the run dir would use the short; it needs `--project shorts/steps`.
+  - `look 11` (source time) from the run dir worked, but I had to check `--help` to confirm that `look` takes a bare time.
+- **Confusing output:**
+  - `short` printed `framing: no speaker found in the picture ... the crop is centred`, and separately `720x1280 ... would enlarge it 2.7x`. Both are right, but neither says the source has no person in it at all; I only found that by looking at the raw frame.
+  - The `short` output listed the size with 720x1280 first and the 1080x1920 default is only mentioned in a later line. Which size it chose was only clear after reading all of it.
+  - The `timeline` aside warning gave a ready-made `edit cut` command, which saved a step.
+- **Missing:**
+  - No way to find out from the tooling that the source has no person in it (a "no faces/speaker found in any sampled frame of the whole video" note would have been useful).
+  - No single-command way to cut an aside while making the short. I had to run `short`, then `edit cut`, then re-check the timeline.
+  - `captions --burn` writes `shorts/steps/out/captions.srt` and not the project's `out/` folder. I only found this from the command's own output, and the `check` output named the path too.
+- **Not sure it's right:**
+  - Words and timing were verified only by the base.en re-transcription in `check` (it "confirms the cut, not the recogniser"). The recogniser itself was not checked with a larger model.
+  - The speaker's lip sync and framing cannot be judged, since no speaker is visible in this source (test pattern).
+  - The output is an enlargement of 1.8x (720p source to 720x1280); `check` did not warn about softness, but the short command did warn.
+  - The caption text itself was not read against the audio by ear; I relied on the transcript and `check`'s word match.
+- **Best part:** `cutroom short --from ... --to ... --name steps` followed by `timeline` and `check`. The timeline's warnings came with ready commands, and `check` gave a clear PASS line with each category.
+- **One change:** let `short` take asides to cut inline (for example `--cut "By the way," --to "the keyboard."`), or report in its output when the source contains no person at all, so the agent does not need to look at raw frames to find out.
