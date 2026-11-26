@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	xdraw "golang.org/x/image/draw"
 	"golang.org/x/image/font"
@@ -63,6 +64,12 @@ type CapGroup struct {
 func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDir string, w, h int) ([]Placement, error) {
 	var ps []Placement
 	burned := tl.Captions() != nil
+	var capBox [4]float64 // where the captions really are, for lower thirds to keep clear of
+	if c := tl.Captions(); c != nil {
+		if p, err := captionPlacement(tl, tr, *c, projDir, cacheDir, w, h); err == nil {
+			capBox = p.Box
+		}
+	}
 	for _, o := range tl.Overlays {
 		a, b, ok, _ := tl.Window(o)
 		if !ok {
@@ -90,6 +97,7 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 		}
 		if burned && (o.Layout == "lower-third" || o.Layout == "") && o.Kind != "captions" {
 			o.Layout = "lower-third-raised" // keep clear of the caption band
+			o.CapBox = capBox
 		}
 		if o.Kind == "text" {
 			st := CardStyle(tl, o)
@@ -127,7 +135,7 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 
 // cardKey hashes everything a card depends on, including the bytes of a referenced image (L19).
 func cardKey(o timeline.Overlay, projDir string, w, h int) (string, error) {
-	parts := []any{CardVersion, w, h, o.Kind, o.Text, o.Sub, o.Layout, o.Size, o.Path}
+	parts := []any{CardVersion, w, h, o.Kind, o.Text, o.Sub, o.Layout, o.Size, o.Path, o.CapBox}
 	if o.Kind == "text" {
 		l, err := resolve(o.Style.Over(CardDefaults(o.Layout)), projDir, w, h)
 		if err != nil {
@@ -185,7 +193,7 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 			ih = h - 2*margin
 			iw = ih * src.Bounds().Dx() / max(1, src.Bounds().Dy())
 		}
-		x, y := place(o.Layout, w, h, iw, ih, margin)
+		x, y := placeCard(o, w, h, iw, ih, margin)
 		r = image.Rect(x, y, x+iw, y+ih)
 		xdraw.CatmullRom.Scale(img, r, src, src.Bounds(), draw.Over, nil)
 		return img, r, nil
@@ -219,7 +227,7 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 			accent = int(math.Max(4, 0.006*float64(w)))
 		}
 		bw, bh := tw+2*l.padX+accent+2*l.outlineW, th+2*l.padY
-		x, y := place(o.Layout, w, h, bw, bh, margin)
+		x, y := placeCard(o, w, h, bw, bh, margin)
 		r = l.boxAt(w, h, bw, bh, x, y)
 		l.drawBox(img, r)
 		if accent > 0 {
@@ -261,6 +269,30 @@ func SafeZone(W, H int) (top, bottom, right int) {
 		return 0, H, W
 	}
 	return int(math.Ceil(260 * float64(H) / 1920)), int(1490 * float64(H) / 1920), W - int(math.Ceil(120*float64(W)/1080))
+}
+
+// placeCard places an overlay's w×h box: by its layout, and for a lower third raised over burned-in
+// captions, clear of where the captions really are (their style may move or enlarge them): it stays
+// in its usual place if that doesn't touch them, else goes just above them (below, if above would
+// leave the safe area and below fits).
+func placeCard(o timeline.Overlay, W, H, w, h, margin int) (int, int) {
+	if o.Layout != "lower-third-raised" || o.CapBox == ([4]float64{}) {
+		return place(o.Layout, W, H, w, h, margin)
+	}
+	x, y := place("lower-third", W, H, w, h, margin)
+	gap := int(0.02 * float64(H))
+	ct, cb := int(o.CapBox[1]*float64(H)), int(math.Ceil(o.CapBox[3]*float64(H)))
+	if y+h+gap <= ct || y >= cb+gap {
+		return x, y
+	}
+	top, bottom := 0, H
+	if H > W {
+		top, bottom, _ = SafeZone(W, H)
+	}
+	if up := ct - gap - h; up >= top || cb+gap+h > bottom {
+		return x, max(0, up)
+	}
+	return x, cb + gap
 }
 
 // place puts a w×h box in the frame for a layout (inside the safe zones on vertical frames).
@@ -351,13 +383,22 @@ func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline
 	add := func(g captions.Group, words []string, active int, a, b float64) error {
 		key := hash([]any{CardVersion, "caption", w, h, words, active, l.key})
 		png := filepath.Join(cacheDir, "overlays", key+".png")
-		img, r := captionCard(words, active, l, w, h)
-		if _, err := os.Stat(png); err != nil {
-			if err := ensureDir(png); err != nil {
-				return err
-			}
-			if err := raster.SavePNG(png, img); err != nil {
-				return err
+		capMu.Lock()
+		r, known := capRects[key]
+		capMu.Unlock()
+		if _, err := os.Stat(png); err != nil || !known {
+			var img *image.NRGBA
+			img, r = captionCard(words, active, l, w, h)
+			capMu.Lock()
+			capRects[key] = r
+			capMu.Unlock()
+			if err != nil {
+				if err := ensureDir(png); err != nil {
+					return err
+				}
+				if err := raster.SavePNG(png, img); err != nil {
+					return err
+				}
 			}
 		}
 		box := [4]float64{float64(r.Min.X) / float64(w), float64(r.Min.Y) / float64(h), float64(r.Max.X) / float64(w), float64(r.Max.Y) / float64(h)}
@@ -399,6 +440,13 @@ func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline
 }
 
 func r3(f float64) float64 { return math.Round(f*1000) / 1000 }
+
+// capRects remembers each caption card's box by key, so a card already on disk isn't drawn again
+// just to learn where it is.
+var (
+	capMu    sync.Mutex
+	capRects = map[string]image.Rectangle{}
+)
 
 // CaptionCard draws one caption group in cutroom's default caption style.
 func CaptionCard(text string, w, h int) (*image.NRGBA, image.Rectangle) {

@@ -33,6 +33,9 @@ type Overlay struct {
 	ClipH   int     `json:"clip_h,omitempty"`
 	// Style: this text card's own look, over the project's card style (text cards only)
 	Style *Style `json:"style,omitempty"`
+	// CapBox: where burned-in captions are drawn (x0, y0, x1, y1 fractions; set at render time) so
+	// a lower third can keep clear of them
+	CapBox [4]float64 `json:"-"`
 }
 
 // Window is the overlay's output time span, on the frame grid. ok is false (with why) when its

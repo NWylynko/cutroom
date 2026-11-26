@@ -2,6 +2,17 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 55 · 2026-11-26 · Lower thirds keep clear of where the captions really are
+Did: with burned-in captions a lower third was raised above the *default* caption band; after
+`style captions --y/--size` it could sit on top of the captions, or jump up for no reason. Placements
+now lays out the captions first and gives text/image lower thirds their real box (Overlay.CapBox,
+not saved): a lower third stays in its usual place when that doesn't touch the captions, else goes
+just above them (below, when above would leave the vertical safe area). Caption card boxes are
+remembered by key, so the extra layout pass doesn't redraw cached cards.
+Measured: real short, card "Nick / builds personal software": captions at y 0.78 → card above them;
+captions at y 0.45 → card stays at its lower-third place. make check green; e2e 269/269.
+Next: rounded cards with an accent bar look slightly off (bar on the curve); entrance animations.
+
 ### 54 · 2026-11-26 · `cutroom style`: captions and cards take any look (no house style forced)
 Did: every caption and card was one hard-coded look (Go Bold, white on a black box, amber bar, fixed
 place, 3 words). New `timeline.Style` (all fields optional, layered defaults ← `style cards` ←

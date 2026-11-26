@@ -97,3 +97,20 @@ func abs(x int) int {
 	}
 	return x
 }
+
+func TestLowerThirdKeepsClearOfStyledCaptions(t *testing.T) {
+	W, H := 1080, 1920
+	o := timeline.Overlay{Kind: "text", Layout: "lower-third-raised"}
+	x0, y0 := place("lower-third", W, H, 500, 150, 60)
+	// captions moved up to the middle: the lower third keeps its own place
+	o.CapBox = [4]float64{0.2, 0.55, 0.8, 0.62}
+	if x, y := placeCard(o, W, H, 500, 150, 60); x != x0 || y != y0 {
+		t.Errorf("captions out of the way: lower third moved to %d,%d (its place %d,%d)", x, y, x0, y0)
+	}
+	// captions where the lower third would be: it goes above them
+	o.CapBox = [4]float64{0.2, 0.70, 0.8, 0.77}
+	_, y := placeCard(o, W, H, 500, 150, 60)
+	if y+150 > int(0.70*float64(H)) {
+		t.Errorf("lower third at y %d–%d overlaps captions from %d", y, y+150, int(0.70*float64(H)))
+	}
+}
