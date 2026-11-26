@@ -2,6 +2,24 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 63 · 2026-11-26 · Real camera + recorder short: three false alarms fixed
+Did: styled short from my-personal-software (4K HEVC 59.94 fps camera + separate recorder, synced:
+offset −104.8 s, drift −24.5 ppm), `--look channel`, `edit audio audio`, card, captions. Three
+problems, all cutroom's:
+1. `short --from` was "ambiguous" — after sync the recorder's transcript has the same words. A short
+   needs a picture: its quotes now resolve only in sources with video (editEnv.videoOnly).
+2. `retake-kept` on "I wanted to" — two different sentences sharing a 3-word phrase. Short repeats
+   (≤ 4 words) now count only when the first is broken off (pause ≥ 0.35 s or sentence end within
+   two words); repeats are recomputed from the words on load, so old transcripts get the rule.
+   Long retakes unchanged (TestL36_LongRetakeReportedOnce still passes).
+3. `check` FAILed picture "−2 frames off, difference 1.9". Measured every sample: the expected
+   frame sits at 3.3–3.9 (encode noise) and a near-still neighbour at 59.94 fps can score 1.8 —
+   indistinguishable to a viewer. The expected frame now also passes at ≤ 6 (pictureNoise); real
+   wrong moments with motion are ≥ 10 (e2e "3 frames off" still FAILs).
+Measured: render + check PASS (picture worst 3.9; sync 0 ms vs recorder, ≤ 6 ms vs camera sound;
+framing speaker 0.55 in crop 0.39–0.71; −16.6 LUFS). make check green; e2e 281/281.
+Next: captions sit on the mouth when the face fills a 4K crop — face-aware caption placement.
+
 ### 62 · 2026-11-26 · Real 4K HLG short: vertical renders from HDR were squashed sideways (fixed, L57)
 Did: end-to-end styled short from another real production (securing take-2: 3840×2160 HLG, rotated
 180°): `short --look channel`, burned captions, a card, render. `check` FAILed picture/captions/

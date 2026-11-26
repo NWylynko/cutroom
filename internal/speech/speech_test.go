@@ -236,3 +236,28 @@ func TestAsidesAtSentenceStarts(t *testing.T) {
 		t.Fatalf("asides: %+v (want only the sentence opening 'By the way')", as)
 	}
 }
+
+func TestL36_SharedPhraseInFlowingSpeechIsNoRetake(t *testing.T) {
+	var ws []Word
+	at := 0.0
+	for _, w := range strings.Fields("but I wanted to use that for everything not just some services and I had a vision of how I wanted to sort that email") {
+		ws = append(ws, Word{Text: w, Start: at, End: at + 0.25})
+		at += 0.3
+	}
+	for _, s := range repeats(ws) {
+		t.Errorf("flowing speech that shares %q reported as a retake", s.Text)
+	}
+	// a broken-off false start still counts
+	ws = nil
+	at = 0
+	for i, w := range strings.Fields("I had an idea, had an idea instead of using one email") {
+		ws = append(ws, Word{Text: w, Start: at, End: at + 0.25})
+		at += 0.3
+		if i == 3 {
+			at += 0.6
+		}
+	}
+	if len(repeats(ws)) != 1 {
+		t.Errorf("a broken-off \"had an idea\" must still be a retake: %v", repeats(ws))
+	}
+}

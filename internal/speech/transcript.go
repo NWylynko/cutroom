@@ -234,7 +234,23 @@ func (c cand) merge(d cand) (cand, bool) {
 	return m, true
 }
 
-// repeats finds n-grams (3–8 words) said more than once within 30 s: retakes (L36).
+// breaksOff says whether speech stops within two words after word i: a pause of ≥ 0.35 s or a
+// sentence end — what a false start looks like before the speaker tries again.
+func breaksOff(words []Word, i int) bool {
+	for j := i; j <= i+2 && j < len(words); j++ {
+		t := strings.TrimSpace(words[j].Text)
+		if strings.HasSuffix(t, ".") || strings.HasSuffix(t, ",") || strings.HasSuffix(t, "?") || strings.HasSuffix(t, "!") {
+			return true
+		}
+		if j+1 >= len(words) || words[j+1].Start-words[j].End >= 0.35 {
+			return true
+		}
+	}
+	return false
+}
+
+// repeats finds n-grams (3–8 words) said more than once within 30 s: retakes (L36). Short ones
+// (3–4 words) count only when the first is broken off (breaksOff).
 func repeats(words []Word) []Suspect {
 	type tok struct {
 		w string
@@ -308,6 +324,9 @@ func repeats(words []Word) []Suspect {
 	}
 	sort.Slice(cands, func(i, j int) bool { return cands[i].occ[0][0] < cands[j].occ[0][0] })
 	for _, c := range cands {
+		if c.occ[0][1]-c.occ[0][0] < 4 && !breaksOff(words, toks[c.occ[0][1]].i) {
+			continue // a short phrase said again in flowing speech ("I wanted to …") is no retake
+		}
 		var times []float64
 		for _, o := range c.occ {
 			times = append(times, words[toks[o[0]].i].Start)

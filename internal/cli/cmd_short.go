@@ -95,7 +95,7 @@ func runShort(c *Ctx) (*Result, error) {
 		return nil, Errf(ExitUsage, "short-exists", fmt.Sprintf("work on it with `--project %s`, or give another --name", relToCwd(dir)), "shorts/%s already exists", name)
 	}
 	// words come from the parent's transcripts (any source, kept by its edit or not)
-	e := &editEnv{p: p, tr: timeline.Transcripts{}, dur: map[string]float64{}}
+	e := &editEnv{p: p, tr: timeline.Transcripts{}, dur: map[string]float64{}, videoOnly: true}
 	for _, id := range p.IDs() {
 		e.dur[id] = p.Sources[id].Facts.End()
 		if t, err := speech.Load(cacheDir(p), id); err == nil {

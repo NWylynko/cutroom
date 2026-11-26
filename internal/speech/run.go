@@ -37,6 +37,14 @@ func Load(cacheDir, id string) (*Transcript, error) {
 	if err := json.Unmarshal(b, t); err != nil {
 		return t, err
 	}
+	// repeats (retakes) are found again from the words, so older transcripts get today's rules
+	kept := t.Suspects[:0]
+	for _, x := range t.Suspects {
+		if x.Kind != "repeat" {
+			kept = append(kept, x)
+		}
+	}
+	t.Suspects = append(kept, repeats(t.Words)...)
 	// asides are found from the words on load, so transcripts made before them get them too
 	for _, a := range Asides(t.Words) {
 		dup := false

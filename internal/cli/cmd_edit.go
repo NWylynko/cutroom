@@ -175,6 +175,7 @@ type editEnv struct {
 	dur          map[string]float64
 	made         bool
 	notes        []timeline.Issue // said once: segments trimmed to where their source really ends
+	videoOnly    bool             // quotes resolve only in sources with a picture (a short needs one)
 }
 
 func loadEditEnv(c *Ctx, create bool) (*editEnv, error) {
@@ -801,6 +802,11 @@ func (e *editEnv) resolve(c *Ctx, phrase string, keptOnly bool, afterSrc string,
 		tx := e.tr[id]
 		if tx == nil || (c.Str("source") != "" && id != c.Str("source")) || (afterSrc != "" && id != afterSrc) {
 			continue
+		}
+		if e.videoOnly && c.Str("source") == "" {
+			if s := e.p.Sources[id]; s == nil || s.Facts == nil || s.Facts.Video == nil {
+				continue
+			}
 		}
 		for _, m := range speech.Search(tx.Words, phrase) {
 			if afterSrc != "" && (m.First < afterIdx || m.Last < minLast) {

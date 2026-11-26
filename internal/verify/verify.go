@@ -199,6 +199,10 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 
 // --- picture ---------------------------------------------------------------------------------
 
+// pictureNoise is the grey-frame difference an encoded frame has from its own source frame (scaling
+// and encoding): measured 3.3–3.9 on 4K HEVC → 1080p; a wrong moment with any motion is ≥ 10.
+const pictureNoise = 6.0
+
 func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 	frames := grey(file, "", 0, 0)
 	if len(frames) == 0 {
@@ -280,8 +284,11 @@ func pictureCheck(file string, m *render.Manifest, fps float64, r *Report) {
 			}
 			s.err = best
 			bestDist := math.Abs(pts[bj]-s.srcT) * 1000
-			if exp >= 0 && errs[exp]-best < 1.0 {
-				s.offset, bestDist = 0, 0 // the expected frame (or an identical one) is shown
+			// the expected frame (or one a viewer can't tell from it) is shown: within 1 of the best,
+			// or at the encode-noise level itself — at 50–60 fps a near-still speaker's neighbouring
+			// frames differ by less than the encode noise (r63: 3.5 vs 1.9 "two frames off")
+			if exp >= 0 && (errs[exp]-best < 1.0 || errs[exp] <= pictureNoise) {
+				s.offset, bestDist = 0, 0
 			} else {
 				s.offset = int(math.Round((pts[bj] - s.srcT) * fps))
 			}
