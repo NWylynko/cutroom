@@ -158,14 +158,16 @@ func runCaptions(c *Ctx) (*Result, error) {
 }
 
 func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64, o captions.Options) (*Result, error) {
-	gs := captions.Groups(ws, captions.DefaultGroups, dur)
+	cst := render.CaptionStyle(e.tl)
+	gopt := render.GroupOptions(cst)
+	gs := captions.Groups(ws, gopt, dur)
 	var lines []string
 	verb := "burning in"
 	if c.Bool("dry-run") {
 		verb = "would burn in"
 	}
 	existing := e.tl.Captions()
-	lines = append(lines, fmt.Sprintf("%s captions: %d groups of 1–3 words (≤ 20 chars; a 4th only to avoid a weak ending), %d words over %s", verb, len(gs), len(ws), clock(dur)))
+	lines = append(lines, fmt.Sprintf("%s captions: %d groups of 1–%d words (≤ %d chars; one more only to avoid a weak ending), %d words over %s", verb, len(gs), gopt.MaxWords, gopt.MaxChars, len(ws), clock(dur)))
 	show := len(gs)
 	if !c.Bool("all") && show > 12 {
 		show = 10
@@ -192,6 +194,7 @@ func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64, o caption
 			return nil, err
 		}
 		lines = append(lines, fmt.Sprintf("added %s: burned-in captions over the whole edit (lower thirds move up above them); remove with `cutroom overlay rm %s`", id, id))
+		lines = append(lines, "their look (font, size, colours, box, outline, position, words at a time, highlighted word) is yours to set: `cutroom style captions --help`")
 	}
 	// the sidecar file comes with it: burned captions for muted viewers, the file for YouTube
 	side := captionPath(c, e)

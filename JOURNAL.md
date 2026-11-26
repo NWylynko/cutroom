@@ -2,6 +2,25 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 54 · 2026-11-26 · `cutroom style`: captions and cards take any look (no house style forced)
+Did: every caption and card was one hard-coded look (Go Bold, white on a black box, amber bar, fixed
+place, 3 words). New `timeline.Style` (all fields optional, layered defaults ← `style cards` ←
+`style <id>`; captions ← `style captions`) and `cutroom style`: font (built-in, a font file, or an
+installed font by face name — `style fonts` lists them; .ttc faces by name or #n), size, colour,
+sub-line font/size/colour, box (any alpha, or none), rounded corners, padding, outline, letter
+shadow, soft box shadow, accent bar, case, alignment, x/y centre, wrap width, words/chars at once,
+and a karaoke highlight (one card per word, timed on word starts). Bad colours and unknown fonts
+are refused when set (with close font names); unsafe placement on vertical frames warns, with a
+style fix. Guide topic `style`; captions/overlays/shorts guides point to it.
+Measured: on the real-footage short: Avenir Black upper-case, outlined, no box, yellow highlight,
+2 words, y 0.62 + a light rounded card (Avenir Next Heavy/Medium, box shadow) — rendered, `check`
+PASS (captions 124 groups sampled on screen, safe zones ok, sync 0 ms). make check green; e2e
+269/269 (+12 style cases).
+Surprises: a letter shadow on a light card looks like smudged print — card panels want a box shadow,
+so `shadow` (letters) and `box-shadow` (panel) are separate fields.
+Next: lower thirds raised above captions ignore the captions' own y/size; entrance animation
+(pop/slide) for captions and cards; T2 task where the brief asks for a specific look.
+
 ### 53 · 2026-11-26 · Fill crop centres on its anchor (vertical shorts framed the speaker off-edge)
 Did: a real-footage short (speaker at x≈0.74, `edit frame --anchor 0.70,0.40`) came out with the face
 against the right edge and the mic hand cut off. FrameFit cropped at `(iw-ow)*fx`: the anchor was a slide

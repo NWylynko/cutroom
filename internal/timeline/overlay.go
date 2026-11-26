@@ -31,6 +31,8 @@ type Overlay struct {
 	ClipDur float64 `json:"clip_duration,omitempty"`
 	ClipW   int     `json:"clip_w,omitempty"`
 	ClipH   int     `json:"clip_h,omitempty"`
+	// Style: this text card's own look, over the project's card style (text cards only)
+	Style *Style `json:"style,omitempty"`
 }
 
 // Window is the overlay's output time span, on the frame grid. ok is false (with why) when its

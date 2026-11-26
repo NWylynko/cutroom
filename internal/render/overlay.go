@@ -69,7 +69,7 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 			continue
 		}
 		if o.Kind == "captions" {
-			p, err := captionPlacement(tl, tr, o, cacheDir, w, h)
+			p, err := captionPlacement(tl, tr, o, projDir, cacheDir, w, h)
 			if err != nil {
 				return nil, err
 			}
@@ -90,6 +90,10 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 		}
 		if burned && (o.Layout == "lower-third" || o.Layout == "") && o.Kind != "captions" {
 			o.Layout = "lower-third-raised" // keep clear of the caption band
+		}
+		if o.Kind == "text" {
+			st := CardStyle(tl, o)
+			o.Style = &st // Card draws the full style
 		}
 		key, err := cardKey(o, projDir, w, h)
 		if err != nil {
@@ -124,6 +128,13 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 // cardKey hashes everything a card depends on, including the bytes of a referenced image (L19).
 func cardKey(o timeline.Overlay, projDir string, w, h int) (string, error) {
 	parts := []any{CardVersion, w, h, o.Kind, o.Text, o.Sub, o.Layout, o.Size, o.Path}
+	if o.Kind == "text" {
+		l, err := resolve(o.Style.Over(CardDefaults(o.Layout)), projDir, w, h)
+		if err != nil {
+			return "", fmt.Errorf("overlay %s: %w", o.ID, err)
+		}
+		parts = append(parts, l.key)
+	}
 	if o.Kind == "image" {
 		b, err := os.ReadFile(absIn(projDir, o.Path))
 		if err != nil {
@@ -149,15 +160,9 @@ func cardBox(o timeline.Overlay, projDir string, w, h int) ([4]float64, error) {
 	return [4]float64{float64(r.Min.X) / float64(w), float64(r.Min.Y) / float64(h), float64(r.Max.X) / float64(w), float64(r.Max.Y) / float64(h)}, nil
 }
 
-var (
-	cardBG     = color.NRGBA{12, 12, 16, 190}
-	cardAccent = color.NRGBA{245, 158, 11, 255}
-)
-
 // Card draws an overlay into a transparent w×h image; r is the area it covers.
 func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r image.Rectangle, err error) {
 	img = image.NewNRGBA(image.Rect(0, 0, w, h))
-	H := float64(min(w, h)) // text scales with the short side: the same look on landscape and vertical
 	margin := int(0.06 * float64(w))
 	switch o.Kind {
 	case "image":
@@ -185,57 +190,53 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 		xdraw.CatmullRom.Scale(img, r, src, src.Bounds(), draw.Over, nil)
 		return img, r, nil
 	case "text":
-		big, small := 0.055, 0.036
-		maxW := 0.62
-		switch o.Layout {
-		case "title", "center":
-			big, small, maxW = 0.085, 0.045, 0.84
-		case "top":
-			big, small, maxW = 0.05, 0.034, 0.84
-		case "corner":
-			big, small, maxW = 0.04, 0.028, 0.4
+		l, err := resolve(o.Style.Over(CardDefaults(o.Layout)), projDir, w, h)
+		if err != nil {
+			return nil, r, fmt.Errorf("overlay %s: %w", o.ID, err)
 		}
-		bf := raster.Face("bold", math.Round(big*H))
-		sf := raster.Face("regular", math.Round(small*H))
-		mw := int(maxW * float64(w))
-		if h > w { // vertical: stay left of the right-hand buttons
+		l.padY = l.padX
+		mw := l.width
+		if h > w && l.x == nil { // vertical: stay left of the right-hand buttons
 			_, _, right := SafeZone(w, h)
 			mw = min(mw, right-2*margin)
 		}
-		pad := int(0.022 * H)
 		var lines []line
-		for _, l := range wrapText(bf, o.Text, mw) {
-			lines = append(lines, line{l, bf, color.NRGBA{255, 255, 255, 255}})
+		for _, t := range wrapText(l.face, l.text(o.Text), mw) {
+			lines = append(lines, line{t, l.face, l.color})
 		}
 		if o.Sub != "" {
-			for _, l := range wrapText(sf, o.Sub, mw) {
-				lines = append(lines, line{l, sf, color.NRGBA{220, 220, 225, 255}})
+			for _, t := range wrapText(l.subFace, l.text(o.Sub), mw) {
+				lines = append(lines, line{t, l.subFace, l.subColor})
 			}
 		}
 		tw, th := 0, 0
-		for _, l := range lines {
-			tw = max(tw, raster.Measure(l.face, l.s))
-			th += lineH(l.face)
+		for _, ln := range lines {
+			tw = max(tw, raster.Measure(ln.face, ln.s))
+			th += lineH(ln.face)
 		}
 		accent := 0
-		if o.Layout == "lower-third" || o.Layout == "" || o.Layout == "lower-third-raised" {
+		if l.accent != nil && (o.Layout == "lower-third" || o.Layout == "" || o.Layout == "lower-third-raised") {
 			accent = int(math.Max(4, 0.006*float64(w)))
 		}
-		bw, bh := tw+2*pad+accent, th+2*pad
+		bw, bh := tw+2*l.padX+accent+2*l.outlineW, th+2*l.padY
 		x, y := place(o.Layout, w, h, bw, bh, margin)
-		r = image.Rect(x, y, x+bw, y+bh)
-		draw.Draw(img, r, image.NewUniform(cardBG), image.Point{}, draw.Over)
+		r = l.boxAt(w, h, bw, bh, x, y)
+		l.drawBox(img, r)
 		if accent > 0 {
-			draw.Draw(img, image.Rect(x, y, x+accent, y+bh), image.NewUniform(cardAccent), image.Point{}, draw.Over)
+			raster.FillRound(img, image.Rect(r.Min.X, r.Min.Y, r.Min.X+accent, r.Max.Y), math.Min(l.radius, float64(accent)/2), l.accent)
 		}
-		cy := y + pad
-		for _, l := range lines {
-			lx := x + accent + pad
-			if o.Layout == "title" || o.Layout == "center" || o.Layout == "top" {
-				lx = x + (bw-raster.Measure(l.face, l.s))/2
+		cy := r.Min.Y + l.padY
+		for _, ln := range lines {
+			lw := raster.Measure(ln.face, ln.s)
+			lx := r.Min.X + accent + l.padX + l.outlineW
+			switch l.align {
+			case "center":
+				lx += (tw - lw) / 2
+			case "right":
+				lx += tw - lw
 			}
-			raster.Text(img, l.face, lx, cy+l.face.Metrics().Ascent.Round(), l.c, l.s)
-			cy += lineH(l.face)
+			raster.StyledLine(img, ln.face, lx, cy+ln.face.Metrics().Ascent.Round(), []raster.Run{{S: ln.s, C: ln.c}}, l.textStyle())
+			cy += lineH(ln.face)
 		}
 		return img, r, nil
 	}
@@ -335,36 +336,61 @@ func captionTop(W, H int) float64 {
 	return captionBottom(W, H) - 1.6*captionSize(W, H)
 }
 
-func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline.Overlay, cacheDir string, w, h int) (Placement, error) {
+func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline.Overlay, projDir, cacheDir string, w, h int) (Placement, error) {
 	ws, missing := captions.OutputWords(tl, tr)
 	if len(missing) > 0 {
 		return Placement{}, fmt.Errorf("burned-in captions need a transcript of %s: run `cutroom transcribe %s`", missing[0], missing[0])
 	}
+	st := CaptionStyle(tl)
+	l, err := resolve(st, projDir, w, h)
+	if err != nil {
+		return Placement{}, fmt.Errorf("caption style: %w", err)
+	}
 	p := Placement{ID: o.ID, Kind: "captions", Start: 0, End: tl.Duration(), Name: "burned-in captions", Key: "captions"}
 	var keys []any
-	for _, g := range captions.Groups(ws, captions.DefaultGroups, tl.Duration()) {
-		key := hash([]any{CardVersion, "caption", w, h, g.Text})
+	add := func(g captions.Group, words []string, active int, a, b float64) error {
+		key := hash([]any{CardVersion, "caption", w, h, words, active, l.key})
 		png := filepath.Join(cacheDir, "overlays", key+".png")
-		img, r := CaptionCard(g.Text, w, h)
+		img, r := captionCard(words, active, l, w, h)
 		if _, err := os.Stat(png); err != nil {
 			if err := ensureDir(png); err != nil {
-				return p, err
+				return err
 			}
 			if err := raster.SavePNG(png, img); err != nil {
-				return p, err
+				return err
 			}
 		}
 		box := [4]float64{float64(r.Min.X) / float64(w), float64(r.Min.Y) / float64(h), float64(r.Max.X) / float64(w), float64(r.Max.Y) / float64(h)}
-		p.Groups = append(p.Groups, CapGroup{Start: g.Start, End: g.End, Text: g.Text, PNG: png, Key: key, Box: box})
-		keys = append(keys, []any{key, g.Start, g.End})
-		for i := range 4 { // the placement's box covers every group's box
-			if p.Box == ([4]float64{}) {
-				p.Box = box
+		p.Groups = append(p.Groups, CapGroup{Start: a, End: b, Text: g.Text, PNG: png, Key: key, Box: box})
+		keys = append(keys, []any{key, a, b})
+		if len(p.Groups) == 1 { // the placement's box covers every group's box
+			p.Box = box
+		}
+		p.Box = [4]float64{math.Min(p.Box[0], box[0]), math.Min(p.Box[1], box[1]), math.Max(p.Box[2], box[2]), math.Max(p.Box[3], box[3])}
+		return nil
+	}
+	for _, g := range captions.Groups(ws, GroupOptions(st), tl.Duration()) {
+		words := strings.Fields(g.Text)
+		if l.highlight == nil || len(words) != g.Last-g.First+1 {
+			if err := add(g, words, -1, g.Start, g.End); err != nil {
+				return p, err
 			}
-			if i < 2 {
-				p.Box[i] = math.Min(p.Box[i], box[i])
-			} else {
-				p.Box[i] = math.Max(p.Box[i], box[i])
+			continue
+		}
+		// karaoke: one card per word, the word being said in the highlight colour
+		for k := range words {
+			a, b := g.Start, g.End
+			if k > 0 {
+				a = r3(ws[g.First+k].Start)
+			}
+			if k+1 < len(words) {
+				b = r3(ws[g.First+k+1].Start)
+			}
+			if b <= a {
+				continue
+			}
+			if err := add(g, words, k, a, b); err != nil {
+				return p, err
 			}
 		}
 	}
@@ -372,21 +398,90 @@ func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline
 	return p, nil
 }
 
-// CaptionCard draws one caption group: bold white on a dark box, centred in the caption band.
+func r3(f float64) float64 { return math.Round(f*1000) / 1000 }
+
+// CaptionCard draws one caption group in cutroom's default caption style.
 func CaptionCard(text string, w, h int) (*image.NRGBA, image.Rectangle) {
+	l, _ := resolve(CaptionDefaults, "", w, h)
+	return captionCard(strings.Fields(text), -1, l, w, h)
+}
+
+// captionCard draws one caption group: its words (wrapped to the style's width), the active one in
+// the highlight colour, on the style's box; by default centred in the caption band.
+func captionCard(words []string, active int, l look, w, h int) (*image.NRGBA, image.Rectangle) {
 	img := image.NewNRGBA(image.Rect(0, 0, w, h))
-	f := raster.Face("bold", captionSize(w, h))
-	m := f.Metrics()
-	tw := raster.Measure(f, text)
-	padX, padY := int(0.3*captionSize(w, h)), int(0.18*captionSize(w, h))
-	bw, bh := tw+2*padX, (m.Ascent+m.Descent).Round()+2*padY
-	x, y := (w-bw)/2, int(captionBottom(w, h))-bh
-	if _, _, right := SafeZone(w, h); h > w {
-		x = max(0, (right-bw)/2) // vertical: centred left of the right-hand buttons (L41)
+	right := w
+	if h > w {
+		_, _, right = SafeZone(w, h)
 	}
-	r := image.Rect(x, y, x+bw, y+bh)
-	draw.Draw(img, r, image.NewUniform(color.NRGBA{0, 0, 0, 170}), image.Point{}, draw.Over)
-	raster.Text(img, f, x+padX, y+padY+m.Ascent.Round(), color.NRGBA{255, 255, 255, 255}, text)
+	mw := l.width
+	if mw <= 0 {
+		mw = right - int(0.12*float64(w))
+	}
+	words = append([]string(nil), words...)
+	for i := range words {
+		words[i] = l.text(words[i])
+	}
+	// wrap words into lines
+	var lines [][]int
+	cur, curS := []int{}, ""
+	for i, wd := range words {
+		try := strings.TrimSpace(curS + " " + wd)
+		if len(cur) > 0 && raster.Measure(l.face, try) > mw {
+			lines = append(lines, cur)
+			cur, curS = nil, wd
+		} else {
+			curS = try
+		}
+		cur = append(cur, i)
+	}
+	if len(cur) > 0 {
+		lines = append(lines, cur)
+	}
+	m := l.face.Metrics()
+	lh := (m.Ascent + m.Descent).Round()
+	gap := int(0.12 * l.size)
+	tw := 0
+	widths := make([]int, len(lines))
+	for i, ln := range lines {
+		var ss []string
+		for _, k := range ln {
+			ss = append(ss, words[k])
+		}
+		widths[i] = raster.Measure(l.face, strings.Join(ss, " "))
+		tw = max(tw, widths[i])
+	}
+	ow := l.outlineW + l.shadowOff
+	bw := tw + 2*l.padX + 2*ow
+	bh := len(lines)*lh + (len(lines)-1)*gap + 2*l.padY + 2*ow
+	dx := max(0, (right-bw)/2) // vertical: centred left of the right-hand buttons (L41)
+	dy := int(captionBottom(w, h)) - bh
+	r := l.boxAt(w, h, bw, bh, dx, dy)
+	l.drawBox(img, r)
+	y := r.Min.Y + l.padY + ow + m.Ascent.Round()
+	for i, ln := range lines {
+		x := r.Min.X + l.padX + ow
+		switch l.align {
+		case "center", "":
+			x += (tw - widths[i]) / 2
+		case "right":
+			x += tw - widths[i]
+		}
+		var runs []raster.Run
+		for j, k := range ln {
+			c := l.color
+			if k == active && l.highlight != nil {
+				c = l.highlight
+			}
+			s := words[k]
+			if j > 0 {
+				runs = append(runs, raster.Run{S: " ", C: c})
+			}
+			runs = append(runs, raster.Run{S: s, C: c})
+		}
+		raster.StyledLine(img, l.face, x, y, runs, l.textStyle())
+		y += lh + gap
+	}
 	return img, r
 }
 

@@ -56,6 +56,9 @@ type Timeline struct {
 	Fill  bool    `json:"fill,omitempty"`
 	FillX float64 `json:"fill_x,omitempty"`
 	FillY float64 `json:"fill_y,omitempty"`
+	// The look of burned-in captions and of text cards (unset fields: cutroom's defaults).
+	CaptionStyle *Style `json:"caption_style,omitempty"`
+	CardStyle    *Style `json:"card_style,omitempty"`
 	// Accepted: warnings the editor decided to keep (timeline --accept)
 	Accepted []Accepted `json:"accepted,omitempty"`
 	Modified time.Time  `json:"modified"`

@@ -29,3 +29,5 @@ Short-form defaults (L41):
   corner layouts and burned captions (`cutroom captions --burn --project …`) are placed inside them;
   `timeline` warns `overlay-unsafe` for anything that isn't (a big image, say) and `check` reports
   `safe-zones` on the render.
+- The captions' and cards' look is yours: `cutroom style captions --font "…" --highlight "#ffd400"
+  --words 2 --case upper --project …` (karaoke highlight, outline, no box, any font) — `cutroom guide style`.

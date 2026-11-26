@@ -1,0 +1,264 @@
+package cli
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/NWylynko/cutroom/internal/raster"
+	"github.com/NWylynko/cutroom/internal/render"
+	"github.com/NWylynko/cutroom/internal/timeline"
+)
+
+func init() {
+	flags := []Flag{}
+	var names []string
+	for _, f := range timeline.StyleFields {
+		help := f.Help
+		if f.For != "" {
+			help = f.For + ": " + help
+		}
+		flags = append(flags, Flag{Name: f.Name, Kind: "string", Help: help + ` ("default" unsets it)`})
+		names = append(names, f.Name)
+	}
+	flags = append(flags,
+		Flag{Name: "reset", Kind: "bool", Help: "Back to cutroom's default look (for what you name)"},
+		Flag{Name: "dry-run", Kind: "bool", Help: "Show the result without saving"})
+	setFlags := append(append([]string{}, names...), "reset", "dry-run")
+	Register(&Command{
+		Name:     "style",
+		Args:     "[captions|cards|<overlay id>|fonts] [font query]",
+		MaxArgs:  2,
+		Category: "edit",
+		Summary:  "The look of burned-in captions and text cards: font, size, colours, box, outline, place",
+		Help: `cutroom has a default look, but none of it is fixed: set what you want, keep the rest.
+  style                                    both looks: what you set, and the defaults under it
+  style captions --font "Arial Black" --size 0.08 --color white --outline black --box none
+  style captions --highlight "#ffd400" --words 2 --case upper --y 0.62
+  style cards --box "#f3f6f7f2" --color "#101718" --accent "#307351" --radius 0.4
+  style o3 --x 0.3 --y 0.2 --align left    one text card (over the card style)
+  style captions --color default           unset one field; --reset unsets them all
+  style fonts [avenir]                     installed fonts you can name with --font
+Colours: #rrggbb, #rrggbbaa (aa = opacity, e.g. #00000099) or a name; "none" turns a box, outline,
+shadow, accent or highlight off. Sizes are fractions of the frame's short side; --x/--y put the centre
+of the box at that point of the frame (0–1 across, down); --pad/--radius/--outline-width are fractions
+of the font size. Changes are undoable (` + "`cutroom edit undo`" + `) and the next render draws them;
+look first: ` + "`cutroom look --output <time>`" + `. On a vertical frame, check warns if text
+reaches where the apps draw their own buttons (L41).`,
+		Flags: flags,
+		Subs: map[string]Sub{
+			"captions": {Usage: "  style captions [--font …] [--size …] [--color …] [--highlight …] [--words …] …   burned-in captions", Flags: setFlags},
+			"cards":    {Usage: "  style cards [--font …] [--box …] [--accent …] …   every text card (each can override: style <id>)", Flags: setFlags},
+			"fonts":    {Usage: "  style fonts [query]   installed fonts (name them with --font)"},
+		},
+		Run: runStyle,
+	})
+}
+
+func runStyle(c *Ctx) (*Result, error) {
+	what := ""
+	if len(c.Args) > 0 {
+		what = c.Args[0]
+	}
+	if what == "fonts" {
+		return styleFonts(c)
+	}
+	e, err := loadEditEnv(c, false)
+	if err != nil {
+		return nil, err
+	}
+	if what == "" {
+		if anyStyleFlag(c) {
+			return nil, Errf(ExitUsage, "missing-target", "`cutroom style captions --color yellow`, `cutroom style cards …` or `cutroom style o3 …`", "say what to style: captions, cards or an overlay id")
+		}
+		lines := []string{"captions:"}
+		lines = append(lines, styleLines(e.tl.CaptionStyle, render.CaptionStyle(e.tl), "captions", e.p.Dir)...)
+		lines = append(lines, "cards (lower-third defaults; title/top/corner differ in size and alignment):")
+		lines = append(lines, styleLines(e.tl.CardStyle, e.tl.CardStyle.Over(render.CardDefaults("lower-third")), "cards", e.p.Dir)...)
+		for _, o := range e.tl.Overlays {
+			if o.Style != nil && !o.Style.Empty() {
+				lines = append(lines, fmt.Sprintf("%s (%q) sets its own: %s", o.ID, o.Text, setSummary(o.Style)))
+			}
+		}
+		return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"captions": render.CaptionStyle(e.tl), "card_style": e.tl.CardStyle},
+			Next: []string{"cutroom style captions --help"}}, nil
+	}
+	var target **timeline.Style
+	var full func() timeline.Style
+	kind := "cards"
+	switch what {
+	case "captions":
+		target, kind = &e.tl.CaptionStyle, "captions"
+		full = func() timeline.Style { return render.CaptionStyle(e.tl) }
+	case "cards":
+		target = &e.tl.CardStyle
+		full = func() timeline.Style { return e.tl.CardStyle.Over(render.CardDefaults("lower-third")) }
+	default:
+		k := e.tl.OverlayByID(what)
+		if k < 0 {
+			return nil, Errf(ExitUsage, "no-target", "style captions, cards, or a text overlay's id (`cutroom overlay list`)", "nothing called %q to style", what)
+		}
+		o := &e.tl.Overlays[k]
+		switch o.Kind {
+		case "captions":
+			target, kind = &e.tl.CaptionStyle, "captions"
+			full = func() timeline.Style { return render.CaptionStyle(e.tl) }
+		case "text":
+			target = &o.Style
+			full = func() timeline.Style { return render.CardStyle(e.tl, *o) }
+		default:
+			return nil, Errf(ExitUsage, "not-text", fmt.Sprintf("an %s overlay is drawn from its file: change the file, or its --layout/--size with `cutroom overlay set %s`", o.Kind, o.ID), "%s is an %s overlay, not text", o.ID, o.Kind)
+		}
+	}
+	if !anyStyleFlag(c) && !c.Bool("reset") {
+		lines := styleLines(*target, full(), kind, e.p.Dir)
+		return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"style": full()}, Next: []string{fmt.Sprintf("cutroom style %s --help", what)}}, nil
+	}
+	st := timeline.Style{}
+	if *target != nil {
+		st = **target
+	}
+	var changed []string
+	if c.Bool("reset") {
+		st = timeline.Style{}
+		changed = append(changed, "reset")
+	}
+	for _, f := range timeline.StyleFields {
+		if !c.Has(f.Name) {
+			continue
+		}
+		if f.For != "" && f.For != kind {
+			return nil, Errf(ExitUsage, "wrong-field", fmt.Sprintf("--%s is for %s", f.Name, f.For), "--%s doesn't apply to %s", f.Name, kind)
+		}
+		if err := st.Set(f.Name, c.Str(f.Name)); err != nil {
+			return nil, Errf(ExitUsage, "bad-style", "see `cutroom style --help`", "%v", err)
+		}
+		changed = append(changed, fmt.Sprintf("%s=%s", f.Name, c.Str(f.Name)))
+	}
+	if err := render.CheckStyle(st, e.p.Dir); err != nil {
+		return nil, Errf(ExitUsage, "bad-font", "`cutroom style fonts` lists installed fonts; or give a .ttf/.otf file", "%v", err)
+	}
+	if st.Empty() {
+		*target = nil
+	} else {
+		*target = &st
+	}
+	label := fmt.Sprintf("style %s %s", what, strings.Join(changed, " "))
+	lines := []string{fmt.Sprintf("%s: %s", what, strings.Join(changed, ", "))}
+	lines = append(lines, styleLines(*target, full(), kind, e.p.Dir)...)
+	for _, is := range e.validate() {
+		if strings.HasPrefix(is.Code, "overlay-") {
+			lines = append(lines, fmt.Sprintf("WARN[%s] %s → %s", is.Code, is.Message, is.Fix))
+		}
+	}
+	if c.Bool("dry-run") {
+		lines = append(lines, "DRY RUN: nothing was changed; run the same command without --dry-run to apply it")
+	} else {
+		if err := timeline.Checkpoint(e.p.Dir, cacheDir(e.p), label); err != nil {
+			return nil, err
+		}
+		if err := e.tl.Save(e.p.Dir); err != nil {
+			return nil, err
+		}
+	}
+	at := 0.0
+	for _, o := range e.tl.Overlays {
+		if a, b, ok, _ := e.tl.Window(o); ok && (kind == "captions") == (o.Kind == "captions") && (o.Kind == "captions" || o.Kind == "text") {
+			at = (a + b) / 2
+			if o.Kind == "captions" {
+				at = a + 1
+			}
+			break
+		}
+	}
+	return &Result{Text: strings.Join(lines, "\n"), Data: map[string]any{"style": full()},
+		Next: []string{fmt.Sprintf("cutroom look --output %.2f   (see it)", at), "cutroom render --preview"}}, nil
+}
+
+func anyStyleFlag(c *Ctx) bool {
+	for _, f := range timeline.StyleFields {
+		if c.Has(f.Name) {
+			return true
+		}
+	}
+	return false
+}
+
+// styleLines prints each field that applies: its value and whether it was set or is the default.
+func styleLines(set *timeline.Style, full timeline.Style, kind, dir string) []string {
+	var out []string
+	for _, f := range timeline.StyleFields {
+		if f.For != "" && f.For != kind {
+			continue
+		}
+		v := full.Get(f.Name)
+		mark := "default"
+		if set.Get(f.Name) != "" {
+			mark = "set"
+		}
+		if v == "" {
+			v = "-"
+			switch f.Name {
+			case "x":
+				v = "centred"
+				if kind == "cards" {
+					v = "from --layout"
+				}
+			case "y":
+				v = "the caption band"
+				if kind == "cards" {
+					v = "from --layout"
+				}
+			case "width":
+				v = "the safe width"
+			case "outline-width":
+				v = "0.08 (with an outline)"
+			case "radius":
+				v = "0 (square)"
+			}
+		}
+		if f.Kind == "font" && v != "-" {
+			v = fmt.Sprintf("%s → %s", v, render.FontName(v, dir))
+		}
+		out = append(out, fmt.Sprintf("  %-14s %-40s %s", f.Name, v, mark))
+	}
+	return out
+}
+
+func setSummary(s *timeline.Style) string {
+	var parts []string
+	for _, f := range timeline.StyleFields {
+		if v := s.Get(f.Name); v != "" {
+			parts = append(parts, f.Name+"="+v)
+		}
+	}
+	return strings.Join(parts, " ")
+}
+
+func styleFonts(c *Ctx) (*Result, error) {
+	q := ""
+	if len(c.Args) > 1 {
+		q = strings.ToLower(c.Args[1])
+	}
+	lines := []string{"built in (always available): bold, regular, mono"}
+	n, shown := 0, 0
+	seen := map[string]bool{}
+	for _, f := range raster.InstalledFonts() {
+		if seen[f.Name] || (q != "" && !strings.Contains(strings.ToLower(f.Name), q)) {
+			continue
+		}
+		seen[f.Name] = true
+		n++
+		if shown < 60 {
+			lines = append(lines, fmt.Sprintf("  %s", f.Name))
+			shown++
+		}
+	}
+	if n > shown {
+		lines = append(lines, fmt.Sprintf("  … %d more: narrow it, e.g. `cutroom style fonts helvetica`", n-shown))
+	}
+	if n == 0 {
+		lines = append(lines, fmt.Sprintf("no installed font matches %q (looked in %s); any .ttf/.otf/.ttc file works too: --font path/to/font.ttf", q, strings.Join(raster.FontDirs(), ", ")))
+	}
+	lines = append(lines, `use one: cutroom style captions --font "<name>"`)
+	return &Result{Text: strings.Join(lines, "\n")}, nil
+}

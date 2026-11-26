@@ -362,6 +362,20 @@ expect "short renders vertical"     '1080x1920'                          cutroom
 expect "short check: picture"       'ok   picture'                       cutroom check shorts/steps/out/final.mp4 --project shorts/steps
 expect "short check: safe zones"    'ok   safe-zones +[0-9]+ overlay box\(es\) inside the vertical safe zones \(y 260–1490, x ≤ 960\)' cutroom check shorts/steps/out/final.mp4 --project shorts/steps
 
+# style: captions and cards take the look you set (no house style forced)
+expect "style shows defaults"        'highlight +none +default'           cutroom style --project shorts/steps
+expect "style captions set"          'highlight +#ffd400 +set'            cutroom style captions --highlight "#ffd400" --box none --outline black --case upper --words 2 --project shorts/steps
+expect "style bad colour refused"    'not a colour'                       cutroom style captions --color "#zzz" --project shorts/steps
+expect "style unknown font refused"  'no font "No Such Font".*style fonts' cutroom style captions --font "No Such Font" --project shorts/steps
+expect "style field for captions only" 'words is for captions'            cutroom style cards --words 2 --project shorts/steps
+expect "style fonts lists built-ins" 'built in .*bold, regular, mono'     cutroom style fonts
+expect "style one card"              'y +0.3 +set'                        cutroom style o1 --y 0.3 --box "#ffffffee" --color "#101718" --radius 0.4 --project shorts/steps
+expect "style unsafe warned"         'overlay-unsafe.*burned-in captions.*style captions --y' cutroom style captions --y 0.95 --project shorts/steps
+expect "style undo"                  'undid'                              cutroom edit undo --project shorts/steps
+expect "styled render"               '1080x1920'                          cutroom render out/styled.mp4 --project shorts/steps
+expect "styled check: captions"      'ok   captions +burned-in captions: [0-9]+ groups' cutroom check out/styled.mp4 --project shorts/steps
+expect "styled check: safe zones"    'ok   safe-zones'                    cutroom check out/styled.mp4 --project shorts/steps
+
 # r8 friction: paths with --project, the retake range, render transcripts by sentence, look conveniences
 expect "render path is cwd-relative"  'wrote out/short\.mp4'             cutroom render out/short.mp4 --project shorts/steps
 expect "file really in cwd"           'short\.mp4'                       ls out

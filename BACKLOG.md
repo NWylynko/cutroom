@@ -7,6 +7,12 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
+- [style] Raised lower thirds use the default caption band; with `style captions --y/--size` they
+  can overlap the captions — place them from the captions' real box.
+- [style] Entrance/exit animation for captions and cards (pop, slide, per-word pop-in), not only fades.
+- [style] T2 eval task whose brief asks for a specific caption look (font, highlight, position) —
+  checks agents find `cutroom style` from the guide.
+- [style] Per-card text formatting beyond title/sub (a third line, an inline accent word).
 - v1 is golden (2026-11-25, iteration 52): see RELEASE_NOTES.md. Publishing is the maintainer's call.
 - export: validate the .otio with the real OpenTimelineIO reader once it can be installed (it isn't
   a declared dependency); today's guarantee is the round-trip tests.

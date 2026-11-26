@@ -31,7 +31,9 @@ look at it: `cutroom look --output 7.75`
 
 Look before rendering: `cutroom look --overlays` shows every overlay at the middle of its window, and
 `cutroom look --output <time>` any moment — both draw the cards exactly as the render will
-(labels show `+o1`). Text is drawn by cutroom itself (no ffmpeg text filters needed, L47).
+(labels show `+o1`). Text is drawn by cutroom itself (no ffmpeg text filters needed, L47). Its
+look — font, colours, panel, corners, shadow, position — is set with `cutroom style cards` (all
+cards) or `cutroom style o1` (one): `cutroom guide style`.
 
 `cutroom check` then verifies each overlay on the render: visible inside its window, gone on the
 frame before it starts and the frame after it ends (`ok overlay o1 … visible over frames 195–269`), and

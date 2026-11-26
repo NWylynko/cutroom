@@ -46,3 +46,5 @@ dark box low in the frame (on vertical video, above the platform's buttons). The
 over the whole edit: the groups are made from the cut at render time, so they follow every re-cut.
 `cutroom look --output <time>` shows them (`+cc`); `cutroom check` samples groups on screen and the
 gaps between them; lower thirds move up above them. Remove with `cutroom overlay rm <id>`.
+That look is only the default: font, size, colours, box, outline, place, words at a time and a
+karaoke highlight are all yours to set — `cutroom guide style`.

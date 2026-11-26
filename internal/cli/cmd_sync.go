@@ -280,7 +280,7 @@ func (e *editEnv) safeZoneIssues() []timeline.Issue {
 		if msg := unsafeBox(boxes, tl.Width, tl.Height); msg != "" {
 			fix := fmt.Sprintf("`cutroom overlay set %s --layout <another>` or a smaller --size", p.ID)
 			if p.Kind == "captions" {
-				fix = "shorter caption groups can't be set yet: report it"
+				fix = "move or shrink them: `cutroom style captions --y 0.62`, a smaller --size, or fewer --words"
 			}
 			is = append(is, timeline.Issue{Level: "warn", Code: "overlay-unsafe", At: p.Start,
 				Message: fmt.Sprintf("overlay %s (%s) %s: the app's own buttons and text cover that part of a vertical video (L41)", p.ID, p.Name, msg), Fix: fix})
