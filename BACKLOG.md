@@ -14,7 +14,6 @@ Move done items to the journal, not here.
 - [r68] Variable fonts (SF Pro = SFNS.ttf): pick a weight (`--font "SF Pro@800"`); x/image/opentype
   draws only the default instance — needs a variation-capable rasteriser or instancing.
 - [T3 r65] Warn when a title card restates the short's last sentence (gives away the payoff).
-- [framing] Speakers who move across the frame: per-segment anchors (follow them) instead of one crop.
 - [style] Per-word pop for karaoke captions (each word bumps as it is said), if asked for.
 - v1 is golden (2026-11-25, iteration 52): see RELEASE_NOTES.md. Publishing is the maintainer's call.
 - export: validate the .otio with the real OpenTimelineIO reader once it can be installed (it isn't

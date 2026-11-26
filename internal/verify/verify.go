@@ -1327,6 +1327,46 @@ func framingCheck(m *render.Manifest, r *Report) {
 	if !m.Fill || len(m.Segments) == 0 {
 		return
 	}
+	perSeg := false
+	for _, g := range m.Segments {
+		perSeg = perSeg || g.FillX > 0
+	}
+	if perSeg { // each segment has its own crop: judge each (up to 12)
+		var bad, ok []string
+		for i, g := range m.Segments {
+			if i >= 12 {
+				break
+			}
+			src, has := m.Sources[g.Source]
+			if !has {
+				continue
+			}
+			_, vw, vh, rot, _ := probeVideo(src.Path)
+			if rot == 90 || rot == 270 {
+				vw, vh = vh, vw
+			}
+			fx := m.FillX
+			if g.FillX > 0 {
+				fx = g.FillX
+			}
+			sp := perceive.FindSpeaker(src.Path, g.In, g.Out-g.In)
+			if !sp.Found || vw == 0 {
+				continue
+			}
+			if render.CropHolds(fx, sp.X, vw, vh, m.Width, m.Height) {
+				ok = append(ok, g.ID)
+			} else {
+				a, b := render.CropSpan(fx, vw, vh, m.Width, m.Height)
+				bad = append(bad, fmt.Sprintf("%s (speaker at %.2f, crop %.2f–%.2f)", g.ID, sp.X, a, b))
+			}
+		}
+		if len(bad) > 0 {
+			r.add(Item{Check: "framing", Status: "warn", Detail: "the crop leaves the speaker out in " + strings.Join(bad, ", "), Fix: "`cutroom edit frame --anchor auto --per-segment`, render again"})
+		} else if len(ok) > 0 {
+			r.add(Item{Check: "framing", Status: "pass", Detail: fmt.Sprintf("each segment's crop holds the speaker (%d checked)", len(ok))})
+		}
+		return
+	}
 	dur := map[string]float64{}
 	lo, hi := map[string]float64{}, map[string]float64{}
 	main := ""

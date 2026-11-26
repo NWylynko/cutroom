@@ -2,6 +2,17 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 83 · 2026-11-27 · Framing per segment: `edit frame --anchor auto --per-segment`
+Did: one crop anchor for a whole vertical edit can't hold a speaker framed differently across
+takes. Segments get their own fill anchor (Segment.FillAt, MSeg.FillX; 0 = the timeline's): render,
+cache key, SegVF and look use it; `edit frame --anchor auto --per-segment` finds the speaker in each
+segment; a plain `--anchor x,y` clears them. `check` judges framing per segment when segments have
+their own. Also fixed: `edit frame --fill` on a never-cropped timeline cropped at x 0.00 (the left
+edge) — it now frames on the speaker (or centres).
+Measured: real two-take vertical edit (securing take-2 HLG 4K + my-personal 4K): s1 0.75, s2 0.55,
+both faces centred (looked), `check` "each segment's crop holds the speaker (2 checked)", picture
+worst 3.0, sync 0 ms per source. e2e 317/317.
+
 ### 82 · 2026-11-27 · `check` sums up the edit: what it keeps, what it removed
 Did: r13 friction (pickup, tighten sonnet: "a one-line summary of the final kept text / removed
 phrases"). New check line `edit` (always ok): the kept words' count with their start and end, and

@@ -29,7 +29,8 @@ type Segment struct {
 	Zoom     float64 `json:"zoom,omitempty"`    // 1 = none
 	AnchorX  float64 `json:"anchor_x,omitempty"`
 	AnchorY  float64 `json:"anchor_y,omitempty"`
-	OutStart float64 `json:"-"` // computed: output time of In
+	FillAt   float64 `json:"fill_x,omitempty"` // this segment's crop centre across (fill frames; 0 = the timeline's)
+	OutStart float64 `json:"-"`                // computed: output time of In
 }
 
 type Timeline struct {
@@ -648,4 +649,12 @@ func (t *Timeline) Trim(a, b float64) (c *Timeline, start float64) {
 	}
 	cp.Recompute()
 	return &cp, round6(float64(fa) / t.fpsNum)
+}
+
+// FillXOf is where a filled frame is cropped across for segment g: its own anchor, or the timeline's.
+func (t *Timeline) FillXOf(g Segment) float64 {
+	if g.FillAt > 0 {
+		return g.FillAt
+	}
+	return t.FillX
 }

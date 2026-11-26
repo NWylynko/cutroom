@@ -384,6 +384,7 @@ expect "blur bars check: picture"    'ok   picture'                       cutroo
 expect "frame colour bars"           'fits 720x1280 \(#101718 bars'       cutroom edit frame --bars "#101718" --project shorts/s2
 expect "colour bars check: picture"  'ok   picture'                       sh -c 'cutroom render out/s2col.mp4 --project shorts/s2 >/dev/null; cutroom check out/s2col.mp4 --project shorts/s2'
 expect "back to a filled frame"      'cropped around'                     cutroom edit frame --fill --project shorts/s2
+expect "frame per segment (no one)"  'framing per segment, on the speaker in each: s[0-9]+ – \(no one found' cutroom edit frame --anchor auto --per-segment --project shorts/s2 --dry-run
 expect "frame auto: no speaker in bars" 'no speaker found in the picture' cutroom edit frame --anchor auto --project shorts/s2
 expect "edit frame"                 'fills 1080x1920, cropped around 0\.60,0\.50' cutroom edit frame --anchor 0.6,0.5 --project shorts/steps
 expect "short: title in safe width" 'added o1: text'                     cutroom overlay add text "3 steps" --layout title --at "The first thing" --duration 3 --project shorts/steps

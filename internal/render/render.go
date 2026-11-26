@@ -209,7 +209,7 @@ func Plan(tl *timeline.Timeline, srcs map[string]Source, o Options) []Chunk {
 		for _, k := range c.Segments {
 			g := tl.Segments[k]
 			s := srcs[g.Source]
-			segs = append(segs, []any{g.Source, g.In, g.Out, g.Zoom, g.AnchorX, g.AnchorY, s.Size, s.ModTime.UnixNano(), s.AudioStart})
+			segs = append(segs, []any{g.Source, g.In, g.Out, g.Zoom, g.AnchorX, g.AnchorY, s.Size, s.ModTime.UnixNano(), s.AudioStart, g.FillAt})
 		}
 		// overlays over this chunk, in chunk frames
 		c0 := int64(math.Round(c.Start * tl.Rate()))
@@ -280,7 +280,7 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 			ax, ay := g.Anchor()
 			chain += "," + ZoomCrop(z, ax, ay)
 		}
-		chain += "," + FrameFit(tl.Fill, tl.FillX, tl.FillY, tl.Bars, fmt.Sprintf("s%d", n), w, h)
+		chain += "," + FrameFit(tl.Fill, tl.FillXOf(g), tl.FillY, tl.Bars, fmt.Sprintf("s%d", n), w, h)
 		chain += ",format=yuv420p" + fmt.Sprintf("[v%d]", n)
 		fc = append(fc, chain)
 		labels += fmt.Sprintf("[v%d]", n)

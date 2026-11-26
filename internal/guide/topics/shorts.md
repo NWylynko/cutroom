@@ -20,7 +20,8 @@ Short-form defaults (L41):
   to fill the frame and cropped; `short` finds the speaker (skin-coloured
   movement — a face talking, hands) and centres the crop on them, saying where (`framing: on the
   speaker, found at x 0.74`) or that it found no one (then it is centred; a screen recording, say).
-  `cutroom edit frame --anchor auto` finds them again after re-cutting; `--anchor 0.4,0.5` centres the crop
+  `cutroom edit frame --anchor auto` finds them again after re-cutting (`--per-segment`: each segment
+  cropped on the speaker as they are in it — takes framed differently, someone who moves); `--anchor 0.4,0.5` centres the crop
   on that point of the source, e.g. the speaker's face (0–1 across, down) — look with `cutroom look --output <time> --project …`.
   `edit frame --fit` keeps the whole picture with bars instead — `--bars blur` (the picture blurred
   behind itself, as many shorts do), `--bars "#101718"` (a colour) or black.

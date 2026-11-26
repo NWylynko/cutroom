@@ -68,6 +68,7 @@ never moves them.`,
 			{Name: "reason", Kind: "string", Help: "Why (stored with the edit; shown in the timeline)"},
 			{Name: "min-cut", Kind: "float", Default: "0.4", Help: "tighten: only shorten pauses where at least this much can go"},
 			{Name: "anchor", Kind: "string", Help: "zoom: point to zoom on as x,y in 0–1 (default 0.5,0.4; --alternate: the speaker's face); frame: where a filled frame is cropped"},
+			{Name: "per-segment", Kind: "bool", Help: "frame --anchor auto: find the speaker in each segment and crop each on them"},
 			{Name: "alternate", Kind: "bool", Help: "zoom: at every jump cut switch between wide and this zoom (punch-ins), starting wide"},
 			{Name: "min", Kind: "float", Default: "2.5", Help: "zoom --alternate: segments shorter than this (s) keep the framing before them"},
 			{Name: "bars", Kind: "string", Help: "frame: what fills the frame around a fitted picture — black (default), blur, or a colour #rrggbb"},
@@ -87,10 +88,11 @@ never moves them.`,
 			"frame": {Usage: `  edit frame --anchor 0.4,0.5   a filled frame (a vertical short) is cropped around this point of the
                                 source (0–1 across, down): move it onto the speaker
   edit frame --fill | --fit     fill the output frame (crop) or fit the whole picture (bars)
+  edit frame --anchor auto --per-segment   each segment cropped on the speaker as they are in it
   edit frame --fit --bars blur  the bars around a fitted picture: black, blur (the picture blurred
                                 behind itself) or a colour #rrggbb
   edit frame --size 720x1280    change the output size (overlays and captions follow)
-Look at the result with ` + "`cutroom look --output <time>`" + `.`, Flags: []string{"anchor", "fill", "fit", "bars", "size", "dry-run"}},
+Look at the result with ` + "`cutroom look --output <time>`" + `.`, Flags: []string{"anchor", "per-segment", "fill", "fit", "bars", "size", "dry-run"}},
 			"cut": {Usage: `  edit cut --text "um, so"                       remove exactly these words (cut lands in the pauses)
   edit cut --from "By the way" --to "keyboard."  remove from the first words through the last words
   edit cut 16.9-17.4 [--source id]               remove a source time range (seconds or m:ss.mmm)
@@ -529,11 +531,40 @@ func runEdit(c *Ctx) (*Result, error) {
 		}
 		if c.Bool("fill") || c.Has("anchor") {
 			e.tl.Fill = true
+			if !c.Has("anchor") && e.tl.FillX == 0 && e.tl.FillY == 0 { // never cropped before: on the speaker
+				e.tl.FillX, e.tl.FillY = 0.5, 0.5
+				if src, a, b := e.mainPicture(); src != "" {
+					ax, note := speakerAnchor(e.p.Abs(e.p.Sources[src]), a, b-a)
+					e.tl.FillX = ax
+					lines = append(lines, note)
+				}
+			}
 		}
 		if c.Bool("fit") {
 			e.tl.Fill = false
 		}
-		if c.Has("anchor") && c.Str("anchor") == "auto" {
+		if c.Has("anchor") && c.Str("anchor") == "auto" && c.Bool("per-segment") {
+			// each segment cropped on the speaker as they are in it (takes framed differently, a
+			// speaker who moves)
+			var parts []string
+			for k := range e.tl.Segments {
+				g := &e.tl.Segments[k]
+				s := e.p.Sources[g.Source]
+				if s == nil || s.Facts == nil || s.Facts.Video == nil {
+					continue
+				}
+				sp := perceive.FindSpeakerCached(cacheDir(e.p), e.p.Abs(s), g.In, g.Out-g.In)
+				if sp.Found {
+					g.FillAt = sp.X
+					parts = append(parts, fmt.Sprintf("%s %.2f", g.ID, sp.X))
+				} else {
+					g.FillAt = 0
+					parts = append(parts, fmt.Sprintf("%s – (no one found: the timeline's %.2f)", g.ID, e.tl.FillX))
+				}
+			}
+			e.tl.Fill = true
+			lines = append(lines, "framing per segment, on the speaker in each: "+strings.Join(parts, ", "))
+		} else if c.Has("anchor") && c.Str("anchor") == "auto" {
 			src, a, b := e.mainPicture()
 			if src == "" {
 				return nil, Errf(ExitUsage, "no-picture", "give the point: --anchor x,y", "the edit keeps no picture to find a speaker in")
@@ -547,9 +578,18 @@ func runEdit(c *Ctx) (*Result, error) {
 				return nil, err
 			}
 			e.tl.FillX, e.tl.FillY = ax, ay
+			for k := range e.tl.Segments { // one anchor for all again
+				e.tl.Segments[k].FillAt = 0
+			}
 		}
 		label = fmt.Sprintf("edit frame %dx%d fill=%v anchor %.2f,%.2f", e.tl.Width, e.tl.Height, e.tl.Fill, e.tl.FillX, e.tl.FillY)
-		if e.tl.Fill {
+		perSeg := false
+		for _, g := range e.tl.Segments {
+			perSeg = perSeg || g.FillAt > 0
+		}
+		if e.tl.Fill && perSeg {
+			lines = append(lines, fmt.Sprintf("frame: the picture fills %dx%d, each segment cropped on its own anchor (others at %.2f) — check it with `cutroom look --cuts`", e.tl.Width, e.tl.Height, e.tl.FillX))
+		} else if e.tl.Fill {
 			lines = append(lines, fmt.Sprintf("frame: the picture fills %dx%d, cropped around %.2f,%.2f (0–1 across, down) — check it with `cutroom look --output <time>`", e.tl.Width, e.tl.Height, e.tl.FillX, e.tl.FillY))
 		} else {
 			bars := "black"

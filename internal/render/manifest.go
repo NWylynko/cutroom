@@ -48,7 +48,8 @@ type MSeg struct {
 	Zoom     float64 `json:"zoom,omitempty"`
 	AnchorX  float64 `json:"anchor_x,omitempty"`
 	AnchorY  float64 `json:"anchor_y,omitempty"`
-	Audio    string  `json:"audio,omitempty"` // audio source this segment's sound came from (multi-take)
+	FillX    float64 `json:"fill_x,omitempty"` // this segment's own crop centre (fill frames)
+	Audio    string  `json:"audio,omitempty"`  // audio source this segment's sound came from (multi-take)
 	// RangeIn/RangeOut: this edge is where a --range render starts/ends, not a cut in the edit
 	RangeIn  bool `json:"range_in,omitempty"`
 	RangeOut bool `json:"range_out,omitempty"`
@@ -76,7 +77,7 @@ func ManifestPath(out string) string { return out + ".cutroom.json" }
 func TimelineHash(tl *timeline.Timeline) string {
 	var segs []any
 	for _, g := range tl.Segments {
-		segs = append(segs, []any{g.Source, g.In, g.Out, g.Zoom, g.AnchorX, g.AnchorY})
+		segs = append(segs, []any{g.Source, g.In, g.Out, g.Zoom, g.AnchorX, g.AnchorY, g.FillAt})
 	}
 	parts := []any{tl.FPS, tl.Width, tl.Height, tl.Audio, tl.Grid, segs, tl.AudioFor}
 	if len(tl.Overlays) > 0 { // unchanged for edits without overlays
@@ -110,7 +111,7 @@ func writeManifest(tl, vtl *timeline.Timeline, srcs map[string]Source, chunks []
 			g := vtl.Segments[k]
 			a, _, _ := AudioFor(tl, srcs, g.Source)
 			ms := MSeg{ID: g.ID, Source: g.Source, In: g.In, Out: g.Out,
-				OutStart: g.OutStart, Frames: tl.Frames(g), Zoom: g.Zoom, AnchorX: g.AnchorX, AnchorY: g.AnchorY, Audio: a}
+				OutStart: g.OutStart, Frames: tl.Frames(g), Zoom: g.Zoom, AnchorX: g.AnchorX, AnchorY: g.AnchorY, FillX: g.FillAt, Audio: a}
 			if full := tl.Find(g.ID); full != nil && vtl != tl {
 				ms.RangeIn, ms.RangeOut = g.In > full.In, g.Out < full.Out
 			}
@@ -141,5 +142,9 @@ func LoadManifest(out string) (*Manifest, error) {
 // SegVF is the PictureVF for a manifest segment (what look/check must apply to source frames).
 func (m *Manifest) SegVF(g MSeg) string {
 	ax, ay := g.Anchor()
-	return PictureVF(g.Zoom, ax, ay, m.Fill, m.FillX, m.FillY, m.Bars, m.Width, m.Height)
+	fx := m.FillX
+	if g.FillX > 0 {
+		fx = g.FillX
+	}
+	return PictureVF(g.Zoom, ax, ay, m.Fill, fx, m.FillY, m.Bars, m.Width, m.Height)
 }
