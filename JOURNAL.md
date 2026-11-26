@@ -2,6 +2,17 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 73 · 2026-11-27 · Punch-ins: `edit zoom 1.2 --alternate` (wide / 1.2× at every jump cut)
+Did: GRAPHICS.md's framing rule (alternate wide ↔ 1.2× at cuts, anchored on the face, segments
+< 2.5 s keep the previous framing, start wide) lived in a separate script (tools/punchins.py).
+`cutroom edit zoom 1.2 --alternate [--min 2.5] [--anchor x,y]` does it: flips at jump cuts only (a
+segment continuing the same shot keeps its framing), anchored on the speaker's face box by default.
+Measured: real deploying edit (4 segments): s1 wide, s3 1.2× on the face (0.53,0.41), s4 wide, the
+0.7 s s5 held; `look --cuts` shows the face stay put and grow; render + `check` PASS 0 warnings
+(picture worst 0.3 — the zoomed segment matched through SegVF; cards unmoved by the zoom). e2e 305/305.
+Next: the kept-sound fix on this edit split "a month | server." inside a sentence — look at whether
+kept-sound fixes should avoid in-sentence cuts.
+
 ### 72 · 2026-11-27 · `sync` says the alignment in plain words
 Did: r13 recorder-haiku: "the sign convention is only clear after reading the mapping line". `sync`
 now adds "in plain words: the same moment is 12:55.555 in video and 11:10.711 in audio — cutroom

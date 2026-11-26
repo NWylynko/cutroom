@@ -284,6 +284,7 @@ expect "eyebrow on an image refused" 'no --sub or --eyebrow'              cutroo
 expect "overlay set eyebrow"         'set o1: --eyebrow "Step 2"'         cutroom overlay set o1 --eyebrow "Step 2" --dry-run
 expect "overlay --y points to style" 'style o1 --y'                        cutroom overlay set o1 --y 0.3
 expect "look --file on a source"     'frame 360 of talk at 0:12'           cutroom look --file talk.mp4 12
+expect "punch-ins at cuts"           'punch-ins: [0-9]+ of [0-9]+ segments at 1\.20×' cutroom edit zoom 1.2 --alternate --dry-run
 expect "overlay set nothing"       'nothing to change'                   cutroom overlay set o1
 expect "overlay sub-help"          'cutroom overlay add'                 sh -c 'cutroom overlay add --help | head -1'
 t1=$(cutroom overlay list --json | python3 -c 'import json,sys;o=json.load(sys.stdin)["result"]["overlays"][0];print(round((o["output_start"]+o["output_end"])/2,2))')

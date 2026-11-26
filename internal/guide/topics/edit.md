@@ -51,3 +51,10 @@ by your first edit as the whole first video source. Sources are never touched.
 
 Times in `edit` are **source** times (what `transcript` prints). Times in `timeline` output
 columns are **output** times (where it lands in the video), followed by the source range.
+
+## Punch-ins (framing changes at jump cuts)
+`cutroom edit zoom 1.2 --alternate` switches the framing at every jump cut: wide, then 1.2× on the
+speaker's face, then wide… A segment shorter than `--min` (2.5 s) keeps the framing before it; one
+that continues the same shot keeps it too. The face stays where it was and gets bigger, so a jump cut
+reads as a camera change. `--anchor x,y` centres elsewhere; `cutroom look --cuts` shows each cut;
+`edit zoom 1 --alternate` makes it all wide again. Above 1.2× a 1080p source looks soft.

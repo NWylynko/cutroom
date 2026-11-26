@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"github.com/NWylynko/cutroom/internal/perceive"
 	"math"
 	"path/filepath"
 	"strconv"
@@ -66,7 +67,9 @@ never moves them.`,
 			{Name: "source", Kind: "string", Help: "Source id (for ranges, reset, or to restrict word matching)"},
 			{Name: "reason", Kind: "string", Help: "Why (stored with the edit; shown in the timeline)"},
 			{Name: "min-cut", Kind: "float", Default: "0.4", Help: "tighten: only shorten pauses where at least this much can go"},
-			{Name: "anchor", Kind: "string", Help: "zoom: point to zoom on as x,y in 0–1 (default 0.5,0.4); frame: where a filled frame is cropped"},
+			{Name: "anchor", Kind: "string", Help: "zoom: point to zoom on as x,y in 0–1 (default 0.5,0.4; --alternate: the speaker's face); frame: where a filled frame is cropped"},
+			{Name: "alternate", Kind: "bool", Help: "zoom: at every jump cut switch between wide and this zoom (punch-ins), starting wide"},
+			{Name: "min", Kind: "float", Default: "2.5", Help: "zoom --alternate: segments shorter than this (s) keep the framing before them"},
 			{Name: "bars", Kind: "string", Help: "frame: what fills the frame around a fitted picture — black (default), blur, or a colour #rrggbb"},
 			{Name: "for", Kind: "string", Help: "audio: only for segments from this video source (multi-take)"},
 			{Name: "with", Kind: "string", Help: "replace: the source whose version of the words goes in (a pickup or another take)"},
@@ -120,8 +123,10 @@ Explicit cuts pin the edges they make already; pin is for edges you set some oth
 			"zoom": {Usage: `  edit zoom 1.15 --from "Then install" --to "on it."   punch in on a span
   edit zoom 1.15 12.0-15.5 [--source id]               ... or a source time range
   edit zoom 1 --from ... --to ...                      zoom back out
+  edit zoom 1.2 --alternate [--min 2.5]                punch-ins: wide / 1.2× at every jump cut, on the
+                                                       speaker's face (makes jump cuts read as camera changes)
 Above 1.2× upscaling looks soft (a 1080p source at 1.3×); 4K sources can go to 2× for 1080p.`,
-				Flags: []string{"anchor", "text", "from", "to", "near", "occurrence", "source", "dry-run"}},
+				Flags: []string{"anchor", "alternate", "min", "text", "from", "to", "near", "occurrence", "source", "dry-run"}},
 			"tighten": {Usage: `  edit tighten [--min-cut 0.4]   shorten every pause longer than the pads + min-cut
 Never moves pinned edges (your explicit cuts). Prints the sounds inside removed pauses.`,
 				Flags: []string{"min-cut", "dry-run"}},
@@ -459,6 +464,15 @@ func runEdit(c *Ctx) (*Result, error) {
 				return nil, Errf(ExitUsage, "bad-anchor", "x,y between 0 and 1, e.g. --anchor 0.5,0.4 (0,0 = top left)", "bad --anchor %q", c.Str("anchor"))
 			}
 			e.ax, e.ay = x, y
+		}
+		if c.Bool("alternate") {
+			res, err := e.alternateZoom(z, c.Has("anchor"), c.Float("min"))
+			if err != nil {
+				return nil, err
+			}
+			label = fmt.Sprintf("edit zoom %.2f --alternate", z)
+			lines = append(lines, res...)
+			break
 		}
 		c.Args = append([]string{c.Args[0]}, c.Args[2:]...) // the rest is the span, as for cut
 		res, desc, err := e.applySpan(c, op)
@@ -1440,4 +1454,67 @@ func (e *editEnv) mainPicture() (string, float64, float64) {
 		return "", 0, 0
 	}
 	return best, lo[best], hi[best]
+}
+
+// alternateZoom gives the edit punch-ins: at every jump cut the framing switches between wide and z,
+// starting wide; a segment shorter than min keeps the framing before it (no flicker), and segments
+// that continue the same shot keep it too. The anchor is the speaker's face unless given, so the
+// face stays put and gets bigger — a jump cut that reads as a camera change.
+func (e *editEnv) alternateZoom(z float64, anchored bool, min float64) ([]string, error) {
+	tl := e.tl
+	tl.Recompute()
+	if len(tl.Segments) < 2 {
+		return nil, Errf(ExitUsage, "no-cuts", "cut first; --alternate switches framing at cuts", "the edit has no cuts to punch in at")
+	}
+	ax, ay, where := e.ax, e.ay, fmt.Sprintf("%.2f,%.2f", e.ax, e.ay)
+	if !anchored {
+		if src, a, b := e.mainPicture(); src != "" {
+			sp := perceive.FindSpeakerCached(cacheDir(e.p), e.p.Abs(e.p.Sources[src]), a, b-a)
+			if sp.Found && sp.Face != ([4]float64{}) {
+				ax, ay = (sp.Face[0]+sp.Face[2])/2, (sp.Face[1]+sp.Face[3])/2
+				where = fmt.Sprintf("the speaker's face (%.2f,%.2f)", ax, ay)
+			} else if sp.Found {
+				ax, where = sp.X, fmt.Sprintf("the speaker (%.2f,%.2f)", sp.X, ay)
+			}
+		}
+	}
+	fps := tl.Rate()
+	zoomed, flips, held := false, 0, 0
+	for k := range tl.Segments {
+		g := &tl.Segments[k]
+		if k > 0 {
+			p := tl.Segments[k-1]
+			sameShot := p.Source == g.Source && math.Abs(p.Out-g.In) < 0.5/fps
+			switch {
+			case sameShot:
+			case g.Out-g.In < min:
+				held++
+			default:
+				zoomed = !zoomed
+				flips++
+			}
+		}
+		if zoomed {
+			g.Zoom, g.AnchorX, g.AnchorY = z, ax, ay
+		} else {
+			g.Zoom, g.AnchorX, g.AnchorY = 0, 0, 0
+		}
+	}
+	n := 0
+	for _, g := range tl.Segments {
+		if g.Zoom > 1 {
+			n++
+		}
+	}
+	out := []string{fmt.Sprintf("punch-ins: %d of %d segments at %.2f×, the rest wide; %d switch(es) at cuts, %d short segment(s) kept their framing; centred on %s",
+		n, len(tl.Segments), z, flips, held, where)}
+	if src, _, _ := e.mainPicture(); src != "" {
+		if s := e.p.Sources[src]; s.Facts != nil && s.Facts.Video != nil {
+			if up := z * float64(tl.Height) / float64(s.Facts.Video.Height); up > 1.2+1e-9 && !tl.Fill {
+				out = append(out, fmt.Sprintf("WARN %.2f× on a %dp source for %dp output upscales %.2f×: above 1.2× it looks soft (L40)", z, s.Facts.Video.Height, tl.Height, up))
+			}
+		}
+	}
+	out = append(out, "see them: `cutroom look --cuts` (each cut, before | after); undo: `cutroom edit undo`, all wide again: `cutroom edit zoom 1 --alternate`")
+	return out, nil
 }
