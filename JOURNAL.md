@@ -2,6 +2,15 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 80 · 2026-11-27 · Eval r14 house-style: both pass; cards hold for reading time, eyebrow case
+Did: new T2 task `house-style` (evals/results/2026-11-27-14.md) with grader `card_color` — measured as
+what the cards add over the source at the same moment (the accent colour alone was useless: the
+default dark translucent card over the fixture's bars makes near-#307351 too). Sonnet and haiku PASS.
+Friction fixed: a text card with `--to` stays up at least its reading time (0.9 s + 0.3 s a word,
+eyebrow counted) unless `--exact`; `style cards --eyebrow-case as-is`; `--accent` help lists what it
+colours.
+Measured: grader selftest 28/28; make check green; e2e 314/314 (+3).
+
 ### 79 · 2026-11-27 · SVG icons drawn directly (Lucide and other stroke icon sets)
 Did: r78's icons needed PNGs and nothing here converts SVG. New raster/svg.go: a small stroke-SVG
 renderer — viewBox, path (M L H V C S Q T A Z, relative and absolute, compact arc flags), circle,

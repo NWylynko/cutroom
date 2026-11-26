@@ -10,7 +10,8 @@ added o1: text "Install Linux", lower-third, output 0:06.500–0:09.000 (2.500 s
 look at it: `cutroom look --output 7.75`
 ```
 
-- `--duration 3` (default 4) or `--to "on it."` (until those words end).
+- `--duration 3` (default 4) or `--to "on it."` (until those words end — a text card stays up at
+  least its reading time, 0.9 s + 0.3 s a word; `--exact` ends it on the words regardless).
 - Layouts: `lower-third` (text default: left, above the bottom), `title` and `center` (big, centred),
   `top`, `corner` (top right; image default), `left` / `right` (vertically centred at that side — the
   empty side of the frame). `--sub` adds a smaller second line, `--eyebrow "Step 3"` a small label

@@ -1,0 +1,19 @@
+# Friction report: r14-house-style-haiku
+
+- **Outcome:** done. `out/final.mp4` (13.767 s, 1280x720) is rendered and `cutroom check` passes with 0 failures and 0 warnings. Two step cards sit on the right words. The eyebrow renders as "STEP 2" / "STEP 3" (capitals), which I could not turn off.
+
+- **Commands run:** about 13 Bash calls and roughly 40 cutroom invocations, in this order: `cutroom guide`; `guide workflow`, `guide edit`, `guide overlays`; `guide verify`, `guide style`; `guide perceive`, `guide pitfalls`, `guide render`; `cutroom doctor`; `cutroom init talk.mp4`; `cutroom transcribe`; `cutroom transcript`; `transcript --suspects`; `transcript --retakes`; `cutroom edit tighten`; `edit cut --from "The first thing you need is, UM" --to "the first thing." --dry-run`; `edit cut --from "By the way," --to "the keyboard." --dry-run`; the same two `edit cut` without `--dry-run`; `cutroom timeline`; `timeline --joins`; `transcript --output`; `style --help`; `overlay add --help`; `style cards --box "#f3f6f7e6" --color "#101718" --accent "#307351" --radius 0.4`; `overlay add text "Install Linux" --eyebrow "Step 2" --icon icons/terminal.svg --layout left --at "Then install" --to "on it."`; the same for "Run the update"; `overlay list`; `overlay set o1 --duration 1.5`; `look --overlays`; `look --output 7.2`; `look --output 10.2`; `render --dry-run`; `render --preview`; `check out/preview.mp4`; `render`; `check out/final.mp4`; `look out/final.mp4 7.2`; `transcript --output --file out/final.mp4`.
+
+- **Errors hit:** none that failed a command. One warning I caused: `WARN[overlay-short] overlay o1 "Install Linux" is on screen 1.43 s: too short to read 2 word(s) (needs ~1.5 s...)`. Its fix line (`cutroom overlay set o1 --duration 1.5`) worked first time.
+
+- **Guessed wrong:** I guessed `--eyebrow "Step 2"` would show the text as written. It shows "STEP 2" because the eyebrow is always capitalised. The `--case` flag in `style` covers titles and captions, and the help does not say it covers eyebrows. I also guessed the `--accent` colour would show as a bar on a `left` card. I see no bar in the look frames, so I am not sure the flag does anything on that layout. Neither guess cost a retry.
+
+- **Confusing output:** `cutroom look --overlays` prints `2 overlay(s), each at the middle of its window` but writes one PNG to `.cutroom/look/overlays.png`, so the PNG path is easy to miss unless you read the "wrote" line. `timeline` prints its overlay line as `overlays: o1 at 0:06.500` with no end time, which makes the window hard to judge without `overlay list`. The `render --dry-run` size line is clear and useful.
+
+- **Missing:** a way to keep the eyebrow's case as written (for example `--eyebrow-case as-is`). A "does this layout draw an accent bar" check for `style cards --accent`. I also wanted a `style cards --radius` value in fractions of the font size that I could translate from "rounded"; the help gives no default, so I chose 0.4 by eye from the look frame.
+
+- **Not sure it's right:** the translucent panel `#f3f6f7e6` (about 90% opacity) and the "slightly see-through" reading are my interpretation. I checked them only by eye on the look frame, not numerically. The words check and the transcript use base.en, which may mishear words, so a word-level error would not show up. I checked the cut points with `transcript --output` and the join list, and the final read reads cleanly. I did not run a larger model. The `left` layout's vertical centring I judged from the frame, not by measurement.
+
+- **Best part:** `timeline` plus `timeline --joins` plus the `WARN` lines with their ready-made `edit cut` commands made the retake and the aside obvious. `--dry-run` on each cut showed the join before I committed, and `check` gave a clear PASS line per check.
+
+- **One change:** let `--eyebrow` keep its text's case (or document that eyebrows are always uppercase), so a house style asking for "Step 2" can be met exactly.

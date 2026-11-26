@@ -33,6 +33,7 @@ type Style struct {
 	Pad             float64  `json:"pad,omitempty"`           // box padding, fraction of the font size
 	Tracking        float64  `json:"tracking,omitempty"`      // letter-spacing, fraction of the font size
 	EyebrowTracking float64  `json:"eyebrow_tracking,omitempty"`
+	EyebrowCase     string   `json:"eyebrow_case,omitempty"` // upper (default) | as-is
 	Case            string   `json:"case,omitempty"`         // upper | upper-keep-names | lower | as-is
 	Align           string   `json:"align,omitempty"`        // left | center | right (lines inside the box)
 	X               *float64 `json:"x,omitempty"`            // centre of the box, 0–1 across
@@ -65,6 +66,7 @@ var StyleFields = []StyleField{
 	{"pad", "num", "box padding as a fraction of the font size", ""},
 	{"tracking", "num", "letter-spacing as a fraction of the font size (0.05 = airy capitals)", ""},
 	{"eyebrow-tracking", "num", "letter-spacing of a card's eyebrow label (default 0.14)", "cards"},
+	{"eyebrow-case", "enum:upper,as-is", "a card's eyebrow label in capitals (default) or as written", "cards"},
 	{"case", "enum:upper,upper-keep-names,lower,as-is", "letter case of captions and card titles (upper-keep-names: capitals, but iCloud, OAuth, GitHub stay as written)", ""},
 	{"align", "enum:left,center,right", "line alignment inside the box", ""},
 	{"x", "num", "centre of the box, 0–1 across (default: centred; cards: from --layout)", ""},
@@ -77,7 +79,7 @@ var StyleFields = []StyleField{
 	{"sub-font", "font", "the second line's font", "cards"},
 	{"sub-size", "num", "the second line's size", "cards"},
 	{"sub-color", "color", "the second line's colour", "cards"},
-	{"accent", "color", "the bar on the left of a lower third, or none", "cards"},
+	{"accent", "color", "cards' accent: the eyebrow label, the icon and its tile, and the bar of a lower third (none = no bar)", "cards"},
 }
 
 func (f StyleField) goName() string {

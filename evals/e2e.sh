@@ -281,6 +281,9 @@ expect "short card warned"         'overlay-short.*o1.*overlay set o1 --duration
 expect "overlay set keeps the id"  'set o1: --duration 2\.5'               cutroom overlay set o1 --duration 2.5
 expect "overlay eyebrow + left"      'text "Two steps", left'             cutroom overlay add text "Two steps" --eyebrow "Step 1" --at "Then install" --duration 1.5 --layout left --dry-run
 printf '<svg viewBox="0 0 24 24" stroke-width="2"><circle cx="12" cy="12" r="9"/></svg>' > ring.svg
+expect "card with --to held to be read" '\(1\.500 s\)'                  cutroom overlay add text "Hi" --at "Finally" --to "Finally," --layout left --dry-run
+expect "--exact ends on the words"   'overlay-short'                      cutroom overlay add text "Hi" --at "Finally" --to "Finally," --layout left --exact --dry-run
+expect "eyebrow as written"          'eyebrow-case=as-is'                 cutroom style cards --eyebrow-case as-is --dry-run
 expect "card with an SVG icon"       'text "Ring", left'                  cutroom overlay add text "Ring" --icon ring.svg --at "Then install" --duration 1.5 --layout left --dry-run
 expect "card with an icon"           'text "Two steps", left'             cutroom overlay add text "Two steps" --icon logo.png --at "Then install" --duration 1.5 --layout left --dry-run
 expect "eyebrow on an image refused" 'no --sub, --eyebrow or --icon'              cutroom overlay add image logo.png --eyebrow "x" --at "Finally" --duration 1 --dry-run

@@ -23,10 +23,13 @@ type Overlay struct {
 	Sub        string  `json:"sub,omitempty"`         // text: smaller second line
 	Eyebrow    string  `json:"eyebrow,omitempty"`     // text: a small label above the title ("STEP 3")
 	Icon       string  `json:"icon,omitempty"`        // text: a PNG/JPEG shown in a tile left of the text
-	Path       string  `json:"path,omitempty"`        // image: file (relative to the project)
-	Layout     string  `json:"layout"`                // lower-third | title | top | corner | center
-	Size       float64 `json:"size,omitempty"`        // image: width as a fraction of the frame
-	Fade       float64 `json:"fade"`                  // s, in and out
+	// Exact: a text card with --to ends exactly on those words even when that is too short to read
+	// (by default it stays up for its reading time)
+	Exact  bool    `json:"exact,omitempty"`
+	Path   string  `json:"path,omitempty"` // image: file (relative to the project)
+	Layout string  `json:"layout"`         // lower-third | title | top | corner | center
+	Size   float64 `json:"size,omitempty"` // image: width as a fraction of the frame
+	Fade   float64 `json:"fade"`           // s, in and out
 	// clip: a video shown over the edit (muted; the speaker's sound continues). ClipIn is where in the
 	// clip it starts; ClipDur, ClipW×ClipH (as displayed) are probed when it is added.
 	ClipIn  float64 `json:"clip_in,omitempty"`
@@ -68,6 +71,9 @@ func (t *Timeline) Window(o Overlay) (start, end float64, ok bool, why string) {
 			b = e + 0.5/t.fpsNum
 		} else {
 			b = a + math.Max(o.Duration, 1)
+		}
+		if o.Kind == "text" && !o.Exact { // words said faster than the card can be read: hold it
+			b = math.Max(b, a+ReadTime(o))
 		}
 	}
 	b = math.Min(math.Round(b*t.fpsNum)/t.fpsNum, t.Duration())
@@ -116,8 +122,8 @@ func (t *Timeline) overlayIssues() []Issue {
 				Fix:     fmt.Sprintf("`cutroom overlay set %s --duration %.2f` (or an earlier --clip-in)", o.ID, math.Floor((o.ClipDur-o.ClipIn)*100)/100)})
 		}
 		if o.Kind == "text" {
-			words := len(strings.Fields(o.Text + " " + o.Sub))
-			need := math.Max(1.5, 0.9+0.3*float64(words)) // reading time
+			words := len(strings.Fields(o.Text + " " + o.Sub + " " + o.Eyebrow))
+			need := ReadTime(o)
 			if b-a < need-0.05 {
 				is = append(is, Issue{Level: "warn", Code: "overlay-short", At: round6(a),
 					Message: fmt.Sprintf("overlay %s %q is on screen %.2f s: too short to read %d word(s) (needs ~%.1f s: 0.9 s + 0.3 s a word)", o.ID, o.Text, b-a, words, need),
@@ -203,4 +209,10 @@ func (t *Timeline) Split(source string, s float64) (left, right string, ok bool)
 		return a.ID, b.ID, true
 	}
 	return "", "", false
+}
+
+// ReadTime is how long a text card needs on screen to be read: 0.9 s + 0.3 s a word, at least 1.5 s.
+func ReadTime(o Overlay) float64 {
+	words := len(strings.Fields(o.Text + " " + o.Sub + " " + o.Eyebrow))
+	return math.Max(1.5, 0.9+0.3*float64(words))
 }

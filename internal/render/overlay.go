@@ -273,7 +273,11 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 			}
 			es := math.Round(0.5 * l.size)
 			ef := raster.Tracked(raster.RefFace(l.fontRef, es), l.eyebrowTrack*es)
-			for _, t := range wrapText(ef, strings.ToUpper(o.Eyebrow), mw) {
+			eb := strings.ToUpper(o.Eyebrow)
+			if l.eyebrowAsIs {
+				eb = o.Eyebrow
+			}
+			for _, t := range wrapText(ef, eb, mw) {
 				lines = append(lines, line{t, ef, c})
 			}
 		}

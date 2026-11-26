@@ -49,8 +49,8 @@ type spec struct {
 	Cards []string `json:"cards,omitempty"`
 	// CardColor: a colour the cards must add (their panel) while each card
 	// phrase is said — pixels near it in frames sampled there.
-	CardColor string `json:"card_color,omitempty"`
-	Clean []string `json:"clean,omitempty"`
+	CardColor string   `json:"card_color,omitempty"`
+	Clean     []string `json:"clean,omitempty"`
 	// BurnedCaptions: the bottom band carries captions while lines are said.
 	BurnedCaptions bool `json:"burned_captions,omitempty"`
 	// SRT: a caption file whose words and timing must match the output's speech.
