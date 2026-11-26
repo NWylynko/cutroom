@@ -8,8 +8,7 @@ Move done items to the journal, not here.
 
 ## NOW
 - [friction r13, low] `sync`: per-segment residuals before rendering (recorder haiku).
-- [friction r13, low] `timeline --joins` with each join's listened level (tighten haiku); `check` one
-  line of removed phrases (pickup, tighten sonnet).
+- [friction r13, low] `timeline --joins` with each join's listened level (tighten haiku); .
 - [r69] Face box from skin heuristics is rough (warm walls read as skin); a real face detector
   (macOS Vision via a tiny helper, optional) would make framing and overlay-covers-face exact.
 - [r68] Variable fonts (SF Pro = SFNS.ttf): pick a weight (`--font "SF Pro@800"`); x/image/opentype

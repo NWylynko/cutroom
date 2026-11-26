@@ -2,6 +2,14 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 82 · 2026-11-27 · `check` sums up the edit: what it keeps, what it removed
+Did: r13 friction (pickup, tighten sonnet: "a one-line summary of the final kept text / removed
+phrases"). New check line `edit` (always ok): the kept words' count with their start and end, and
+each removed phrase within the stretch of each source the edit uses (consecutive removed words are
+one phrase; long ones shortened).
+Measured: real deploying edit: "keeps 99 words: 'luckily personal software…a month server.';
+removed 1: 'You don't need to care about … need to worry–'". e2e 316/316.
+
 ### 81 · 2026-11-27 · Emphasised words in card titles: `--text "Watch the *ongoing cost*"`
 Did: starred words in a card title are drawn in the emphasis colour (`style cards --emphasis`,
 default the accent); stars aren't drawn, `\*` is a literal star; wrapping and measuring see the

@@ -178,6 +178,7 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 	if o.Model != "" {
 		wordCheck(renderWav, tmp, m, o, r)
 	}
+	editSummary(m, o, r)
 	for id := range audioSources(m) {
 		if tr := o.Transcripts[id]; tr != nil && len(load(id)) > 0 {
 			edgeCheck(load(id), m.Sources[id].AudioStart, tr, id, m, r)
@@ -1361,4 +1362,76 @@ func framingCheck(m *render.Manifest, r *Report) {
 	}
 	r.add(Item{Check: "framing", Status: "warn", Detail: fmt.Sprintf("the speaker is at x %.2f of %s, but the crop keeps %.2f–%.2f: they are cut off or out of the picture", sp.X, main, a, b),
 		Fix: "`cutroom edit frame --anchor auto` (or --anchor x,y), render again, look at it"})
+}
+
+// editSummary: one line on what the edit is — the words it keeps, start and end, and the phrases it
+// removed from the stretch of each source it uses — so it can be read through without a transcript.
+func editSummary(m *render.Manifest, o Options, r *Report) {
+	if m.Partial || len(m.Segments) == 0 {
+		return
+	}
+	var kept []string
+	keptIdx := map[string]map[int]bool{}
+	lo, hi := map[string]float64{}, map[string]float64{}
+	for _, g := range m.Segments {
+		tr := o.Transcripts[g.Source]
+		if tr == nil {
+			return
+		}
+		if keptIdx[g.Source] == nil {
+			keptIdx[g.Source] = map[int]bool{}
+			lo[g.Source], hi[g.Source] = g.In, g.Out
+		}
+		lo[g.Source], hi[g.Source] = math.Min(lo[g.Source], g.In), math.Max(hi[g.Source], g.Out)
+		for k, w := range tr.Words {
+			if mid := (w.Start + w.End) / 2; mid >= g.In && mid < g.Out && speech.Norm(w.Text) != "" {
+				kept = append(kept, w.Text)
+				keptIdx[g.Source][k] = true
+			}
+		}
+	}
+	if len(kept) == 0 {
+		return
+	}
+	var removed []string
+	for src, ks := range keptIdx {
+		tr := o.Transcripts[src]
+		var run []string
+		flush := func() {
+			if len(run) > 0 {
+				ph := strings.Join(run, " ")
+				if len(run) > 10 {
+					ph = strings.Join(run[:6], " ") + " … " + strings.Join(run[len(run)-3:], " ")
+				}
+				removed = append(removed, fmt.Sprintf("%q", ph))
+			}
+			run = nil
+		}
+		for k, w := range tr.Words {
+			mid := (w.Start + w.End) / 2
+			if mid < lo[src] || mid >= hi[src] || speech.Norm(w.Text) == "" {
+				continue
+			}
+			if ks[k] {
+				flush()
+				continue
+			}
+			run = append(run, w.Text)
+		}
+		flush()
+	}
+	say := strings.Join(kept, " ")
+	if len(kept) > 16 {
+		say = strings.Join(kept[:9], " ") + " … " + strings.Join(kept[len(kept)-6:], " ")
+	}
+	d := fmt.Sprintf("keeps %d words: %q", len(kept), say)
+	switch {
+	case len(removed) == 0:
+		d += "; nothing removed between its first and last word"
+	case len(removed) <= 6:
+		d += fmt.Sprintf("; removed %d: %s", len(removed), strings.Join(removed, ", "))
+	default:
+		d += fmt.Sprintf("; removed %d, first: %s (`cutroom timeline --joins` shows every cut)", len(removed), strings.Join(removed[:6], ", "))
+	}
+	r.add(Item{Check: "edit", Status: "pass", Detail: d})
 }

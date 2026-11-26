@@ -392,6 +392,7 @@ expect "unsafe overlay warned"      'overlay-unsafe.*o2.*reaches right'   sh -c 
 cutroom overlay rm o2 --project shorts/steps >/dev/null; cutroom captions --burn --project shorts/steps >/dev/null
 expect "short renders vertical"     '1080x1920'                          cutroom render --project shorts/steps
 expect "short check: picture"       'ok   picture'                       cutroom check shorts/steps/out/final.mp4 --project shorts/steps
+expect "check sums up the edit"      'ok   edit +keeps [0-9]+ words: "The first thing' cutroom check shorts/steps/out/final.mp4 --project shorts/steps
 expect "short check: safe zones"    'ok   safe-zones +[0-9]+ overlay box\(es\) inside the vertical safe zones \(y 260–1490, x ≤ 960\)' cutroom check shorts/steps/out/final.mp4 --project shorts/steps
 
 # style: captions and cards take the look you set (no house style forced)
