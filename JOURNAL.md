@@ -2,6 +2,18 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 66 · 2026-11-26 · Misheard words: flagged before burning, fixed with `transcript --fix`
+Did: r65's reviewer found "work providers" (OAuth) and "greater" (great at) burned into captions.
+`captions --burn` now lists the edit's doubtful words (low confidence, or the two recognition passes
+disagreed) with output and source times. `cutroom transcript --fix "heard" --as "said"` [--near t]
+corrects the words in place (timing shared by length, punctuation kept) and is stored per project
+(transcripts/fixes.json), applied on every load, after a recorder's words are mapped onto the camera,
+and copied into shorts; `--fixes` lists, `--unfix` removes. New `case upper-keep-names` leaves
+mixed-case names (iCloud, OAuth, GitHub) as written in upper-case captions.
+Measured: sso — 5 doubtful words listed, "work" among them; fixed → captions "OAuth providers".
+github2 — 1 listed: "greater". Both reviewer misses caught; e2e 293/293 (+5).
+Next: a project vocabulary for the recogniser itself (whisper --prompt) so names come out right first time.
+
 ### 65 · 2026-11-26 · T3 editor review of styled shorts: six fixes (+ L58 caption timing)
 Did: opus editor reviewed three styled real-footage shorts (evals/results/t3/2026-11-26-r65-styled-
 review.md): REJECT ×3. Fixed what was cutroom's: `--words` is a hard limit when set; caption groups

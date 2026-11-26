@@ -37,6 +37,7 @@ func Load(cacheDir, id string) (*Transcript, error) {
 	if err := json.Unmarshal(b, t); err != nil {
 		return t, err
 	}
+	t.ApplyFixes(LoadFixes(cacheDir)) // the user's corrections of what was heard
 	// repeats (retakes) are found again from the words, so older transcripts get today's rules
 	kept := t.Suspects[:0]
 	for _, x := range t.Suspects {

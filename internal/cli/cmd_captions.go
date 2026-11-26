@@ -3,6 +3,7 @@ package cli
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"strings"
@@ -202,6 +203,11 @@ func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64, o caption
 		lines = append(lines, fmt.Sprintf("added %s: burned-in captions over the whole edit%s; remove with `cutroom overlay rm %s`", id, raise, id))
 		lines = append(lines, "their look (font, size, colours, box, outline, position, words at a time, highlighted word) is yours to set: `cutroom style captions --help`")
 	}
+	if dw := doubtfulWords(e, ws); len(dw) > 0 {
+		lines = append(lines, fmt.Sprintf("check these words before publishing — the recogniser wasn't sure, and burned-in captions show them to everyone (%d):", len(dw)))
+		lines = append(lines, dw...)
+		lines = append(lines, "  listen: `cutroom listen <source time>`; correct: `cutroom transcript --fix \"<heard>\" --as \"<said>\"`")
+	}
 	// the sidecar file comes with it: burned captions for muted viewers, the file for YouTube
 	side := captionPath(c, e)
 	if err := writeTarget(e.p, side); err != nil {
@@ -246,4 +252,57 @@ func captionPath(c *Ctx, e *editEnv) string {
 		ext = ".vtt"
 	}
 	return filepath.Join(e.p.Dir, "out", "captions"+ext)
+}
+
+// doubtfulWords lists the edit's words the recogniser wasn't sure of (low confidence, or the two
+// passes heard differently), in output time, with what to run to correct one.
+func doubtfulWords(e *editEnv, ws []captions.Word) []string {
+	var out []string
+	seen := map[string]bool{}
+	for k, w := range ws {
+		g := e.tl.Find(w.Segment)
+		if g == nil || e.tr[g.Source] == nil {
+			continue
+		}
+		tx := e.tr[g.Source]
+		why := ""
+		for _, sw := range tx.Words {
+			if math.Abs(sw.Start-w.SourceTime) < 0.005 {
+				for _, f := range sw.Flags {
+					if f == "low-confidence" {
+						why = "low confidence"
+					}
+				}
+				break
+			}
+		}
+		if why == "" {
+			for _, su := range tx.Suspects {
+				if su.Kind == "pass-diff" && w.SourceTime >= su.Start-0.01 && w.SourceTime < su.End {
+					why = "the two passes heard different words"
+					break
+				}
+			}
+		}
+		if why == "" {
+			continue
+		}
+		// the word with its neighbours, as a phrase to quote in --fix
+		a, b := max(0, k-1), min(len(ws)-1, k+1)
+		var ph []string
+		for _, x := range ws[a : b+1] {
+			ph = append(ph, strings.Trim(x.Text, ".,?!;:"))
+		}
+		key := fmt.Sprintf("%.2f", w.Start)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, fmt.Sprintf("  %s  %q in \"%s\" (%s; %s %s)", clock(w.Start), strings.Trim(w.Text, ".,?!;:"), strings.Join(ph, " "), why, g.Source, clock(w.SourceTime)))
+		if len(out) >= 15 {
+			out = append(out, "  … more: `cutroom transcript --suspects`")
+			break
+		}
+	}
+	return out
 }

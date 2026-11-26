@@ -389,6 +389,11 @@ expect "style undo"                  'undid'                              cutroo
 expect "style animate"               'now set: .*animate=pop'                  cutroom style captions --animate pop --project shorts/steps
 expect "style animate: how to see it" 'to see the motion, render' cutroom style o1 --animate-time 0.4 --project shorts/steps
 expect "style animate cards"         'now set: animate=slide-up'             cutroom style cards --animate slide-up --project shorts/steps
+expect "transcript --fix"            'fixed talk "old laptop" → "old ThinkPad"' cutroom transcript --fix "old laptop" --as "old ThinkPad" --project shorts/steps
+expect "fix shows in captions"       'ThinkPad'                           cutroom captions --burn --dry-run --all --project shorts/steps
+expect "fix listed"                  'talk: "old laptop" → "old ThinkPad"' cutroom transcript --fixes --project shorts/steps
+expect "fix needs --as"              'needs --as'                         cutroom transcript --fix "old laptop" --project shorts/steps
+expect "unfix"                       'removed 1 fix'                      cutroom transcript --unfix "old laptop" --project shorts/steps
 export CUTROOM_LOOKS="$W/looks"
 expect "style save look"             'saved look "channel"'               cutroom style save channel --project shorts/steps
 expect "style looks lists it"        'channel +captions: .*animate=pop'   cutroom style looks

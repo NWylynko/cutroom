@@ -180,3 +180,10 @@ func TestL58_CaptionCardsReadAtTheTimelineRate(t *testing.T) {
 		t.Errorf("every file (and the repeated last one) must be read at the timeline rate:\n%s", l)
 	}
 }
+
+func TestUpperKeepNames(t *testing.T) {
+	l := look{upper: true, keepNames: true}
+	if got := l.text("using iCloud's OAuth on GitHub with Google API"); got != "USING iCloud's OAuth ON GitHub WITH GOOGLE API" {
+		t.Errorf("got %q", got)
+	}
+}

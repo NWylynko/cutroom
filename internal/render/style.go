@@ -7,6 +7,8 @@ import (
 	"image/color"
 	"math"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"golang.org/x/image/font"
 
@@ -43,7 +45,7 @@ type look struct {
 	outlineW, shadowOff                                             int
 	radius                                                          float64
 	padX, padY                                                      int
-	upper, lower                                                    bool
+	upper, lower, keepNames                                         bool
 	align                                                           string
 	x, y                                                            *float64
 	width                                                           int
@@ -82,7 +84,7 @@ func resolve(st timeline.Style, dir string, w, h int) (look, error) {
 		color: colorOf(st.Color), subColor: colorOf(st.SubColor), highlight: colorOf(st.Highlight), box: colorOf(st.Box),
 		accent: colorOf(st.Accent), outln: colorOf(st.Outline), shade: colorOf(st.Shadow), boxShade: colorOf(st.BoxShadow),
 		radius: st.Radius * size, padX: int(st.Pad * size), padY: int(0.6 * st.Pad * size),
-		upper: st.Case == "upper", lower: st.Case == "lower", align: st.Align, x: st.X, y: st.Y,
+		upper: st.Case == "upper" || st.Case == "upper-keep-names", lower: st.Case == "lower", keepNames: st.Case == "upper-keep-names", align: st.Align, x: st.X, y: st.Y,
 		width: int(st.Width * float64(w))}
 	if l.color == nil {
 		l.color = color.NRGBA{255, 255, 255, 255}
@@ -107,6 +109,14 @@ func resolve(st timeline.Style, dir string, w, h int) (look, error) {
 
 func (l look) text(s string) string {
 	switch {
+	case l.upper && l.keepNames:
+		ws := strings.Fields(s)
+		for i, w := range ws {
+			if !mixedCase(w) {
+				ws[i] = strings.ToUpper(w)
+			}
+		}
+		return strings.Join(ws, " ")
 	case l.upper:
 		return strings.ToUpper(s)
 	case l.lower:
@@ -220,4 +230,20 @@ func animAt(kind string, p float64) (scale, dx, dy, alpha float64) {
 		dx, alpha = -0.3*(1-e), math.Min(1, 2*p)
 	}
 	return
+}
+
+// mixedCase: a name written with capitals inside it (iCloud, OAuth, GitHub, macOS) — not a word that
+// is merely capitalised (Google) or all capitals (API).
+func mixedCase(w string) bool {
+	up, low := 0, 0
+	for i, r := range w {
+		switch {
+		case unicode.IsUpper(r) && i > 0:
+			up++
+		case unicode.IsLower(r):
+			low++
+		}
+	}
+	first, _ := utf8.DecodeRuneInString(w)
+	return low > 0 && (up > 0 || unicode.IsLower(first) && strings.ContainsFunc(w, unicode.IsUpper))
 }

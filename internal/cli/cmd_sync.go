@@ -212,8 +212,9 @@ func heardWords(p *project.Project, tl *timeline.Timeline, tr timeline.Transcrip
 		sy := p.Sources[a].Sync
 		cam := tr[v]
 		tr[v] = tr[a].MapTo(v, func(r float64) float64 { return (r - sy.Offset) / (1 + sy.Drift) }, dur[v])
-		tr[v].ReconcileTiming(cam, 1.2) // words the recorder couldn't place: the camera's own microphone heard them
-		tr[v].BorrowPunctuation(cam)    // sentence ends the recorder's transcript left out, for captions
+		tr[v].ReconcileTiming(cam, 1.2)                 // words the recorder couldn't place: the camera's own microphone heard them
+		tr[v].BorrowPunctuation(cam)                    // sentence ends the recorder's transcript left out, for captions
+		tr[v].ApplyFixes(speech.LoadFixes(cacheDir(p))) // corrections made to the words of v
 	}
 }
 

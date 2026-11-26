@@ -30,7 +30,7 @@ type Style struct {
 	BoxShadow    string   `json:"box_shadow,omitempty"`    // soft shadow under the box, or none
 	Radius       float64  `json:"radius,omitempty"`        // box corner radius, fraction of the font size
 	Pad          float64  `json:"pad,omitempty"`           // box padding, fraction of the font size
-	Case         string   `json:"case,omitempty"`          // upper | lower | as-is
+	Case         string   `json:"case,omitempty"`          // upper | upper-keep-names | lower | as-is
 	Align        string   `json:"align,omitempty"`         // left | center | right (lines inside the box)
 	X            *float64 `json:"x,omitempty"`             // centre of the box, 0–1 across
 	Y            *float64 `json:"y,omitempty"`             // centre of the box, 0–1 down
@@ -59,7 +59,7 @@ var StyleFields = []StyleField{
 	{"box-shadow", "color", "soft shadow under the box (e.g. #00000066), or none", ""},
 	{"radius", "num", "box corner radius as a fraction of the font size (0 = square)", ""},
 	{"pad", "num", "box padding as a fraction of the font size", ""},
-	{"case", "enum:upper,lower,as-is", "letter case", ""},
+	{"case", "enum:upper,upper-keep-names,lower,as-is", "letter case (upper-keep-names: capitals, but iCloud, OAuth, GitHub stay as written)", ""},
 	{"align", "enum:left,center,right", "line alignment inside the box", ""},
 	{"x", "num", "centre of the box, 0–1 across (default: centred; cards: from --layout)", ""},
 	{"y", "num", "centre of the box, 0–1 down (default: the caption band / the layout's place)", ""},

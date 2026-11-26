@@ -46,5 +46,11 @@ dark box low in the frame (on vertical video, above the platform's buttons). The
 over the whole edit: the groups are made from the cut at render time, so they follow every re-cut.
 `cutroom look --output <time>` shows them (`+cc`); `cutroom check` samples groups on screen and the
 gaps between them; lower thirds move up above them. Remove with `cutroom overlay rm <id>`.
+Burned-in captions show every misheard word to everyone, so `captions --burn` lists the words the
+recogniser wasn't sure of (low confidence, or its two passes disagreed). Listen (`cutroom listen <source
+time>`), then correct one with `cutroom transcript --fix "other work providers" --as "other OAuth
+providers"` — captions, subtitle files and word checks use the fix; the recording is unchanged
+(`--near <time>` for one place only, `--fixes` lists them, `--unfix` removes one). In upper-case
+captions, `style captions --case upper-keep-names` leaves iCloud, OAuth, GitHub as written.
 That look is only the default: font, size, colours, box, outline, place, words at a time and a
 karaoke highlight are all yours to set — `cutroom guide style`.

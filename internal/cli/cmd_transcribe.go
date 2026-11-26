@@ -71,6 +71,11 @@ Examples:
 			{Name: "all", Kind: "bool", Help: "Don't truncate long output"},
 			{Name: "file", Kind: "string", Help: "Transcribe and read any file, e.g. your render (cached); times are file times"},
 			{Name: "source", Kind: "string", Help: "Source id (same as giving it first: `cutroom transcript pickup`)"},
+			{Name: "fix", Kind: "string", Help: "Words the recogniser got wrong (quoted as the transcript has them); with --as"},
+			{Name: "as", Kind: "string", Help: "What was really said, for --fix (captions, subtitles and word checks use it)"},
+			{Name: "near", Kind: "string", Help: "--fix only the place nearest this source time (default: everywhere it is said)"},
+			{Name: "unfix", Kind: "string", Help: "Remove a fix (its --fix words), or `all`"},
+			{Name: "fixes", Kind: "bool", Help: "List the word fixes"},
 		},
 		Run: runTranscript,
 	})
@@ -281,6 +286,9 @@ func runTranscript(c *Ctx) (*Result, error) {
 	}
 	if c.Bool("output") {
 		return transcriptOutput(c)
+	}
+	if c.Has("fix") || c.Has("unfix") || c.Bool("fixes") {
+		return transcriptFix(c, p, id)
 	}
 	var t *speech.Transcript
 	if c.Has("file") && !c.Has("project") {
@@ -658,4 +666,106 @@ func transcriptOutput(c *Ctx) (*Result, error) {
 	}
 	return &Result{Text: head + "\n" + strings.Join(lines, "\n"), Data: map[string]any{"phrases": out, "duration": e.tl.Duration()},
 		Next: []string{"cutroom timeline --joins   (each cut, with the words either side)"}}, nil
+}
+
+// transcriptFix adds, removes or lists word fixes: corrections of what the recogniser heard.
+func transcriptFix(c *Ctx, p *project.Project, id string) (*Result, error) {
+	fs := speech.LoadFixes(cacheDir(p))
+	if c.Bool("fixes") {
+		if len(fs) == 0 {
+			return &Result{Text: "no word fixes yet: `cutroom transcript --fix \"what it heard\" --as \"what was said\"`"}, nil
+		}
+		var lines []string
+		for _, f := range fs {
+			where := "everywhere"
+			if f.Near > 0 {
+				where = "near " + clock(f.Near)
+			}
+			lines = append(lines, fmt.Sprintf("  %s: %q → %q (%s)", f.Source, f.From, f.To, where))
+		}
+		return &Result{Text: "word fixes:\n" + strings.Join(lines, "\n"), Data: map[string]any{"fixes": fs}}, nil
+	}
+	if c.Has("unfix") {
+		var keep []speech.Fix
+		gone := 0
+		for _, f := range fs {
+			if c.Str("unfix") == "all" || strings.EqualFold(speech.Norm(f.From), speech.Norm(c.Str("unfix"))) || strings.EqualFold(speech.Norm(f.To), speech.Norm(c.Str("unfix"))) {
+				gone++
+				continue
+			}
+			keep = append(keep, f)
+		}
+		if gone == 0 {
+			return nil, Errf(ExitUsage, "no-fix", "`cutroom transcript --fixes` lists them", "no fix of %q", c.Str("unfix"))
+		}
+		if err := speech.SaveFixes(cacheDir(p), keep); err != nil {
+			return nil, err
+		}
+		return &Result{Text: fmt.Sprintf("removed %d fix(es); the transcript shows what the recogniser heard there again", gone)}, nil
+	}
+	if !c.Has("as") || strings.TrimSpace(c.Str("as")) == "" {
+		return nil, Errf(ExitUsage, "missing-flag", `cutroom transcript --fix "work providers" --as "OAuth providers"`, "--fix needs --as (what was really said)")
+	}
+	// the words as the edit shows them: a camera whose sound comes from a recorder shows its words
+	tr, dur := timeline.Transcripts{}, map[string]float64{}
+	for _, sid := range p.IDs() {
+		if x, err := speech.Load(cacheDir(p), sid); err == nil {
+			tr[sid] = x
+		}
+		dur[sid] = p.Sources[sid].Facts.End()
+	}
+	if tl, err := timeline.Load(p.Dir); err == nil {
+		heardWords(p, tl, tr, dur)
+	}
+	type hit struct {
+		src string
+		at  float64
+	}
+	var hits []hit
+	for _, sid := range p.IDs() {
+		if tr[sid] == nil || (id != "" && sid != id) {
+			continue
+		}
+		for _, m := range speech.Search(tr[sid].Words, c.Str("fix")) {
+			hits = append(hits, hit{sid, tr[sid].Words[m.First].Start})
+		}
+	}
+	if len(hits) == 0 {
+		return nil, Errf(ExitUsage, "text-not-found", fmt.Sprintf("quote the words as the transcript has them: `cutroom transcript --search %q`", c.Str("fix")), "%q not found", c.Str("fix"))
+	}
+	src := hits[0].src
+	for _, h := range hits {
+		if h.src != src && id == "" {
+			if s := p.Sources[h.src]; s != nil && s.Facts.Video == nil {
+				continue // a recorder's own words: the camera's view is the one captions use
+			}
+			if s := p.Sources[src]; s != nil && s.Facts.Video == nil {
+				src = h.src
+				continue
+			}
+			return nil, Errf(ExitUsage, "ambiguous-text", "add --source <id>", "%q is in %s and %s", c.Str("fix"), src, h.src)
+		}
+	}
+	f := speech.Fix{Source: src, From: c.Str("fix"), To: strings.TrimSpace(c.Str("as"))}
+	n := 0
+	for _, h := range hits {
+		if h.src == src {
+			n++
+		}
+	}
+	where := fmt.Sprintf("all %d place(s) it is said", n)
+	if c.Has("near") {
+		v, err := timecode.Parse(c.Str("near"), timecode.Rate{Num: 30, Den: 1})
+		if err != nil {
+			return nil, Errf(ExitUsage, "bad-time", "a source time like 121.9 or 2:01.9", "--near: %v", err)
+		}
+		f.Near = v.Float()
+		where = "the place nearest " + clock(f.Near)
+	}
+	fs = append(fs, f)
+	if err := speech.SaveFixes(cacheDir(p), fs); err != nil {
+		return nil, err
+	}
+	return &Result{Text: fmt.Sprintf("fixed %s %q → %q at %s: captions, subtitle files and word checks use it (the recording is unchanged; undo: `cutroom transcript --unfix %q`)", src, f.From, f.To, where, f.From),
+		Next: []string{"cutroom captions --burn --dry-run   (see the groups)", "cutroom render"}}, nil
 }
