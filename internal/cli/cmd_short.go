@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"github.com/NWylynko/cutroom/internal/perceive"
 	"math"
 	"os"
 	"path/filepath"
@@ -45,7 +46,7 @@ vertical safe zones (nothing above y 260, below y 1490 or in the right 120 px of
 			{Name: "to", Kind: "string", Help: "Last words of the short"},
 			{Name: "name", Kind: "string", Default: "short", Help: "Its folder: shorts/<name>"},
 			{Name: "size", Kind: "string", Help: "Output size WxH (vertical; default 1080x1920, or 720x1280 when the source is too small to fill 1080x1920 sharply)"},
-			{Name: "anchor", Kind: "string", Default: "0.5,0.5", Help: "Point of the source kept in frame (0–1 across, down)"},
+			{Name: "anchor", Kind: "string", Help: "Point of the source the crop centres on (0–1 across, down); default: the speaker, found in the picture"},
 			{Name: "near", Kind: "string", Help: "Pick the --from match closest to this source time when words repeat"},
 			{Name: "occurrence", Kind: "int", Help: "Pick the Nth --from match when words repeat"},
 			{Name: "source", Kind: "string", Help: "Only match words in this source"},
@@ -73,9 +74,12 @@ func runShort(c *Ctx) (*Result, error) {
 			return nil, Errf(ExitUsage, "bad-flag-value", "--size WxH with even numbers, e.g. 1080x1920", "bad --size %q", c.Str("size"))
 		}
 	}
-	ax, ay, err := parseAnchor(c.Str("anchor"))
-	if err != nil {
-		return nil, err
+	ax, ay := 0.5, 0.5
+	if c.Has("anchor") && c.Str("anchor") != "auto" {
+		var err error
+		if ax, ay, err = parseAnchor(c.Str("anchor")); err != nil {
+			return nil, err
+		}
 	}
 	var look *Look
 	if c.Has("look") {
@@ -154,6 +158,13 @@ func runShort(c *Ctx) (*Result, error) {
 	}
 	a := math.Max(0, ws[i].Start-shortPadBefore)
 	b := ws[j].End + shortPadAfter
+	frameNote := ""
+	if !c.Has("anchor") || c.Str("anchor") == "auto" {
+		ax, frameNote = speakerAnchor(p.Abs(s), a, b-a)
+		tl.FillX = ax
+	} else if sp := perceive.FindSpeaker(p.Abs(s), a, b-a); sp.Found && !cropHolds(ax, sp.X, s.Facts.Video.Width, s.Facts.Video.Height, w, h) {
+		frameNote = fmt.Sprintf("WARN the speaker is at x %.2f, outside a crop centred on %.2f: `cutroom edit frame --anchor auto --project %s` frames them", sp.X, ax, relToCwd(dir))
+	}
 	tl.Keep(src, a, b, "short")
 	tr := tl.Tighten(e.tr, shortMinCut)
 	if err := timeline.Checkpoint(dir, cacheDir(sp), fmt.Sprintf("short --from %q --to %q", c.Str("from"), c.Str("to"))); err != nil {
@@ -167,6 +178,9 @@ func runShort(c *Ctx) (*Result, error) {
 		fmt.Sprintf("made %s: %s %s–%s %q … %q", rel, src, clock(ws[i].Start), clock(ws[j].End), speech.Text(ws, i, min(i+5, j)), speech.Text(ws, max(i, j-4), j)),
 		fmt.Sprintf("  %dx%d, picture filled and cropped around %.2f,%.2f; pads %.2f/%.2f s; %d pause(s) tightened (%.1f s out)", w, h, ax, ay, shortPadBefore, shortPadAfter, tr.Pauses, tr.Removed),
 		fmt.Sprintf("  timeline: %s, %s", plural(len(tl.Segments), "segment"), secs(tl.Duration())),
+	}
+	if frameNote != "" {
+		lines = append(lines, "  "+frameNote)
 	}
 	if d := tl.Duration(); d > shortMaxLen {
 		lines = append(lines, fmt.Sprintf("WARN short is %.1f s: shorts work best under %.0f s — cut asides and side points, or end earlier (--to)", d, shortMaxLen))
@@ -213,4 +227,22 @@ func cropHeight(vw, vh, w, h int) float64 {
 		return float64(vw) * float64(h) / float64(w)
 	}
 	return float64(vh)
+}
+
+// speakerAnchor finds the speaker in [start, start+dur) of a video: the crop's x, and a line saying
+// what was found.
+func speakerAnchor(path string, start, dur float64) (float64, string) {
+	sp := perceive.FindSpeaker(path, start, dur)
+	if !sp.Found {
+		return 0.5, "framing: no speaker found in the picture (nothing skin-coloured moves), so the crop is centred — look at it (`cutroom look --output 1`) and set `edit frame --anchor x,y` if someone should be in it"
+	}
+	return sp.X, fmt.Sprintf("framing: on the speaker, found at x %.2f (skin and movement; check it with `cutroom look --output 1`, move it with `edit frame --anchor x,y`)", sp.X)
+}
+
+// cropHolds says whether a w:h crop of a vw×vh picture centred on ax keeps x (0–1) inside it, with
+// a margin of a tenth of the crop each side.
+func cropHolds(ax, x float64, vw, vh, w, h int) bool {
+	cw := cropHeight(vw, vh, w, h) * float64(w) / float64(h) / float64(vw) // crop width, 0–1
+	lo := math.Max(0, math.Min(1-cw, ax-cw/2))
+	return x >= lo+0.1*cw && x <= lo+0.9*cw
 }

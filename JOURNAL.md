@@ -2,6 +2,20 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 60 · 2026-11-26 · Shorts frame the speaker by default (`edit frame --anchor auto`)
+Did: `short` cropped the centre unless told otherwise; on the real footage the speaker sits at
+x≈0.74 and the short showed an empty desk (every check passed). New perceive.FindSpeaker: 16 frames
+at 160×90 over the short's span; pixels that look like skin (YCbCr) and move weigh most, upper rows
+more than lower (face over hands/mic); the crop centre is the weighted centroid inside the best
+9:16-wide window. Below 2% skin area it reports "no speaker" and stays centred. `short` uses it when
+no --anchor is given (and warns when a given anchor leaves the speaker out); `edit frame --anchor
+auto` re-finds them. Prototyped first on all five real takes.
+Measured: estimate vs the face by eye — getting-started 0.76 (0.74), deploying 0.52 (0.52),
+my-personal 0.54 (0.53), securing take-1 0.70 (0.74), take-2 0.75 (0.74); colour-bar fixture: 0.5%
+skin → not found. The re-made GitHub short is framed on him (looked at 3 frames). ~1 s added to
+`short`. make check green; e2e 279/279.
+Next: `check` could say when a render's crop holds no one (today only `short`/`edit frame` do).
+
 ### 59 · 2026-11-26 · Named looks: `style save/use/looks`, `short --look`
 Did: r12 haiku's "one change" — a channel look took ~10 style calls per short. `style save <name>`
 keeps the project's caption + card style (font files made absolute) in the user config folder

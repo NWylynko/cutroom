@@ -353,6 +353,7 @@ expect "short sizes to a 720p source" 'size 720x1280: the 1280x720 source.s 9:16
 expect "short exists refused"       'shorts/steps already exists'        cutroom short --from "Then install" --to "on it." --name steps
 expect "status lists shorts"        'shorts: shorts/s2 .*shorts/steps'   cutroom status
 expect "one-token flag split"       'segment'                            cutroom timeline "--project shorts/steps"
+expect "frame auto: no speaker in bars" 'no speaker found in the picture' cutroom edit frame --anchor auto --project shorts/s2
 expect "edit frame"                 'fills 1080x1920, cropped around 0\.60,0\.50' cutroom edit frame --anchor 0.6,0.5 --project shorts/steps
 expect "short: title in safe width" 'added o1: text'                     cutroom overlay add text "3 steps" --layout title --at "The first thing" --duration 3 --project shorts/steps
 ffmpeg -v error -y -f lavfi -i color=c=orange:s=300x150 -frames:v 1 shorts/steps/logo.png

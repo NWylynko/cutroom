@@ -7,9 +7,8 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- [real footage] `short` crops the centre by default; a speaker off-centre (x≈0.74) ends up half out
-  of frame and `check` passes. Find the speaker (face/skin + motion) and default the anchor to them;
-  `check`/`timeline` warn when the crop holds no person.
+- [framing] `check` on a filled (vertical) render: warn when the crop holds no speaker the source has.
+- [framing] Speakers who move across the frame: per-segment anchors (follow them) instead of one crop.
 - [style] Per-word pop for karaoke captions (each word bumps as it is said), if asked for.
 - [style] Per-card text formatting beyond title/sub (a third line, an inline accent word).
 - v1 is golden (2026-11-25, iteration 52): see RELEASE_NOTES.md. Publishing is the maintainer's call.

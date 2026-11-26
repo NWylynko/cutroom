@@ -15,9 +15,12 @@ made shorts/steps: talk 0:10.250–0:25.990 "The first thing you need is" … "a
 ```
 
 Short-form defaults (L41):
-- 1080×1920 (`--size 720x1280` for a 720p source: it enlarges less; change it later with
-  `cutroom edit frame --size 720x1280 --project …`). The landscape picture is scaled
-  to fill the frame and cropped; `cutroom edit frame --anchor 0.4,0.5 --project …` centres the crop
+- 1080×1920, or 720×1280 for a 720p-class source (it would look soft enlarged); `--size WxH` to
+  choose, later `cutroom edit frame --size 720x1280 --project …`. The landscape picture is scaled
+  to fill the frame and cropped; `short` finds the speaker (skin-coloured
+  movement — a face talking, hands) and centres the crop on them, saying where (`framing: on the
+  speaker, found at x 0.74`) or that it found no one (then it is centred; a screen recording, say).
+  `cutroom edit frame --anchor auto` finds them again after re-cutting; `--anchor 0.4,0.5` centres the crop
   on that point of the source, e.g. the speaker's face (0–1 across, down) — look with `cutroom look --output <time> --project …`.
   `edit frame --fit` keeps the whole picture with bars instead.
 - Pads at cuts 0.06 s before / 0.16 s after; every pause tightened to ~0.2 s.

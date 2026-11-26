@@ -44,7 +44,7 @@ Every edit is checked afterwards and problems are printed. Use --dry-run to prev
   edit move s5 --after s2 | --before s1 | --after start      reorder a segment
   edit split --text "Then install" | edit split 12.4        split a segment in two (nothing removed)
   edit pin s3 [--in|--out] [--unpin]             keep tighten off a segment's edges
-  edit frame --anchor 0.4,0.5                    where a filled (vertical) frame is cropped; --fill / --fit
+  edit frame --anchor 0.4,0.5                    where a filled (vertical) frame is cropped (auto = on the speaker); --fill / --fit
   edit tighten [--min-cut 0.4]                   shorten every pause longer than the pads + min-cut
   edit audio mic                                 take the sound from source "mic" (after ` + "`cutroom sync mic`" + `)
   edit audio mic2 --for take2                    multi-take: segments from take2 use recorder mic2
@@ -497,7 +497,15 @@ func runEdit(c *Ctx) (*Result, error) {
 		if c.Bool("fit") {
 			e.tl.Fill = false
 		}
-		if c.Has("anchor") {
+		if c.Has("anchor") && c.Str("anchor") == "auto" {
+			src, a, b := e.mainPicture()
+			if src == "" {
+				return nil, Errf(ExitUsage, "no-picture", "give the point: --anchor x,y", "the edit keeps no picture to find a speaker in")
+			}
+			ax, note := speakerAnchor(e.p.Abs(e.p.Sources[src]), a, b-a)
+			e.tl.FillX, e.tl.FillY = ax, 0.5
+			lines = append(lines, note)
+		} else if c.Has("anchor") {
 			ax, ay, err := parseAnchor(c.Str("anchor"))
 			if err != nil {
 				return nil, err
@@ -1376,4 +1384,29 @@ func isTimeish(v string) bool {
 		}
 	}
 	return strings.ContainsAny(v, "0123456789")
+}
+
+// mainPicture is the video source most of the edit shows and the source span it covers.
+func (e *editEnv) mainPicture() (string, float64, float64) {
+	e.tl.Recompute()
+	dur := map[string]float64{}
+	lo, hi := map[string]float64{}, map[string]float64{}
+	best := ""
+	for _, g := range e.tl.Segments {
+		if s := e.p.Sources[g.Source]; s == nil || s.Facts.Video == nil {
+			continue
+		}
+		if _, ok := lo[g.Source]; !ok {
+			lo[g.Source], hi[g.Source] = g.In, g.Out
+		}
+		lo[g.Source], hi[g.Source] = math.Min(lo[g.Source], g.In), math.Max(hi[g.Source], g.Out)
+		dur[g.Source] += g.Out - g.In
+		if best == "" || dur[g.Source] > dur[best] {
+			best = g.Source
+		}
+	}
+	if best == "" {
+		return "", 0, 0
+	}
+	return best, lo[best], hi[best]
 }
