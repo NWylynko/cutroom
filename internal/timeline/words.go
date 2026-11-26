@@ -443,6 +443,23 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 					"%q (source %.2f–%.2f) %s", ellipsizeWords(s.Text, 12), s.Start, s.End, s.Detail)
 			case "sound":
 				if o, ok := t.ToOutput(src, (s.Start+s.End)/2); ok {
+					// inside a sentence (words on both sides within 0.8 s, the one before not ending it), a
+					// wordless sound is usually part of the speech — a trailing "s", a breath (r74: cutting
+					// "month | server" jumped the picture mid-phrase to remove the end of "months")
+					var prev, next *speech.Word
+					for k := range tx.Words {
+						w := &tx.Words[k]
+						if w.End <= s.Start+0.01 {
+							prev = w
+						} else if w.Start >= s.End-0.01 && next == nil {
+							next = w
+						}
+					}
+					if prev != nil && next != nil && !endsSentence(prev.Text) && next.Start-prev.End <= 0.8 && t.Kept(src, prev.Start) && t.Kept(src, next.Start) {
+						add("warn", "kept-sound", nil, o, fmt.Sprintf("listen first: `cutroom listen %.2f-%.2f` — usually keep it (`cutroom timeline --accept kept-sound@%.2f --reason \"part of the sentence\"`); cutting it (`cutroom edit cut %.2f-%.2f`) jumps the picture mid-sentence", s.Start-0.5, s.End+0.5, o, s.Start, s.End),
+							"a sound with no words is kept at source %.3f–%.3f, inside the sentence \"…%s | %s…\" (likely the end of a word or a breath)", s.Start, s.End, prev.Text, next.Text)
+						continue
+					}
 					add("warn", "kept-sound", nil, o, fmt.Sprintf("`cutroom listen %.2f-%.2f`; cut it with `cutroom edit cut %.2f-%.2f` if unwanted", s.Start-0.5, s.End+0.5, s.Start, s.End),
 						"a sound with no words is kept at source %.3f–%.3f (cough, bump, or missed words?)", s.Start, s.End)
 				}

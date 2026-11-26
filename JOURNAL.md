@@ -2,6 +2,16 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 74 · 2026-11-27 · A wordless sound inside a sentence: listen and keep, don't cut
+Did: r73's real edit had a jump cut inside "a $10 a month | server." from applying a kept-sound fix.
+`listen` there: the isolated clip hears "months server" — the sound was the end of "months" (or a
+breath). `kept-sound` now tells a sound inside a sentence (words on both sides within 0.8 s, the one
+before not ending a sentence) from one between sentences: inside, it says so ("…month | server…",
+likely the end of a word or a breath) and leads with listen + accept; the cut is still named, with
+the warning that it jumps the picture mid-sentence.
+Measured: the deploying edit's sound gets the new message; the fixtures' between-sentence sound is
+unchanged; e2e 305/305.
+
 ### 73 · 2026-11-27 · Punch-ins: `edit zoom 1.2 --alternate` (wide / 1.2× at every jump cut)
 Did: GRAPHICS.md's framing rule (alternate wide ↔ 1.2× at cuts, anchored on the face, segments
 < 2.5 s keep the previous framing, start wide) lived in a separate script (tools/punchins.py).
