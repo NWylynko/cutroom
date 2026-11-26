@@ -7,6 +7,11 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
+- [T3 r65] Misheard words get burned in ("work providers" for OAuth, "greater" for "great at"):
+  `captions --burn` should list low-confidence / recogniser-disagreement words in the groups and offer
+  `edit replace`-style text fixes for captions; a project vocabulary (OAuth, iCloud, GitHub) for the
+  recogniser and for brand casing in upper-case captions.
+- [T3 r65] Warn when a title card restates the short's last sentence (gives away the payoff).
 - [framing] Speakers who move across the frame: per-segment anchors (follow them) instead of one crop.
 - [style] Per-word pop for karaoke captions (each word bumps as it is said), if asked for.
 - [style] Per-card text formatting beyond title/sub (a third line, an inline accent word).

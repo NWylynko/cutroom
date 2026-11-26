@@ -261,3 +261,11 @@ func TestL36_SharedPhraseInFlowingSpeechIsNoRetake(t *testing.T) {
 		t.Errorf("a broken-off \"had an idea\" must still be a retake: %v", repeats(ws))
 	}
 }
+
+func TestBorrowPunctuationFromTheCamera(t *testing.T) {
+	rec := &Transcript{Words: []Word{{Text: "each", Start: 1.0}, {Text: "inbox", Start: 1.3}, {Text: "I", Start: 3.0}, {Text: "couldn't", Start: 3.2}}}
+	cam := &Transcript{Words: []Word{{Text: "each", Start: 1.05}, {Text: "inbox.", Start: 1.32}, {Text: "I", Start: 3.02}, {Text: "couldn't", Start: 3.25}}}
+	if n := rec.BorrowPunctuation(cam); n != 1 || rec.Words[1].Text != "inbox." {
+		t.Errorf("borrowed %d, words %+v", n, rec.Words)
+	}
+}

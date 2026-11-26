@@ -504,7 +504,8 @@ func captionCard(words []string, active int, l look, w, h int) (*image.NRGBA, im
 	}
 	mw := l.width
 	if mw <= 0 {
-		mw = right - int(0.12*float64(w))
+		// the safe width less a small margin and the box's own padding: wrap only when it must
+		mw = right - int(0.06*float64(w)) - 2*(l.padX+l.outlineW+l.shadowOff)
 	}
 	words = append([]string(nil), words...)
 	for i := range words {

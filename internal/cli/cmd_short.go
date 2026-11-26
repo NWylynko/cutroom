@@ -157,8 +157,25 @@ func runShort(c *Ctx) (*Result, error) {
 	if a := p.Sources[src]; a.Facts.Audio == nil {
 		tl.Audio = "" // a silent video: the parent's audio choice is made in the short with edit audio
 	}
+	// a recorder synced to this camera gives the short its sound — and its words, before pauses are
+	// tightened (r65: the camera's transcript missed "Apple." and tightening cut the word out)
+	soundNote := ""
+	for _, id := range sp.IDs() {
+		if x := sp.Sources[id]; x.Sync != nil && x.Sync.To == src && x.Facts != nil && x.Facts.Audio != nil && e.tr[id] != nil {
+			tl.Audio = id
+			heardWords(sp, tl, e.tr, e.dur)
+			soundNote = fmt.Sprintf("sound: from %s, the recorder synced to %s (its words are what the edit follows; `cutroom edit audio %s` for the camera's own)", id, src, src)
+			break
+		}
+	}
 	a := math.Max(0, ws[i].Start-shortPadBefore)
 	b := ws[j].End + shortPadAfter
+	// end on a breath, not on the last word: up to shortTail after it, stopping short of the next word
+	tail := shortTail
+	if j+1 < len(ws) {
+		tail = math.Min(tail, math.Max(shortPadAfter, ws[j+1].Start-ws[j].End-0.1))
+	}
+	b = math.Min(ws[j].End+tail, e.dur[src])
 	frameNote := ""
 	if !c.Has("anchor") || c.Str("anchor") == "auto" {
 		ax, frameNote = speakerAnchor(p.Abs(s), a, b-a)
@@ -182,6 +199,9 @@ func runShort(c *Ctx) (*Result, error) {
 	}
 	if frameNote != "" {
 		lines = append(lines, "  "+frameNote)
+	}
+	if soundNote != "" {
+		lines = append(lines, "  "+soundNote)
 	}
 	if d := tl.Duration(); d > shortMaxLen {
 		lines = append(lines, fmt.Sprintf("WARN short is %.1f s: shorts work best under %.0f s — cut asides and side points, or end earlier (--to)", d, shortMaxLen))
@@ -223,6 +243,10 @@ func parseAnchor(s string) (float64, float64, error) {
 }
 
 // cropHeight is the height of the largest w:h crop of a vw×vh picture.
+// shortTail is how long a short holds after its last word (r65 review: shorts that stop on the last
+// word feel chopped).
+const shortTail = 0.45
+
 func cropHeight(vw, vh, w, h int) float64 {
 	if float64(vw)/float64(vh) < float64(w)/float64(h) {
 		return float64(vw) * float64(h) / float64(w)

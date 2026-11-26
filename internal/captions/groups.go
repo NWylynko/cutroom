@@ -20,6 +20,9 @@ type Group struct {
 type GroupOptions struct {
 	MaxChars, MaxWords int
 	Pause, Hold        float64
+	// Hard: MaxWords is a hard limit (a word count the user asked for), never one more to avoid a
+	// weak ending
+	Hard bool
 }
 
 var DefaultGroups = GroupOptions{MaxChars: 20, MaxWords: 3, Pause: 0.3, Hold: 0.4}
@@ -33,7 +36,9 @@ func Groups(ws []Word, o GroupOptions, duration float64) []Group {
 	// runs: sentences, split again at pauses; each is grouped on its own
 	a := 0
 	for k := range ws {
-		if k+1 == len(ws) || endsSentence(ws[k].Text) || ws[k+1].Start-ws[k].End >= 1.0 {
+		// a group never spans a cut: the picture jumps there, and a transcript without punctuation
+		// (a recorder's) would otherwise run "…each inbox | I couldn't…" together
+		if k+1 == len(ws) || endsSentence(ws[k].Text) || ws[k+1].Start-ws[k].End >= 1.0 || ws[k+1].AfterCut {
 			for _, r := range bestGroups(ws, a, k+1, o) {
 				gs = append(gs, Group{Start: ws[r[0]].Start, End: ws[r[1]-1].End, Text: groupText(ws[r[0]:r[1]]), First: r[0], Last: r[1] - 1})
 			}
@@ -65,10 +70,14 @@ func bestGroups(ws []Word, a, b int, o GroupOptions) [][2]int {
 	from := make([]int, n+1)
 	for k := 1; k <= n; k++ {
 		best[k] = 1e18
-		for s := k - 1; s >= 0 && k-s <= o.MaxWords+1; s-- {
+		extra := 1
+		if o.Hard {
+			extra = 0
+		}
+		for s := k - 1; s >= 0 && k-s <= o.MaxWords+extra; s-- {
 			chars := utf8.RuneCountInString(groupText(ws[a+s : a+k]))
 			if (chars > o.MaxChars || k-s > o.MaxWords) && k-s > 1 {
-				if k-s > o.MaxWords+1 || chars > o.MaxChars {
+				if k-s > o.MaxWords+extra || chars > o.MaxChars {
 					continue
 				}
 			}
@@ -94,6 +103,11 @@ func bestGroups(ws []Word, a, b int, o GroupOptions) [][2]int {
 			}
 			if p := trailingPunct(ws[last].Text); k < n && (p == "," || p == ";" || p == ":") {
 				c -= 4
+			}
+			for j := a + s; j < last; j++ { // a clause break inside the group: "EMAIL, BUT" reads as one thought
+				if p := trailingPunct(ws[j].Text); p == "," || p == ";" || p == ":" {
+					c += 9
+				}
 			}
 			if best[s]+c < best[k] {
 				best[k], from[k] = best[s]+c, s

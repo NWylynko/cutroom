@@ -25,7 +25,7 @@ import (
 )
 
 // Version is part of every cache key; bump when output would change.
-const Version = 3 // 2: HDR sources tone-mapped to SDR bt709 (L23); 3: GPU pre-scale keeps the source shape (filled HDR frames were squashed)
+const Version = 4 // 4: caption cards read at the timeline's frame rate (were snapped to 40 ms); 2: HDR sources tone-mapped to SDR bt709 (L23); 3: GPU pre-scale keeps the source shape (filled HDR frames were squashed)
 
 type Source struct {
 	Path       string
@@ -110,7 +110,10 @@ func captionFrames(p Placement, c0, n int64, fps float64) []CapRun {
 }
 
 // capList is the ffconcat list that plays caption runs as one clip: each card for its run's frames.
-func capList(runs []CapRun, blank string, fps float64) string {
+//
+// Each PNG is read at the timeline's own frame rate (`option framerate`): the image demuxer's
+// default 1/25 s timebase snapped every card's start to 40 ms, ±1 frame at 30 and 59.94 fps (r65).
+func capList(runs []CapRun, blank string, fps float64, rate string) string {
 	var b strings.Builder
 	b.WriteString("ffconcat version 1.0\n")
 	q := func(p string) string { return "'" + strings.ReplaceAll(p, "'", `'\''`) + "'" }
@@ -120,10 +123,10 @@ func capList(runs []CapRun, blank string, fps float64) string {
 		if p == "" {
 			p = blank
 		}
-		fmt.Fprintf(&b, "file %s\nduration %s\n", q(p), f6(float64(r.To-r.From)/fps))
+		fmt.Fprintf(&b, "file %s\noption framerate %s\nduration %s\n", q(p), rate, f6(float64(r.To-r.From)/fps))
 		last = p
 	}
-	fmt.Fprintf(&b, "file %s\n", q(last)) // the concat demuxer needs the last file once more
+	fmt.Fprintf(&b, "file %s\noption framerate %s\n", q(last), rate) // the concat demuxer needs the last file once more
 	return b.String()
 }
 
@@ -395,7 +398,7 @@ func renderChunk(tl *timeline.Timeline, srcs map[string]Source, c *Chunk, previe
 		if err != nil {
 			return err
 		}
-		if err := os.WriteFile(capListPath(*c, k), []byte(capList(co.Frames, blank, tl.Rate())), 0o644); err != nil {
+		if err := os.WriteFile(capListPath(*c, k), []byte(capList(co.Frames, blank, tl.Rate(), tl.FPS)), 0o644); err != nil {
 			return err
 		}
 	}

@@ -17,7 +17,7 @@ import (
 
 // CaptionDefaults is cutroom's caption look: bold white on a translucent black box (L48).
 var CaptionDefaults = timeline.Style{Font: "bold", Size: 0.068, Color: "#ffffff", Box: "#000000aa", Pad: 0.3,
-	Highlight: "none", Outline: "none", Shadow: "none", BoxShadow: "none", Case: "as-is", Align: "center", Words: 3, Chars: 20, Animate: "none", AnimateTime: 0.15}
+	Highlight: "none", Outline: "none", Shadow: "none", BoxShadow: "none", Case: "as-is", Align: "center", Chars: 20, Animate: "none", AnimateTime: 0.15}
 
 // CardDefaults is cutroom's text-card look for a layout: white on a dark translucent panel, an amber
 // bar on lower thirds.
@@ -149,7 +149,7 @@ func CardStyle(tl *timeline.Timeline, o timeline.Overlay) timeline.Style {
 func GroupOptions(st timeline.Style) captions.GroupOptions {
 	g := captions.DefaultGroups
 	if st.Words > 0 {
-		g.MaxWords = st.Words
+		g.MaxWords, g.Hard = st.Words, true // a count the user asked for is a limit
 	}
 	if st.Chars > 0 {
 		g.MaxChars = st.Chars
@@ -199,10 +199,15 @@ func animAt(kind string, p float64) (scale, dx, dy, alpha float64) {
 	e := 1 - math.Pow(1-p, 3) // ease out
 	scale, alpha = 1, 1
 	switch kind {
-	case "pop":
-		c := 1.70158 // ease out back
-		b := 1 + (c+1)*math.Pow(p-1, 3) + c*math.Pow(p-1, 2)
-		scale, alpha = 0.6+0.4*b, math.Min(1, 2*p)
+	case "pop": // 70% → 108% (eased out) → 100%, opaque almost at once: reads as a pop, not a fade
+		if p < 0.6 {
+			q := p / 0.6
+			scale = 0.7 + 0.38*(1-math.Pow(1-q, 2))
+		} else {
+			q := (p - 0.6) / 0.4
+			scale = 1.08 - 0.08*q*q*(3-2*q)
+		}
+		alpha = math.Min(1, 0.55+3*p)
 	case "fade":
 		alpha = e
 	case "slide-up":

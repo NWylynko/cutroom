@@ -173,3 +173,10 @@ func TestL57_GPUScaleKeepsTheSourceShape(t *testing.T) {
 		t.Errorf("unknown source size on a fill: no GPU scale, got %dx%d", w, h)
 	}
 }
+
+func TestL58_CaptionCardsReadAtTheTimelineRate(t *testing.T) {
+	l := capList([]CapRun{{"/a.png", 0, 7}, {"", 7, 20}}, "/blank.png", 60000.0/1001, "60000/1001")
+	if strings.Count(l, "option framerate 60000/1001") != 3 {
+		t.Errorf("every file (and the repeated last one) must be read at the timeline rate:\n%s", l)
+	}
+}

@@ -655,3 +655,39 @@ func (t *Transcript) ReconcileTiming(ref *Transcript, maxShift float64) int {
 	}
 	return n
 }
+
+// BorrowPunctuation gives this transcript's words (a recorder's, mapped onto the camera's clock) the
+// sentence and clause punctuation the camera's own transcript has for the same word at the same
+// moment: two recognisers of one speech often differ only in punctuation, and captions break at it.
+// Returns how many words got punctuation.
+func (t *Transcript) BorrowPunctuation(cam *Transcript) int {
+	if cam == nil || len(cam.Words) == 0 {
+		return 0
+	}
+	n, j := 0, 0
+	for i := range t.Words {
+		w := &t.Words[i]
+		if strings.ContainsAny(w.Text[len(w.Text)-1:], ".,?!;:") {
+			continue
+		}
+		key := Norm(w.Text)
+		if key == "" {
+			continue
+		}
+		for j < len(cam.Words) && cam.Words[j].Start < w.Start-0.35 {
+			j++
+		}
+		for k := j; k < len(cam.Words) && cam.Words[k].Start <= w.Start+0.35; k++ {
+			c := strings.TrimSpace(cam.Words[k].Text)
+			if Norm(c) != key || c == "" {
+				continue
+			}
+			if p := c[len(strings.TrimRight(c, ".,?!;:")):]; p != "" {
+				w.Text += p
+				n++
+			}
+			break
+		}
+	}
+	return n
+}

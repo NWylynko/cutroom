@@ -238,7 +238,7 @@ func TestL48_CaptionsOneClipPerChunk(t *testing.T) {
 			t.Errorf("chunk %d: captions must be one concat clip: %s", i, args)
 		}
 	}
-	list := capList(cs[0].Overlays[0].Frames, "/x/blank.png", 30)
+	list := capList(cs[0].Overlays[0].Frames, "/x/blank.png", 30, "30/1")
 	if !strings.HasPrefix(list, "ffconcat version 1.0\n") || strings.Count(list, "duration ") != len(cs[0].Overlays[0].Frames) {
 		t.Errorf("concat list: %s", list)
 	}

@@ -2,6 +2,21 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 65 · 2026-11-26 · T3 editor review of styled shorts: six fixes (+ L58 caption timing)
+Did: opus editor reviewed three styled real-footage shorts (evals/results/t3/2026-11-26-r65-styled-
+review.md): REJECT ×3. Fixed what was cutroom's: `--words` is a hard limit when set; caption groups
+never span a cut; a recorder's punctuation-free words borrow the camera transcript's punctuation
+(BorrowPunctuation) and crossing a comma costs more than breaking at it; captions wrap only past the
+safe width (less their box padding); pop now 70%→108%→100% and opaque at once; shorts hold up to
+0.45 s after the last word; `short` takes a synced recorder's sound and words before tightening (the
+camera's transcript had missed "Apple." and tightening cut the word). Found while checking the new
+tail: caption cards in the concat list were read at the image demuxer's 1/25 s timebase, so every
+card could start a frame early or late (reproduced: transitions at 7/19/24/2278 instead of
+7/20/23/2277) → `option framerate` per file, exact; L58 + TestL58, render Version 4.
+Measured: mail rebuilt: no timeline warnings, groups ≤ 2 words, "inbox. | I couldn't", tail 0.44 s,
+`check` PASS (636 caption cards, gaps clean, safe zones). make check green; e2e 288/288; grader 28/28.
+Next: flag likely-misheard words before burning captions; warn when a card restates the ending.
+
 ### 64 · 2026-11-26 · Fitted frames: blurred or coloured bars (`edit frame --fit --bars blur|#rrggbb`)
 Did: looked again at r63's "captions over the mouth" — at full size the captions sit just below the
 chin, not on the mouth: dropped. Next forced look: a fitted (whole-picture) vertical frame always had

@@ -304,6 +304,8 @@ func styleLines(set *timeline.Style, full timeline.Style, kind, dir string) []st
 				v = "0.08 (with an outline)"
 			case "radius":
 				v = "0 (square)"
+			case "words":
+				v = "3 (a 4th only to avoid a weak ending; set it to make it a hard limit)"
 			}
 		}
 		if f.Kind == "font" && v != "-" {
