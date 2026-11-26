@@ -3,6 +3,7 @@ package cli
 import (
 	"errors"
 	"fmt"
+	"github.com/NWylynko/cutroom/internal/perceive"
 	"github.com/NWylynko/cutroom/internal/render"
 	"math"
 	"os"
@@ -222,6 +223,7 @@ func (e *editEnv) validate() []timeline.Issue {
 	is := append(append([]timeline.Issue{}, e.notes...), e.audioIssues()...)
 	is = append(is, e.tl.Validate(e.dur, e.tr)...)
 	is = append(is, e.safeZoneIssues()...)
+	is = append(is, e.faceIssues()...)
 	for i := range is { // decided by the editor: listed, not open
 		if ok, _ := e.tl.IsAccepted(is[i]); ok && is[i].Level == "warn" {
 			is[i].Level = "accepted"
@@ -351,4 +353,80 @@ func quietLevels(p *project.Project, tl *timeline.Timeline) func(string, []float
 		}
 		return out
 	}
+}
+
+// faceIssues: an overlay (card, image, inset clip, captions) that covers a large part of the
+// speaker's face — "never cover the face" (GRAPHICS.md). The face is found in the edit's main
+// picture (cached) and mapped through the frame's crop or fit.
+func (e *editEnv) faceIssues() []timeline.Issue {
+	tl := e.tl
+	if len(tl.Overlays) == 0 {
+		return nil
+	}
+	src, a, b := e.mainPicture()
+	if src == "" {
+		return nil
+	}
+	s := e.p.Sources[src]
+	sp := perceive.FindSpeakerCached(cacheDir(e.p), e.p.Abs(s), a, b-a)
+	if !sp.Found || sp.Face == ([4]float64{}) {
+		return nil
+	}
+	face := faceInFrame(sp.Face, s.Facts.Video.Width, s.Facts.Video.Height, tl)
+	if face[2] <= face[0] || face[3] <= face[1] {
+		return nil // the crop leaves the face out (framing warns about that)
+	}
+	ps, err := render.Placements(tl, e.tr, e.p.Dir, cacheDir(e.p), tl.Width, tl.Height)
+	if err != nil {
+		return nil
+	}
+	area := (face[2] - face[0]) * (face[3] - face[1])
+	var is []timeline.Issue
+	for _, p := range ps {
+		if p.Kind == "clip" && p.Full {
+			continue // a cutaway replaces the picture
+		}
+		boxes := [][4]float64{p.Box}
+		if p.Kind == "captions" {
+			boxes = nil
+			for _, g := range p.Groups {
+				boxes = append(boxes, g.Box)
+			}
+		}
+		worst := 0.0
+		for _, bx := range boxes {
+			ix := math.Max(0, math.Min(bx[2], face[2])-math.Max(bx[0], face[0]))
+			iy := math.Max(0, math.Min(bx[3], face[3])-math.Max(bx[1], face[1]))
+			worst = math.Max(worst, ix*iy/area)
+		}
+		if worst < 0.3 {
+			continue
+		}
+		side := "right"
+		if (face[0]+face[2])/2 > 0.5 {
+			side = "left"
+		}
+		fix := fmt.Sprintf("`cutroom overlay set %s --layout %s` (the empty side), or place it: `cutroom style %s --x … --y …`", p.ID, side, p.ID)
+		if p.Kind == "captions" {
+			fix = "`cutroom style captions --y …` (below the chin) or a smaller --size"
+		}
+		is = append(is, timeline.Issue{Level: "warn", Code: "overlay-covers-face", At: p.Start,
+			Message: fmt.Sprintf("overlay %s (%s) covers %.0f%% of the speaker's face (face at x %.2f–%.2f, y %.2f–%.2f of the frame)", p.ID, p.Name, 100*worst, face[0], face[2], face[1], face[3]),
+			Fix:     fix})
+	}
+	return is
+}
+
+// faceInFrame maps a face box (0–1 of a vw×vh source picture) into the output frame: through the
+// fill crop, or the fit's scale and bars.
+func faceInFrame(f [4]float64, vw, vh int, tl *timeline.Timeline) [4]float64 {
+	W, H := float64(tl.Width), float64(tl.Height)
+	if tl.Fill {
+		lo, hi := render.CropSpan(tl.FillX, vw, vh, tl.Width, tl.Height)
+		cl := func(x float64) float64 { return math.Max(0, math.Min(1, (x-lo)/(hi-lo))) }
+		return [4]float64{cl(f[0]), f[1], cl(f[2]), f[3]}
+	}
+	sc := math.Min(W/float64(vw), H/float64(vh))
+	ox, oy := (W-sc*float64(vw))/2, (H-sc*float64(vh))/2
+	return [4]float64{(ox + f[0]*sc*float64(vw)) / W, (oy + f[1]*sc*float64(vh)) / H, (ox + f[2]*sc*float64(vw)) / W, (oy + f[3]*sc*float64(vh)) / H}
 }

@@ -2,6 +2,19 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 69 · 2026-11-26 · `overlay-covers-face`: cards, images and captions that cover the speaker's face
+Did: GRAPHICS.md's first rule is "never cover the face". FindSpeaker now also gives a face box: the
+forehead row (first skin at the centre column) and the median run of skin pixels below it (width ≈
+height); results are cached per file+span in .cutroom/speakers.json (versioned). New timeline warning
+`overlay-covers-face` when an overlay (any but a full cutaway; captions by group) covers ≥ 30% of the
+face, mapped into the frame through the fill crop or the fit; the fix names the empty side.
+Measured: real footage — the landscape house-style edit's left cards: no warning; a centred card: 37%
+warned; the three styled shorts: no warnings (captions sit below the chin). First run +1.7 s, cached
+0.55 s per `timeline`. Iterated three times on the box: motion-weighted columns were half the face,
+40%-of-peak columns took in neck and hands; the warm pink wall in the securing take still reads as
+skin (its box is off — the 30% threshold keeps it quiet). e2e 299/299.
+Next: a real face detector would make this exact (Vision on macOS?) — backlog.
+
 ### 68 · 2026-11-26 · Landscape edit in the house style: eyebrow, left/right layouts, retake direction
 Did: a 16:9 edit from deploying take-2 (1080p VFR, vocab for Coolify/Hetzner/…): keep a section,
 tighten, decide warnings. Retake bug: "You don't need to care about having high availability…" then

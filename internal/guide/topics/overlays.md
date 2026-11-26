@@ -31,6 +31,10 @@ look at it: `cutroom look --output 7.75`
   were cut — `cutroom timeline` warns `overlay-orphaned`). Two overlays in the same layout at the same
   time warn `overlay-overlap`. `cutroom overlay rm o1` removes one; `cutroom edit undo` brings it back.
 
+Never cover the face: when a card, image, inset or the captions cover ≥ 30% of the speaker's face
+(found in the picture by skin-coloured movement and mapped through the frame's crop), `timeline` warns
+`overlay-covers-face` with the side to move it to. It is a warning: accept it when you mean it.
+
 Look before rendering: `cutroom look --overlays` shows every overlay at the middle of its window, and
 `cutroom look --output <time>` any moment — both draw the cards exactly as the render will
 (labels show `+o1`). Text is drawn by cutroom itself (no ffmpeg text filters needed, L47). Its

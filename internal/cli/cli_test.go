@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"strings"
 	"testing"
+
+	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
 func run(args ...string) (string, string, int) {
@@ -106,5 +108,17 @@ func TestParseSize(t *testing.T) {
 		if (err != nil) != c.shouldFail || w != c.w || h != c.h {
 			t.Errorf("%s from %dx%d: %dx%d %v", c.in, c.cw, c.ch, w, h, err)
 		}
+	}
+}
+
+func TestFaceInFrameThroughTheCrop(t *testing.T) {
+	tl := &timeline.Timeline{Width: 1080, Height: 1920, Fill: true, FillX: 0.75}
+	f := faceInFrame([4]float64{0.68, 0.2, 0.84, 0.55}, 1920, 1080, tl)
+	if f[0] < 0.2 || f[2] > 0.8 || f[1] != 0.2 {
+		t.Errorf("a face at 0.68–0.84 in a crop centred on 0.75 sits mid-frame: %v", f)
+	}
+	tl = &timeline.Timeline{Width: 1920, Height: 1080}
+	if f := faceInFrame([4]float64{0.4, 0.2, 0.6, 0.6}, 1920, 1080, tl); f != [4]float64{0.4, 0.2, 0.6, 0.6} {
+		t.Errorf("same shape: unchanged, got %v", f)
 	}
 }

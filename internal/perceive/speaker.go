@@ -1,8 +1,12 @@
 package perceive
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
+	"os"
+	"path/filepath"
+	"sort"
 
 	"github.com/NWylynko/cutroom/internal/deps"
 	"github.com/NWylynko/cutroom/internal/media"
@@ -15,9 +19,15 @@ type Speaker struct {
 	X     float64 `json:"x"`
 	Found bool    `json:"found"`
 	Skin  float64 `json:"skin"` // share of the frame that looks like skin, on average
+	// Face: the face's box (x0, y0, x1, y1, 0–1 of the picture) — the top of the skin that moves
+	// around X, about as tall as it is wide plus a third; zero when no speaker is found
+	Face [4]float64 `json:"face"`
 }
 
 const spW, spH = 160, 90
+
+// speakerVersion changes whenever FindSpeaker does, so cached results are found again.
+const speakerVersion = 3
 
 // FindSpeaker samples 16 frames of path over [start, start+dur) and finds the speaker: pixels that
 // look like skin and move (a face talking, hands) weigh most, upper ones more than lower (the face
@@ -109,5 +119,78 @@ func speakerIn(frames [][]byte) Speaker {
 	}
 	sp.X = math.Round((sx/sw+0.5)/spW*100) / 100
 	sp.Found = true
+	// the face: from the first row with skin at the centre column (the forehead, under the hair),
+	// its width the median run of skin-coloured pixels around the centre over the rows below that,
+	// its height about its width (the run includes the ears)
+	cx := int(sx / sw)
+	isSk := func(x, y int) bool { return x >= 0 && x < spW && skin[y*spW+x] >= 0.5 }
+	top := -1
+	for y := range spH {
+		n := 0
+		for x := cx - 2; x <= cx+2; x++ {
+			if isSk(x, y) {
+				n++
+			}
+		}
+		if n >= 3 {
+			top = y
+			break
+		}
+	}
+	if top >= 0 {
+		var runs []int
+		var lefts []int
+		for y := top + 2; y < min(spH, top+14); y++ {
+			l, r := cx, cx
+			if !isSk(cx, y) {
+				continue
+			}
+			for l > 0 && (isSk(l-1, y) || isSk(l-2, y)) {
+				l--
+			}
+			for r < spW-1 && (isSk(r+1, y) || isSk(r+2, y)) {
+				r++
+			}
+			runs = append(runs, r-l+1)
+			lefts = append(lefts, l)
+		}
+		if len(runs) > 0 {
+			idx := make([]int, len(runs))
+			for i := range idx {
+				idx[i] = i
+			}
+			sort.Slice(idx, func(a, b int) bool { return runs[idx[a]] < runs[idx[b]] })
+			m := idx[len(idx)/2]
+			w, x0 := runs[m], lefts[m]
+			sp.Face = [4]float64{r2(float64(x0) / spW), r2(float64(top) / spH), r2(float64(x0+w) / spW), r2(math.Min(1, (float64(top)+1.0*float64(w))/spH))}
+		}
+	}
+	return sp
+}
+
+func r2(f float64) float64 { return math.Round(f*100) / 100 }
+
+// FindSpeakerCached is FindSpeaker remembered in cacheDir per file and span (timeline warnings
+// ask for it on every edit).
+func FindSpeakerCached(cacheDir, path string, start, dur float64) Speaker {
+	st, err := os.Stat(path)
+	if err != nil {
+		return FindSpeaker(path, start, dur)
+	}
+	key := fmt.Sprintf("v%d|%s|%d|%d|%.1f|%.1f", speakerVersion, path, st.Size(), st.ModTime().UnixNano(), start, dur)
+	file := filepath.Join(cacheDir, "speakers.json")
+	m := map[string]Speaker{}
+	if b, err := os.ReadFile(file); err == nil {
+		_ = json.Unmarshal(b, &m)
+	}
+	if sp, ok := m[key]; ok {
+		return sp
+	}
+	sp := FindSpeaker(path, start, dur)
+	m[key] = sp
+	if b, err := json.Marshal(m); err == nil {
+		_ = os.MkdirAll(cacheDir, 0o755)
+		_ = os.WriteFile(file, b, 0o644)
+	}
 	return sp
 }

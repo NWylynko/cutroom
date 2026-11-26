@@ -51,3 +51,11 @@ func TestNoSpeakerInAPattern(t *testing.T) {
 		t.Errorf("a pattern with no skin: %+v, want not found at 0.5", sp)
 	}
 }
+
+func TestSpeakerFaceBox(t *testing.T) {
+	sp := speakerIn(synthFrames(0.7, 16))
+	f := sp.Face
+	if f[0] > 0.66 || f[2] < 0.74 || f[1] > 0.25 || f[3] < 0.4 {
+		t.Errorf("face box %v should cover the moving skin blob around x 0.70, y 0.18–0.5", f)
+	}
+}

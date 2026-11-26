@@ -7,8 +7,8 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- [r68] Warn when a card/overlay covers the speaker's face (FindSpeaker gives x; add the face's
-  vertical span) — GRAPHICS.md's first rule is "never cover the face".
+- [r69] Face box from skin heuristics is rough (warm walls read as skin); a real face detector
+  (macOS Vision via a tiny helper, optional) would make framing and overlay-covers-face exact.
 - [r68] Variable fonts (SF Pro = SFNS.ttf): pick a weight (`--font "SF Pro@800"`); x/image/opentype
   draws only the default instance — needs a variation-capable rasteriser or instancing.
 - [r68] Eyebrow letter-spacing (tracking 0.14em in the house style).
