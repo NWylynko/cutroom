@@ -25,7 +25,7 @@ import (
 )
 
 // CardVersion changes whenever card drawing changes, so cached cards are redrawn.
-const CardVersion = 4 // 4: highlight box drawn over the outline; 3: clips relabelled bt709 like sources (newer ffmpeg converted untagged clips from bt601)
+const CardVersion = 5 // 5: eyebrow tracking 0.14 by default; 4: 4: highlight box drawn over the outline; 3: clips relabelled bt709 like sources (newer ffmpeg converted untagged clips from bt601)
 
 // Placement is one overlay as rendered: a full-frame RGBA PNG shown over output [Start, End),
 // fading in and out over Fade seconds. Box is the drawn area as fractions of the frame
@@ -219,7 +219,8 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 			if c == nil {
 				c = l.subColor
 			}
-			ef := raster.RefFace(l.fontRef, math.Round(0.5*l.size))
+			es := math.Round(0.5 * l.size)
+			ef := raster.Tracked(raster.RefFace(l.fontRef, es), l.eyebrowTrack*es)
 			for _, t := range wrapText(ef, strings.ToUpper(o.Eyebrow), mw) {
 				lines = append(lines, line{t, ef, c})
 			}
@@ -228,7 +229,7 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 			lines = append(lines, line{t, l.face, l.color})
 		}
 		if o.Sub != "" {
-			for _, t := range wrapText(l.subFace, l.text(o.Sub), mw) {
+			for _, t := range wrapText(l.subFace, o.Sub, mw) {
 				lines = append(lines, line{t, l.subFace, l.subColor})
 			}
 		}

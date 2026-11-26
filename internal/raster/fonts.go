@@ -1,7 +1,10 @@
 package raster
 
 import (
+	"image"
+
 	"fmt"
+	"golang.org/x/image/math/fixed"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -240,4 +243,29 @@ func RefFace(r FontRef, size float64) font.Face {
 	}
 	refFaces[k] = ff
 	return ff
+}
+
+// tracked is a face with extra space after every glyph (letter-spacing), so measuring, wrapping and
+// drawing all see it.
+type tracked struct {
+	font.Face
+	extra fixed.Int26_6
+}
+
+// Tracked returns face with extra px of letter-spacing (0: face itself).
+func Tracked(face font.Face, extra float64) font.Face {
+	if extra == 0 {
+		return face
+	}
+	return tracked{face, fixed.Int26_6(extra * 64)}
+}
+
+func (t tracked) Glyph(dot fixed.Point26_6, r rune) (image.Rectangle, image.Image, image.Point, fixed.Int26_6, bool) {
+	dr, m, mp, adv, ok := t.Face.Glyph(dot, r)
+	return dr, m, mp, adv + t.extra, ok
+}
+
+func (t tracked) GlyphAdvance(r rune) (fixed.Int26_6, bool) {
+	adv, ok := t.Face.GlyphAdvance(r)
+	return adv + t.extra, ok
 }

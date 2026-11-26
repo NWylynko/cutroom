@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/NWylynko/cutroom/internal/raster"
 	"github.com/NWylynko/cutroom/internal/timeline"
 )
 
@@ -197,5 +198,16 @@ func TestCaptionHighlightBox(t *testing.T) {
 	}
 	if n := countColor(img, r, color.NRGBA{255, 0, 0, 255}); n < 100 {
 		t.Errorf("the boxed word's letters are drawn on top of the box: %d red px", n)
+	}
+}
+
+func TestTrackingWidensText(t *testing.T) {
+	l0, _ := resolve(CaptionDefaults, "", 1080, 1920)
+	st := (&timeline.Style{Tracking: 0.1}).Over(CaptionDefaults)
+	l1, _ := resolve(st, "", 1080, 1920)
+	a, b := raster.Measure(l0.face, "HELLO"), raster.Measure(l1.face, "HELLO")
+	want := a + int(5*0.1*l1.size) - 2
+	if b < want {
+		t.Errorf("tracking 0.1 on 5 letters: width %d, want ≥ %d (untracked %d)", b, want, a)
 	}
 }

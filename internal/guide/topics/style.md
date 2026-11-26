@@ -28,7 +28,9 @@ Fields (`cutroom style --help` lists them all; `--x default` unsets one, `--rese
 - **highlight-box** (captions): a rounded box in this colour behind the word being said (with
   `--highlight` for its letters, e.g. `--highlight-box "#ffd400" --highlight "#111111"`).
 - **words** / **chars** (captions): how much shows at once (default 3 words, 20 characters).
-- **case** (upper | lower | as-is), **align** (left | center | right), **radius** and **pad**
+- **tracking** (letter-spacing, a fraction of the font size: 0.05–0.1 for airy capitals),
+  **eyebrow-tracking** (cards' eyebrow label, default 0.14)
+- **case** (upper | lower | as-is; captions and card titles — sub-lines keep theirs), **align** (left | center | right), **radius** and **pad**
   (fractions of the font size), **outline-width** (fraction of the font size, default 0.08).
 - **x** / **y**: the centre of the box as a point of the frame (0–1 across, down), like
   `edit frame --anchor`; unset, captions sit in the caption band and cards follow `--layout`.

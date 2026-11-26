@@ -25,7 +25,7 @@ var CaptionDefaults = timeline.Style{Font: "bold", Size: 0.068, Color: "#ffffff"
 // bar on lower thirds.
 func CardDefaults(layout string) timeline.Style {
 	s := timeline.Style{Font: "bold", SubFont: "regular", Size: 0.055, SubSize: 0.036, Color: "#ffffff", SubColor: "#dcdce1",
-		Box: "#0c0c10be", Accent: "#f59e0b", Outline: "none", Shadow: "none", BoxShadow: "none", Pad: 0.4, Case: "as-is", Align: "left", Width: 0.62, Animate: "fade", AnimateTime: 0.3}
+		Box: "#0c0c10be", Accent: "#f59e0b", Outline: "none", Shadow: "none", BoxShadow: "none", Pad: 0.4, Case: "as-is", Align: "left", Width: 0.62, EyebrowTracking: 0.14, Animate: "fade", AnimateTime: 0.3}
 	switch layout {
 	case "title", "center":
 		s.Size, s.SubSize, s.Width, s.Align, s.Accent = 0.085, 0.045, 0.84, "center", "none"
@@ -51,6 +51,7 @@ type look struct {
 	width                                                                  int
 	key                                                                    string // for caches: the style and its font files
 	fontRef                                                                raster.FontRef
+	eyebrowTrack                                                           float64
 }
 
 func colorOf(s string) color.Color {
@@ -81,7 +82,7 @@ func resolve(st timeline.Style, dir string, w, h int) (look, error) {
 	if subSize == 0 {
 		subSize = math.Round(0.65 * size)
 	}
-	l := look{fontRef: fr, face: raster.RefFace(fr, size), subFace: raster.RefFace(sr, subSize), size: size,
+	l := look{fontRef: fr, face: raster.Tracked(raster.RefFace(fr, size), st.Tracking*size), eyebrowTrack: st.EyebrowTracking, subFace: raster.RefFace(sr, subSize), size: size,
 		color: colorOf(st.Color), subColor: colorOf(st.SubColor), highlight: colorOf(st.Highlight), hiBox: colorOf(st.HighlightBox), box: colorOf(st.Box),
 		accent: colorOf(st.Accent), outln: colorOf(st.Outline), shade: colorOf(st.Shadow), boxShade: colorOf(st.BoxShadow),
 		radius: st.Radius * size, padX: int(st.Pad * size), padY: int(0.6 * st.Pad * size),

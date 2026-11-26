@@ -14,7 +14,6 @@ Move done items to the journal, not here.
   (macOS Vision via a tiny helper, optional) would make framing and overlay-covers-face exact.
 - [r68] Variable fonts (SF Pro = SFNS.ttf): pick a weight (`--font "SF Pro@800"`); x/image/opentype
   draws only the default instance — needs a variation-capable rasteriser or instancing.
-- [r68] Eyebrow letter-spacing (tracking 0.14em in the house style).
 - [T3 r65] Warn when a title card restates the short's last sentence (gives away the payoff).
 - [framing] Speakers who move across the frame: per-segment anchors (follow them) instead of one crop.
 - [style] Per-word pop for karaoke captions (each word bumps as it is said), if asked for.

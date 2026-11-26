@@ -2,6 +2,15 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 76 · 2026-11-27 · Letter-spacing: `tracking`, `eyebrow-tracking` (0.14 by default, as the house style)
+Did: style field `tracking` (captions and card titles, fraction of the font size) and
+`eyebrow-tracking` (cards, default 0.14 — the house style's eyebrow). Implemented as a face wrapper
+that adds the spacing to every glyph advance (raster.Tracked), so measuring, wrapping and drawing
+all agree. `case` now applies to captions and card titles only; card sub-lines keep their case
+(upper-casing "Don't swap a $5 subscription…" read badly). CardVersion 5.
+Measured: deploying cards: eyebrows spaced like the published ones; `--tracking 0.06 --case upper`
+title looked right at full size; test: 5 letters at 0.1 widen by ≥ 0.5 em. e2e 307/307.
+
 ### 75 · 2026-11-27 · Caption `highlight-box`: a rounded box behind the word being said
 Did: another common shorts caption look — the spoken word on a coloured rounded box. New style field
 `highlight-box` (karaoke cards per word, like `highlight`); drawn after the line's outline and shadow,

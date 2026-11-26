@@ -15,31 +15,33 @@ import (
 // paddings and radii are fractions of the main font size; X/Y place the centre of the box as a
 // fraction of the frame (0–1 across, down), like `edit frame --anchor`.
 type Style struct {
-	Font         string   `json:"font,omitempty"`          // bold | regular | mono | a font file | an installed font's name
-	SubFont      string   `json:"sub_font,omitempty"`      // cards: the second line's font
-	Size         float64  `json:"size,omitempty"`          // main text height, fraction of the short side
-	SubSize      float64  `json:"sub_size,omitempty"`      // cards: second line
-	Color        string   `json:"color,omitempty"`         // text colour
-	SubColor     string   `json:"sub_color,omitempty"`     // cards: second line colour
-	Highlight    string   `json:"highlight,omitempty"`     // captions: colour of the word being said ("none" = off)
-	HighlightBox string   `json:"highlight_box,omitempty"` // captions: a rounded box behind the word being said ("none" = off)
-	Box          string   `json:"box,omitempty"`           // background colour, or none
-	Accent       string   `json:"accent,omitempty"`        // cards: bar on the left of lower thirds, or none
-	Outline      string   `json:"outline,omitempty"`       // text outline colour, or none
-	OutlineWidth float64  `json:"outline_width,omitempty"` // fraction of the font size
-	Shadow       string   `json:"shadow,omitempty"`        // drop-shadow colour under the letters, or none
-	BoxShadow    string   `json:"box_shadow,omitempty"`    // soft shadow under the box, or none
-	Radius       float64  `json:"radius,omitempty"`        // box corner radius, fraction of the font size
-	Pad          float64  `json:"pad,omitempty"`           // box padding, fraction of the font size
-	Case         string   `json:"case,omitempty"`          // upper | upper-keep-names | lower | as-is
-	Align        string   `json:"align,omitempty"`         // left | center | right (lines inside the box)
-	X            *float64 `json:"x,omitempty"`             // centre of the box, 0–1 across
-	Y            *float64 `json:"y,omitempty"`             // centre of the box, 0–1 down
-	Width        float64  `json:"width,omitempty"`         // widest line, fraction of the frame width
-	Animate      string   `json:"animate,omitempty"`       // how it comes in and goes out: none | fade | pop | slide-up | slide-down | slide-left | slide-right
-	AnimateTime  float64  `json:"animate_time,omitempty"`  // seconds the animation takes
-	Words        int      `json:"words,omitempty"`         // captions: most words shown at once
-	Chars        int      `json:"chars,omitempty"`         // captions: most characters shown at once
+	Font            string   `json:"font,omitempty"`          // bold | regular | mono | a font file | an installed font's name
+	SubFont         string   `json:"sub_font,omitempty"`      // cards: the second line's font
+	Size            float64  `json:"size,omitempty"`          // main text height, fraction of the short side
+	SubSize         float64  `json:"sub_size,omitempty"`      // cards: second line
+	Color           string   `json:"color,omitempty"`         // text colour
+	SubColor        string   `json:"sub_color,omitempty"`     // cards: second line colour
+	Highlight       string   `json:"highlight,omitempty"`     // captions: colour of the word being said ("none" = off)
+	HighlightBox    string   `json:"highlight_box,omitempty"` // captions: a rounded box behind the word being said ("none" = off)
+	Box             string   `json:"box,omitempty"`           // background colour, or none
+	Accent          string   `json:"accent,omitempty"`        // cards: bar on the left of lower thirds, or none
+	Outline         string   `json:"outline,omitempty"`       // text outline colour, or none
+	OutlineWidth    float64  `json:"outline_width,omitempty"` // fraction of the font size
+	Shadow          string   `json:"shadow,omitempty"`        // drop-shadow colour under the letters, or none
+	BoxShadow       string   `json:"box_shadow,omitempty"`    // soft shadow under the box, or none
+	Radius          float64  `json:"radius,omitempty"`        // box corner radius, fraction of the font size
+	Pad             float64  `json:"pad,omitempty"`           // box padding, fraction of the font size
+	Tracking        float64  `json:"tracking,omitempty"`      // letter-spacing, fraction of the font size
+	EyebrowTracking float64  `json:"eyebrow_tracking,omitempty"`
+	Case            string   `json:"case,omitempty"`         // upper | upper-keep-names | lower | as-is
+	Align           string   `json:"align,omitempty"`        // left | center | right (lines inside the box)
+	X               *float64 `json:"x,omitempty"`            // centre of the box, 0–1 across
+	Y               *float64 `json:"y,omitempty"`            // centre of the box, 0–1 down
+	Width           float64  `json:"width,omitempty"`        // widest line, fraction of the frame width
+	Animate         string   `json:"animate,omitempty"`      // how it comes in and goes out: none | fade | pop | slide-up | slide-down | slide-left | slide-right
+	AnimateTime     float64  `json:"animate_time,omitempty"` // seconds the animation takes
+	Words           int      `json:"words,omitempty"`        // captions: most words shown at once
+	Chars           int      `json:"chars,omitempty"`        // captions: most characters shown at once
 }
 
 // StyleField describes one settable field: its flag name, kind and help.
@@ -61,7 +63,9 @@ var StyleFields = []StyleField{
 	{"box-shadow", "color", "soft shadow under the box (e.g. #00000066), or none", ""},
 	{"radius", "num", "box corner radius as a fraction of the font size (0 = square)", ""},
 	{"pad", "num", "box padding as a fraction of the font size", ""},
-	{"case", "enum:upper,upper-keep-names,lower,as-is", "letter case (upper-keep-names: capitals, but iCloud, OAuth, GitHub stay as written)", ""},
+	{"tracking", "num", "letter-spacing as a fraction of the font size (0.05 = airy capitals)", ""},
+	{"eyebrow-tracking", "num", "letter-spacing of a card's eyebrow label (default 0.14)", "cards"},
+	{"case", "enum:upper,upper-keep-names,lower,as-is", "letter case of captions and card titles (upper-keep-names: capitals, but iCloud, OAuth, GitHub stay as written)", ""},
 	{"align", "enum:left,center,right", "line alignment inside the box", ""},
 	{"x", "num", "centre of the box, 0–1 across (default: centred; cards: from --layout)", ""},
 	{"y", "num", "centre of the box, 0–1 down (default: the caption band / the layout's place)", ""},
