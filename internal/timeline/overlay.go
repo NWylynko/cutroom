@@ -22,6 +22,7 @@ type Overlay struct {
 	Text       string  `json:"text,omitempty"`        // text: first line
 	Sub        string  `json:"sub,omitempty"`         // text: smaller second line
 	Eyebrow    string  `json:"eyebrow,omitempty"`     // text: a small label above the title ("STEP 3")
+	Icon       string  `json:"icon,omitempty"`        // text: a PNG/JPEG shown in a tile left of the text
 	Path       string  `json:"path,omitempty"`        // image: file (relative to the project)
 	Layout     string  `json:"layout"`                // lower-third | title | top | corner | center
 	Size       float64 `json:"size,omitempty"`        // image: width as a fraction of the frame

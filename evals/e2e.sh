@@ -280,7 +280,8 @@ expect "overlay set duration"      'set o1: --duration 1; now output .*\(1\.000 
 expect "short card warned"         'overlay-short.*o1.*overlay set o1 --duration' cutroom timeline
 expect "overlay set keeps the id"  'set o1: --duration 2\.5'               cutroom overlay set o1 --duration 2.5
 expect "overlay eyebrow + left"      'text "Two steps", left'             cutroom overlay add text "Two steps" --eyebrow "Step 1" --at "Then install" --duration 1.5 --layout left --dry-run
-expect "eyebrow on an image refused" 'no --sub or --eyebrow'              cutroom overlay add image logo.png --eyebrow "x" --at "Finally" --duration 1 --dry-run
+expect "card with an icon"           'text "Two steps", left'             cutroom overlay add text "Two steps" --icon logo.png --at "Then install" --duration 1.5 --layout left --dry-run
+expect "eyebrow on an image refused" 'no --sub, --eyebrow or --icon'              cutroom overlay add image logo.png --eyebrow "x" --at "Finally" --duration 1 --dry-run
 expect "overlay set eyebrow"         'set o1: --eyebrow "Step 2"'         cutroom overlay set o1 --eyebrow "Step 2" --dry-run
 expect "overlay --y points to style" 'style o1 --y'                        cutroom overlay set o1 --y 0.3
 expect "look --file on a source"     'frame 360 of talk at 0:12'           cutroom look --file talk.mp4 12

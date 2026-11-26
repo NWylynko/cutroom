@@ -2,6 +2,16 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 78 · 2026-11-27 · Card icons: `overlay --icon` (tinted glyph in an accent tile)
+Did: the house style puts an accent-coloured icon in a tinted tile beside each point. `overlay
+add/set text … --icon file.png`: a PNG with transparency is drawn as a glyph in the card's accent
+colour on a 13% accent tile (rounded); an opaque picture fills the tile instead. The tile sits left
+of the eyebrow/title block, ~1.15 title lines square; the icon file's bytes are in the card key.
+Measured: real deploying card "Keep in mind / Watch the ongoing cost" with a ring glyph: tinted Turf
+Green tile, text shifted right, sub-line in its own case. e2e 310/310 (+1); unit test on the tint.
+Surprises: the house icons are Lucide SVGs and nothing here rasterises SVG (no rsvg-convert or
+ImageMagick) → backlog.
+
 ### 77 · 2026-11-27 · Styled images and inset clips: rounded corners, border, shadow, placement
 Did: image and inset-clip overlays were bare rectangles. `cutroom style o2 --radius … --outline …
 --outline-width … --box-shadow … --x/--y` now applies to them (radius/border as fractions of the

@@ -242,3 +242,25 @@ func TestStyledImageOverlay(t *testing.T) {
 		t.Errorf("picture inside: %v", c)
 	}
 }
+
+func TestCardIconTintedInAccent(t *testing.T) {
+	dir := t.TempDir()
+	g := image.NewNRGBA(image.Rect(0, 0, 64, 64))
+	for y := 16; y < 48; y++ {
+		for x := 16; x < 48; x++ {
+			g.SetNRGBA(x, y, color.NRGBA{255, 255, 255, 255}) // an opaque square on transparency
+		}
+	}
+	if err := raster.SavePNG(dir+"/g.png", g); err != nil {
+		t.Fatal(err)
+	}
+	st := (&timeline.Style{Accent: "#00aa00", Box: "#ffffff"}).Over(CardDefaults("left"))
+	o := timeline.Overlay{ID: "o1", Kind: "text", Text: "Title", Layout: "left", Icon: "g.png", Style: &st}
+	img, r, err := Card(o, dir, 1920, 1080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if n := countColor(img, r, color.NRGBA{0, 170, 0, 255}); n < 50 {
+		t.Errorf("the glyph should be drawn in the accent colour: %d px", n)
+	}
+}

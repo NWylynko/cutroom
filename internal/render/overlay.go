@@ -172,7 +172,12 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 
 // cardKey hashes everything a card depends on, including the bytes of a referenced image (L19).
 func cardKey(o timeline.Overlay, projDir string, w, h int) (string, error) {
-	parts := []any{CardVersion, w, h, o.Kind, o.Text, o.Sub, o.Layout, o.Size, o.Path, o.CapBox, o.Eyebrow}
+	parts := []any{CardVersion, w, h, o.Kind, o.Text, o.Sub, o.Layout, o.Size, o.Path, o.CapBox, o.Eyebrow, o.Icon}
+	if o.Icon != "" {
+		if b, err := os.ReadFile(absIn(projDir, o.Icon)); err == nil {
+			parts = append(parts, fmt.Sprintf("%x", sha256.Sum256(b)))
+		}
+	}
 	if o.Kind == "text" {
 		l, err := resolve(o.Style.Over(CardDefaults(o.Layout)), projDir, w, h)
 		if err != nil {
@@ -274,6 +279,21 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 		for _, t := range wrapText(l.face, l.text(o.Text), mw) {
 			lines = append(lines, line{t, l.face, l.color})
 		}
+		var icon image.Image
+		ts := 0 // icon tile size (px), and the room it takes left of the text
+		if o.Icon != "" {
+			f, err := os.Open(absIn(projDir, o.Icon))
+			if err != nil {
+				return nil, r, fmt.Errorf("overlay %s: icon: %w", o.ID, err)
+			}
+			icon, _, err = image.Decode(f)
+			f.Close()
+			if err != nil {
+				return nil, r, fmt.Errorf("overlay %s: icon %s is not a PNG or JPEG (convert an SVG first, e.g. with rsvg-convert): %w", o.ID, o.Icon, err)
+			}
+			ts = int(math.Round(1.15 * float64(lineH(l.face))))
+			mw -= ts + int(0.45*l.size)
+		}
 		if o.Sub != "" {
 			for _, t := range wrapText(l.subFace, o.Sub, mw) {
 				lines = append(lines, line{t, l.subFace, l.subColor})
@@ -291,7 +311,12 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 				accent = max(accent, int(math.Min(l.radius*0.5, 0.02*float64(w))))
 			}
 		}
-		bw, bh := tw+2*l.padX+accent+2*l.outlineW, th+2*l.padY
+		iconW := 0
+		if icon != nil {
+			iconW = ts + int(0.45*l.size)
+			th = max(th, ts)
+		}
+		bw, bh := tw+2*l.padX+accent+2*l.outlineW+iconW, th+2*l.padY
 		x, y := placeCard(o, w, h, bw, bh, margin)
 		r = l.boxAt(w, h, bw, bh, x, y)
 		l.drawBox(img, r)
@@ -303,9 +328,16 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 			}
 		}
 		cy := r.Min.Y + l.padY
+		if icon != nil {
+			c := l.accent
+			if c == nil {
+				c = l.color
+			}
+			drawIconTile(img, icon, image.Rect(r.Min.X+accent+l.padX, cy, r.Min.X+accent+l.padX+ts, cy+ts), c, 0.4*float64(ts))
+		}
 		for _, ln := range lines {
 			lw := raster.Measure(ln.face, ln.s)
-			lx := r.Min.X + accent + l.padX + l.outlineW
+			lx := r.Min.X + accent + l.padX + l.outlineW + iconW
 			switch l.align {
 			case "center":
 				lx += (tw - lw) / 2
@@ -754,4 +786,39 @@ func motion(kind string) string {
 		return ""
 	}
 	return kind
+}
+
+// drawIconTile draws an icon in a rounded tile at r: an icon with transparency (a glyph) is tinted
+// in c on a light tile of c (as the house style's accent icons); an opaque picture fills the tile.
+func drawIconTile(img *image.NRGBA, icon image.Image, r image.Rectangle, c color.Color, radius float64) {
+	transparent := false
+	b := icon.Bounds()
+	for y := b.Min.Y; y < b.Max.Y && !transparent; y += max(1, b.Dy()/32) {
+		for x := b.Min.X; x < b.Max.X; x += max(1, b.Dx()/32) {
+			if _, _, _, a := icon.At(x, y).RGBA(); a < 0xffff {
+				transparent = true
+				break
+			}
+		}
+	}
+	if !transparent {
+		pic := image.NewNRGBA(image.Rect(0, 0, r.Dx(), r.Dy()))
+		xdraw.CatmullRom.Scale(pic, pic.Bounds(), icon, b, draw.Src, nil)
+		mask := image.NewAlpha(pic.Bounds())
+		raster.FillRound(mask, mask.Bounds(), radius, image.Opaque)
+		draw.DrawMask(img, r, pic, image.Point{}, mask, image.Point{}, draw.Over)
+		return
+	}
+	cr, cg, cb, _ := c.RGBA()
+	raster.FillRound(img, r, radius, color.NRGBA{uint8(cr >> 8), uint8(cg >> 8), uint8(cb >> 8), 0x22})
+	in := int(0.62 * float64(r.Dx()))
+	ir := image.Rect(0, 0, in, in*b.Dy()/max(1, b.Dx()))
+	glyph := image.NewNRGBA(ir)
+	xdraw.CatmullRom.Scale(glyph, ir, icon, b, draw.Src, nil)
+	mask := image.NewAlpha(ir)
+	for i := 0; i < len(mask.Pix); i++ {
+		mask.Pix[i] = glyph.Pix[4*i+3]
+	}
+	at := image.Pt(r.Min.X+(r.Dx()-ir.Dx())/2, r.Min.Y+(r.Dy()-ir.Dy())/2)
+	draw.DrawMask(img, ir.Add(at), image.NewUniform(c), image.Point{}, mask, image.Point{}, draw.Over)
 }

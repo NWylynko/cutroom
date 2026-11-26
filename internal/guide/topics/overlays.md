@@ -14,7 +14,9 @@ look at it: `cutroom look --output 7.75`
 - Layouts: `lower-third` (text default: left, above the bottom), `title` and `center` (big, centred),
   `top`, `corner` (top right; image default), `left` / `right` (vertically centred at that side — the
   empty side of the frame). `--sub` adds a smaller second line, `--eyebrow "Step 3"` a small label
-  above the title (capitals, in the card style's accent colour).
+  above the title (capitals, in the card style's accent colour). `--icon glyph.png` puts a picture in a
+  rounded tile left of the text: a PNG with transparency (an icon glyph) is drawn in the accent
+  colour on a light accent tile; an opaque picture fills the tile. SVG icons: convert to PNG first.
 - `cutroom overlay add image logo.png --at "Finally" --duration 4 [--size 0.2]` — PNG or JPEG (alpha
   kept); `--size` is its width as a fraction of the frame.
 - `cutroom overlay add clip terminal.mp4 --at "open the terminal" --to "update command." [--clip-in 2.5]`

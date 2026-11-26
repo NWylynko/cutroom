@@ -42,6 +42,7 @@ Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rend
 			{Name: "duration", Kind: "float", Help: "Seconds on screen (default 4)"},
 			{Name: "sub", Kind: "string", Help: "text: a smaller second line"},
 			{Name: "eyebrow", Kind: "string", Help: "text: a small label above the title, e.g. \"STEP 3\" (accent colour, capitals)"},
+			{Name: "icon", Kind: "string", Help: "text: a PNG/JPEG left of the text in a tile — a transparent glyph takes the accent colour"},
 			{Name: "layout", Kind: "string", Help: "lower-third | title | top | corner | center | left | right"},
 			{Name: "size", Kind: "float", Help: "image: width as a fraction of the frame (default 0.25)"},
 			{Name: "fade", Kind: "float", Default: "0.2", Help: "Fade in/out seconds (0 = cut in and out)"},
@@ -58,11 +59,11 @@ Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rend
   overlay set o2 --at "Then install"   move it to other words
   overlay set o2 --layout top --text "Step 2" --sub "…" --fade 0
 Changes only what you give; the id stays.`,
-				Flags: []string{"duration", "to", "at", "near", "occurrence", "source", "layout", "text", "sub", "eyebrow", "fade", "size", "clip-in", "dry-run"}},
+				Flags: []string{"duration", "to", "at", "near", "occurrence", "source", "layout", "text", "sub", "eyebrow", "icon", "fade", "size", "clip-in", "dry-run"}},
 			"add": {Usage: `  overlay add text "Install Linux" --at "Then install" [--duration 3 | --to "on it."] [--sub "…"]
   overlay add image logo.png --at "Finally" --duration 4 [--layout corner] [--size 0.2]
   overlay add clip broll.mp4 --at "open the terminal" [--to "…" | --duration 3] [--clip-in 2.5] [--layout full|corner] [--size 0.35]`,
-				Flags: []string{"at", "to", "duration", "sub", "eyebrow", "layout", "size", "fade", "clip-in", "near", "occurrence", "source", "dry-run"}},
+				Flags: []string{"at", "to", "duration", "sub", "eyebrow", "icon", "layout", "size", "fade", "clip-in", "near", "occurrence", "source", "dry-run"}},
 			"list": {Usage: `  overlay list   every overlay: id, kind, output time, layout, anchor words`},
 			"rm":   {Usage: `  overlay rm o2  remove an overlay (undo-able with ` + "`cutroom edit undo`" + `)`, Flags: []string{"dry-run"}},
 		},
@@ -180,7 +181,7 @@ func (e *editEnv) overlayFromFlags(c *Ctx) (timeline.Overlay, error) {
 	if len(c.Args) != 3 {
 		return timeline.Overlay{}, Errf(ExitUsage, "bad-args", `overlay add text "Install Linux" --at "Then install"  or  overlay add image logo.png --at "…"`, "overlay add takes a kind (text|image) and its content")
 	}
-	o := timeline.Overlay{Kind: c.Args[1], Fade: c.Float("fade"), Duration: 4, Layout: c.Str("layout"), Sub: c.Str("sub"), Eyebrow: c.Str("eyebrow"), Size: c.Float("size")}
+	o := timeline.Overlay{Kind: c.Args[1], Fade: c.Float("fade"), Duration: 4, Layout: c.Str("layout"), Sub: c.Str("sub"), Eyebrow: c.Str("eyebrow"), Icon: iconPath(c.Str("icon")), Size: c.Float("size")}
 	switch o.Kind {
 	case "text":
 		o.Text = c.Args[2]
@@ -202,8 +203,8 @@ func (e *editEnv) overlayFromFlags(c *Ctx) (timeline.Overlay, error) {
 			p = abs
 		}
 		o.Path = p
-		if o.Sub != "" || o.Eyebrow != "" {
-			return o, Errf(ExitUsage, "bad-flag", "--sub/--eyebrow are for text overlays", "%s overlays have no --sub or --eyebrow", o.Kind)
+		if o.Sub != "" || o.Eyebrow != "" || o.Icon != "" {
+			return o, Errf(ExitUsage, "bad-flag", "--sub/--eyebrow/--icon are for text overlays", "%s overlays have no --sub, --eyebrow or --icon", o.Kind)
 		}
 		if o.Layout == "" {
 			o.Layout = "corner"
@@ -348,7 +349,7 @@ func (e *editEnv) overlaySet(c *Ctx, o timeline.Overlay) (timeline.Overlay, []st
 		o.Layout = c.Str("layout")
 		ch = append(ch, "--layout "+o.Layout)
 	}
-	if c.Has("text") || c.Has("sub") || c.Has("eyebrow") {
+	if c.Has("text") || c.Has("sub") || c.Has("eyebrow") || c.Has("icon") {
 		if o.Kind != "text" {
 			return o, nil, Errf(ExitUsage, "bad-flag", "--text/--sub are for text overlays", "%s is an image overlay", o.ID)
 		}
@@ -366,6 +367,10 @@ func (e *editEnv) overlaySet(c *Ctx, o timeline.Overlay) (timeline.Overlay, []st
 		if c.Has("eyebrow") {
 			o.Eyebrow = c.Str("eyebrow")
 			ch = append(ch, fmt.Sprintf("--eyebrow %q", o.Eyebrow))
+		}
+		if c.Has("icon") {
+			o.Icon = iconPath(c.Str("icon"))
+			ch = append(ch, fmt.Sprintf("--icon %q", o.Icon))
 		}
 	}
 	if c.Has("fade") {
@@ -393,4 +398,12 @@ func (e *editEnv) overlaySet(c *Ctx, o timeline.Overlay) (timeline.Overlay, []st
 		ch = append(ch, fmt.Sprintf("--size %g", o.Size))
 	}
 	return o, ch, nil
+}
+
+// iconPath is an --icon file as an absolute path ("" stays ""; "none" removes it).
+func iconPath(p string) string {
+	if p == "" || p == "none" {
+		return ""
+	}
+	return userPath(p)
 }
