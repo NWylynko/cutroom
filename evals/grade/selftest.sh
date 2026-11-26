@@ -162,6 +162,11 @@ cut $FIX/talk.mp4 "$W/shortlow/out/short.mp4" "crop=ih*9/16:ih:'clip(0.6*iw-ow/2
 want FAIL short "$W/shortlow" "safe_bottom"
 cut $FIX/talk.mp4 "$W/shortwide/out/short.mp4" "drawbox=x=300:y=520:w=680:h=60:color=black@0.75:t=fill:enable='$SHORTSPEECH'"
 want FAIL short "$W/shortwide" "vertical_9x16"
+# styled-short: the asked-for caption colour must be on screen; the plain short has none of it
+cut $FIX/talk.mp4 "$W/styled/out/short.mp4" "crop=ih*9/16:ih:'clip(0.6*iw-ow/2,0,iw-ow)':0,scale=1080:1920,drawbox=x=240:y=1100:w=600:h=90:color=0xff5fa2:t=fill:enable='$SHORTSPEECH'"
+want PASS styled-short "$W/styled"
+mkdir -p "$W/styledplain/out"; cp "$W/short/out/short.mp4" "$W/styledplain/out/short.mp4"
+want FAIL styled-short "$W/styledplain" "caption_color"
 segs=$full_segs
 cut $FIX/talk.mp4 "$W/brollbase/out/final.mp4"
 mkdir -p "$W/broll/out" "$W/brolltone/out"

@@ -58,6 +58,9 @@ type spec struct {
 	// SafeBottom: nothing drawn in the bottom sixth of the frame while lines are said (a vertical
 	// video's own buttons and description sit there).
 	SafeBottom bool `json:"safe_bottom,omitempty"`
+	// CaptionColor: text the brief asked for in this colour (#rrggbb) is on screen while lines are
+	// said — pixels near the colour in most sampled frames (the fixture has none of it).
+	CaptionColor string `json:"caption_color,omitempty"`
 	// AltDuring: while these phrases are said, the picture comes from AltRef (a B-roll cutaway).
 	AltDuring []string `json:"alt_during,omitempty"`
 }
@@ -166,6 +169,10 @@ func main() {
 	}
 	if has(sp.Checks, "upright") || has(sp.Checks, "frames_from_source") || has(sp.Checks, "av_sync") || has(sp.Checks, "alt_used") || len(sp.Cards)+len(sp.Clean) > 0 || sp.BurnedCaptions || sp.SafeBottom || len(sp.AltDuring) > 0 {
 		frameAndSync(out, sp, add)
+	}
+	if sp.CaptionColor != "" {
+		n, hit, best := colorFrames(out, sp.CaptionColor)
+		add("caption_color", n > 0 && float64(hit) >= 0.6*float64(n), "%d of %d sampled frames show %s text (most: %d px)", hit, n, sp.CaptionColor, best)
 	}
 	res = append(res, result{"transcript", true, truncate(text, 400)})
 	finish(task, res)
@@ -999,4 +1006,39 @@ func bandRMS(p, band string) float64 {
 	}
 	v, _ := strconv.ParseFloat(m[len(m)-1][1], 64)
 	return v
+}
+
+// colorFrames samples 12 frames over the middle 80% of p (270 px wide) and counts, per frame, pixels
+// within a small distance of hex; a frame "shows" the colour with ≥ 40 of them.
+func colorFrames(p, hex string) (n, hit, best int) {
+	var r, g, b int
+	if _, err := fmt.Sscanf(strings.TrimPrefix(hex, "#"), "%02x%02x%02x", &r, &g, &b); err != nil {
+		return 0, 0, 0
+	}
+	d := streamDur(p, "v:0")
+	if d <= 0 {
+		return 0, 0, 0
+	}
+	const W, H = 270, 480
+	for i := range 12 {
+		t := d * (0.1 + 0.8*float64(i)/11)
+		px, err := exec.Command("ffmpeg", "-v", "error", "-ss", fmt.Sprintf("%.3f", t), "-i", p, "-frames:v", "1",
+			"-vf", fmt.Sprintf("scale=%d:%d", W, H), "-pix_fmt", "rgb24", "-f", "rawvideo", "-").Output()
+		if err != nil || len(px) < W*H*3 {
+			continue
+		}
+		n++
+		c := 0
+		for k := 0; k+2 < len(px); k += 3 {
+			dr, dg, db := int(px[k])-r, int(px[k+1])-g, int(px[k+2])-b
+			if dr*dr+dg*dg+db*db < 40*40 {
+				c++
+			}
+		}
+		best = max(best, c)
+		if c >= 40 {
+			hit++
+		}
+	}
+	return
 }
