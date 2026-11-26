@@ -53,6 +53,7 @@ type look struct {
 	fontRef                                                                raster.FontRef
 	eyebrowTrack                                                           float64
 	eyebrowAsIs                                                            bool
+	emphasis                                                               color.Color
 }
 
 func colorOf(s string) color.Color {
@@ -83,7 +84,7 @@ func resolve(st timeline.Style, dir string, w, h int) (look, error) {
 	if subSize == 0 {
 		subSize = math.Round(0.65 * size)
 	}
-	l := look{fontRef: fr, face: raster.Tracked(raster.RefFace(fr, size), st.Tracking*size), eyebrowTrack: st.EyebrowTracking, eyebrowAsIs: st.EyebrowCase == "as-is", subFace: raster.RefFace(sr, subSize), size: size,
+	l := look{fontRef: fr, face: raster.Tracked(raster.RefFace(fr, size), st.Tracking*size), eyebrowTrack: st.EyebrowTracking, eyebrowAsIs: st.EyebrowCase == "as-is", emphasis: colorOf(st.Emphasis), subFace: raster.RefFace(sr, subSize), size: size,
 		color: colorOf(st.Color), subColor: colorOf(st.SubColor), highlight: colorOf(st.Highlight), hiBox: colorOf(st.HighlightBox), box: colorOf(st.Box),
 		accent: colorOf(st.Accent), outln: colorOf(st.Outline), shade: colorOf(st.Shadow), boxShade: colorOf(st.BoxShadow),
 		radius: st.Radius * size, padX: int(st.Pad * size), padY: int(0.6 * st.Pad * size),

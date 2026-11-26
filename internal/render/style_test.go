@@ -264,3 +264,16 @@ func TestCardIconTintedInAccent(t *testing.T) {
 		t.Errorf("the glyph should be drawn in the accent colour: %d px", n)
 	}
 }
+
+func TestStarWords(t *testing.T) {
+	plain, em := starWords(`Watch the *ongoing cost* now \*not starred\*`)
+	if plain != "Watch the ongoing cost now *not starred*" {
+		t.Errorf("plain %q", plain)
+	}
+	want := []bool{false, false, true, true, false, false, false}
+	for i := range want {
+		if em[i] != want[i] {
+			t.Errorf("word %d emphasised %v, want %v (%v)", i, em[i], want[i], em)
+		}
+	}
+}

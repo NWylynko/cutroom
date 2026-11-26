@@ -278,11 +278,24 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 				eb = o.Eyebrow
 			}
 			for _, t := range wrapText(ef, eb, mw) {
-				lines = append(lines, line{t, ef, c})
+				lines = append(lines, line{s: t, face: ef, c: c})
 			}
 		}
-		for _, t := range wrapText(l.face, l.text(o.Text), mw) {
-			lines = append(lines, line{t, l.face, l.color})
+		// *starred* words are the emphasis colour (default: the accent); the stars aren't drawn
+		emph := l.emphasis
+		if emph == nil {
+			emph = l.accent
+		}
+		plain, starred := starWords(l.text(o.Text))
+		k := 0
+		for _, t := range wrapText(l.face, plain, mw) {
+			ln := line{s: t, face: l.face, c: l.color}
+			for range strings.Fields(t) {
+				ln.em = append(ln.em, emph != nil && k < len(starred) && starred[k])
+				k++
+			}
+			ln.emC = emph
+			lines = append(lines, ln)
 		}
 		var icon image.Image
 		ts := 0 // icon tile size (px), and the room it takes left of the text
@@ -309,7 +322,7 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 		}
 		if o.Sub != "" {
 			for _, t := range wrapText(l.subFace, o.Sub, mw) {
-				lines = append(lines, line{t, l.subFace, l.subColor})
+				lines = append(lines, line{s: t, face: l.subFace, c: l.subColor})
 			}
 		}
 		tw, th := 0, 0
@@ -357,7 +370,7 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 			case "right":
 				lx += tw - lw
 			}
-			raster.StyledLine(img, ln.face, lx, cy+ln.face.Metrics().Ascent.Round(), []raster.Run{{S: ln.s, C: ln.c}}, l.textStyle())
+			raster.StyledLine(img, ln.face, lx, cy+ln.face.Metrics().Ascent.Round(), ln.runs(), l.textStyle())
 			cy += lineH(ln.face)
 		}
 		return img, r, nil
@@ -369,6 +382,46 @@ type line struct {
 	s    string
 	face font.Face
 	c    color.Color
+	em   []bool      // per word: drawn in emC
+	emC  color.Color // emphasis colour
+}
+
+// runs splits a line into coloured runs (its emphasised words in emC).
+func (ln line) runs() []raster.Run {
+	ws := strings.Fields(ln.s)
+	if len(ln.em) != len(ws) || ln.emC == nil {
+		return []raster.Run{{S: ln.s, C: ln.c}}
+	}
+	var out []raster.Run
+	for i, w := range ws {
+		c := ln.c
+		if ln.em[i] {
+			c = ln.emC
+		}
+		if i > 0 {
+			out = append(out, raster.Run{S: " ", C: c})
+		}
+		out = append(out, raster.Run{S: w, C: c})
+	}
+	return out
+}
+
+// starWords takes "Watch the *ongoing cost*" apart: the text without stars, and per word whether it
+// was starred (a "\*" is a literal star).
+func starWords(s string) (string, []bool) {
+	s = strings.ReplaceAll(s, `\*`, "\x00")
+	var words []string
+	var em []bool
+	in := false
+	for _, w := range strings.Fields(s) {
+		e := in || strings.HasPrefix(w, "*")
+		in = in != (strings.Count(w, "*")%2 == 1)
+		if clean := strings.ReplaceAll(w, "*", ""); clean != "" {
+			words = append(words, strings.ReplaceAll(clean, "\x00", "*"))
+			em = append(em, e)
+		}
+	}
+	return strings.Join(words, " "), em
 }
 
 func lineH(f font.Face) int {

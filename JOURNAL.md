@@ -2,6 +2,13 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 81 · 2026-11-27 · Emphasised words in card titles: `--text "Watch the *ongoing cost*"`
+Did: starred words in a card title are drawn in the emphasis colour (`style cards --emphasis`,
+default the accent); stars aren't drawn, `\*` is a literal star; wrapping and measuring see the
+plain text, each line is drawn as coloured runs.
+Measured: real deploying card: "WATCH THE / ONGOING COST" with the second line in Turf Green; test on
+the star parsing. e2e 315/315.
+
 ### 80 · 2026-11-27 · Eval r14 house-style: both pass; cards hold for reading time, eyebrow case
 Did: new T2 task `house-style` (evals/results/2026-11-27-14.md) with grader `card_color` — measured as
 what the cards add over the source at the same moment (the accent colour alone was useless: the

@@ -34,6 +34,7 @@ type Style struct {
 	Tracking        float64  `json:"tracking,omitempty"`      // letter-spacing, fraction of the font size
 	EyebrowTracking float64  `json:"eyebrow_tracking,omitempty"`
 	EyebrowCase     string   `json:"eyebrow_case,omitempty"` // upper (default) | as-is
+	Emphasis        string   `json:"emphasis,omitempty"`     // cards: colour of *starred* title words (default: accent)
 	Case            string   `json:"case,omitempty"`         // upper | upper-keep-names | lower | as-is
 	Align           string   `json:"align,omitempty"`        // left | center | right (lines inside the box)
 	X               *float64 `json:"x,omitempty"`            // centre of the box, 0–1 across
@@ -66,6 +67,7 @@ var StyleFields = []StyleField{
 	{"pad", "num", "box padding as a fraction of the font size", ""},
 	{"tracking", "num", "letter-spacing as a fraction of the font size (0.05 = airy capitals)", ""},
 	{"eyebrow-tracking", "num", "letter-spacing of a card's eyebrow label (default 0.14)", "cards"},
+	{"emphasis", "color", "colour of *starred words* in a card's title (default: the accent)", "cards"},
 	{"eyebrow-case", "enum:upper,as-is", "a card's eyebrow label in capitals (default) or as written", "cards"},
 	{"case", "enum:upper,upper-keep-names,lower,as-is", "letter case of captions and card titles (upper-keep-names: capitals, but iCloud, OAuth, GitHub stay as written)", ""},
 	{"align", "enum:left,center,right", "line alignment inside the box", ""},

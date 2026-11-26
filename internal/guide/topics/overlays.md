@@ -15,7 +15,8 @@ look at it: `cutroom look --output 7.75`
 - Layouts: `lower-third` (text default: left, above the bottom), `title` and `center` (big, centred),
   `top`, `corner` (top right; image default), `left` / `right` (vertically centred at that side — the
   empty side of the frame). `--sub` adds a smaller second line, `--eyebrow "Step 3"` a small label
-  above the title (capitals, in the card style's accent colour). `--icon glyph.png` puts a picture in a
+  above the title (capitals, in the card style's accent colour). In `--text`, `*starred words*` are
+  drawn in the emphasis colour (`style cards --emphasis`, default the accent): "Watch the *ongoing cost*". `--icon glyph.png` puts a picture in a
   rounded tile left of the text: a PNG with transparency (an icon glyph) is drawn in the accent
   colour on a light accent tile; an opaque picture fills the tile. Stroke SVG icons (Lucide and the
   like: path, circle, line, rect, polyline) are drawn directly — `--icon icons/house.svg`.
