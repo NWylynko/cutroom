@@ -160,3 +160,16 @@ func TestCropSpanAndHolds(t *testing.T) {
 		t.Errorf("a speaker at 0.76: outside a centred crop, inside one centred on them")
 	}
 }
+
+func TestL57_GPUScaleKeepsTheSourceShape(t *testing.T) {
+	// 4K landscape into a vertical 1080x1920 fill: scale to cover (3413x1920), never squash to 1080x1920
+	if w, h := gpuSize(true, 3840, 2160, 1080, 1920, 1); w != 3414 && w != 3412 || h != 1920 {
+		t.Errorf("fill: %dx%d, want ≈3413x1920", w, h)
+	}
+	if w, h := gpuSize(false, 3840, 2160, 1920, 1080, 1.2); w != 2304 || h != 1296 {
+		t.Errorf("fit with zoom 1.2: %dx%d, want 2304x1296", w, h)
+	}
+	if w, h := gpuSize(true, 0, 0, 1080, 1920, 1); w != 0 || h != 0 {
+		t.Errorf("unknown source size on a fill: no GPU scale, got %dx%d", w, h)
+	}
+}

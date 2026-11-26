@@ -180,6 +180,9 @@ func renderSources(p *project.Project) map[string]render.Source {
 	srcs := map[string]render.Source{}
 	for id, s := range p.Sources {
 		rs := render.Source{Path: p.Abs(s), HasAudio: s.Facts != nil && s.Facts.Audio != nil, Size: s.Size, ModTime: s.ModTime, Sync: s.Sync}
+		if s.Facts != nil && s.Facts.Video != nil {
+			rs.W, rs.H = s.Facts.Video.Width, s.Facts.Video.Height
+		}
 		if rs.HasAudio {
 			rs.AudioStart = s.Facts.Audio.Start
 		}

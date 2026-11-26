@@ -50,6 +50,7 @@ Categories: **INVARIANT** (built in, impossible to get wrong) · **DETECT** (`in
 | L25 | Display-matrix rotation −180: hardware frames aren't autorotated, render came out upside down. PNG stills hid it (ffmpeg rotates PNGs). | DETECT + CHECK: orientation is checked on an encoded sample, never a PNG. |
 | L26 | Two takes of one shoot came back rotated 0.45° and colour-shifted; region-mean colour matching made skin look sick. | GUIDE: show face crops of options to a human; NON-GOAL: automatic grading in v1. |
 | L27 | `loudnorm` outputs 192 kHz. | INVARIANT: always `-ar 48000` (or the timeline rate) on output. |
+| L57 | HDR sources are scaled on the GPU (`scale_vt`) before the rest of the chain; scaling a 16:9 picture straight to a 9:16 output size squashed every vertical short from HDR footage sideways (r62, real 4K HLG). | INVARIANT: the GPU pre-scale keeps the source's aspect (cover for fill, inside for fit); e2e renders a vertical short from the HDR fixture and `check`s its picture. |
 
 ## Transcripts (the agent's eyes and ears)
 

@@ -2,6 +2,23 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 62 · 2026-11-26 · Real 4K HLG short: vertical renders from HDR were squashed sideways (fixed, L57)
+Did: end-to-end styled short from another real production (securing take-2: 3840×2160 HLG, rotated
+180°): `short --look channel`, burned captions, a card, render. `check` FAILed picture/captions/
+overlay/tone and the frames showed why: the picture was squeezed ~2× sideways. HDR sources are
+scaled on the GPU (scale_vt) to the size the render asks for, and the render asked for the output
+size — 1080×1920 for a short — so a 16:9 picture became 9:16 before FrameFit's crop. New gpuSize:
+the source's own aspect, covering the output for fill, inside it for fit (× zoom); unknown size →
+no GPU scale. render.Source carries the displayed W×H; render Version 3 (old chunks re-render).
+New lesson L57 + TestL57; e2e renders a vertical short from the HDR fixture and checks its picture
+(confirmed it FAILs with the old code).
+Measured: re-render: picture ok (worst diff 1.9), captions, overlay, framing (speaker 0.73, crop
+0.57–0.89), tone ok. Render 17.5 s for 18.6 s of 4K HLG. make check green; e2e 281/281.
+Surprises: every earlier HDR check used landscape timelines, where output and source shapes agree —
+the bug only shows when the shapes differ. Phone footage is usually HLG, so this hit most shorts
+from phones.
+Next: T3-style review of styled shorts from all four productions.
+
 ### 61 · 2026-11-26 · `check` warns when a cropped render leaves the speaker out
 Did: new check item `framing` for filled (cropped) renders: finds the speaker in the main source over
 the span the edit uses (perceive.FindSpeaker) and compares with the crop (render.CropSpan/CropHolds,

@@ -257,6 +257,12 @@ expect "check HDR render: SDR, no rotation" 'format +1280x720, display rotation 
 expect "check HDR render: picture"   'ok   picture'                      cutroom check
 expect "check HDR render: tone"      'ok   tone +HDR \(HLG\) source tone-mapped' cutroom check
 expect "render says HDR tone-mapped"  'is HDR \(HLG\): tone-mapped to SDR bt709' cutroom render --preview
+# a vertical short from the HDR source: the GPU pre-scale must keep the picture's shape (r62: 9:16
+# fills from HDR were squashed sideways)
+cutroom transcribe --passes 1 >/dev/null 2>&1
+cutroom short --from "The first thing you need is an" --to "update command." --name vhdr --source talk-hdr >/dev/null
+expect "HDR short renders"           '720x1280'                           cutroom render out/vhdr.mp4 --project shorts/vhdr
+expect "HDR short: picture not squashed" 'ok   picture'                   cutroom check out/vhdr.mp4 --project shorts/vhdr
 popd >/dev/null
 
 # overlays: text and image cards anchored to words; rendered, looked at and checked frame-exactly

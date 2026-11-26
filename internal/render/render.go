@@ -25,7 +25,7 @@ import (
 )
 
 // Version is part of every cache key; bump when output would change.
-const Version = 2 // 2: HDR sources tone-mapped to SDR bt709 (L23)
+const Version = 3 // 2: HDR sources tone-mapped to SDR bt709 (L23); 3: GPU pre-scale keeps the source shape (filled HDR frames were squashed)
 
 type Source struct {
 	Path       string
@@ -34,6 +34,7 @@ type Source struct {
 	Size       int64
 	ModTime    time.Time
 	Sync       *align.Sync // set when this source's audio is aligned to another source
+	W, H       int         // picture as displayed (rotation applied); 0 = unknown
 }
 
 type Options struct {
@@ -263,7 +264,8 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 		dur := lead + float64(nf+3)/tl.Rate() // 3 spare frames (L09)
 		z := g.ZoomOf()
 		// HDR → SDR bt709 on the way in (L23); a zoomed segment needs z× the pixels before its crop
-		sdr := media.ReadSDR(s.Path, even(float64(w)*z), even(float64(h)*z))
+		gw, gh := gpuSize(tl.Fill, s.W, s.H, w, h, z)
+		sdr := media.ReadSDR(s.Path, gw, gh)
 		args = append(args, "-ss", f6(seek), "-t", f6(dur))
 		args = append(args, sdr.Pre...)
 		args = append(args, "-i", s.Path)
@@ -858,4 +860,23 @@ func CropHolds(ax, x float64, vw, vh, w, h int) bool {
 	lo, hi := CropSpan(ax, vw, vh, w, h)
 	m := 0.1 * (hi - lo)
 	return x >= lo+m && x <= hi-m
+}
+
+// gpuSize is the size a hardware-decoded (HDR) source may be scaled to on the GPU before the rest
+// of the chain: the output size × zoom when the shapes match, but with the source's own aspect kept
+// — covering the output for a filled (cropped) frame, inside it for a fitted one — so FrameFit's
+// crop sees an undistorted picture. Unknown source size: no GPU scale (0, 0).
+func gpuSize(fill bool, sw, sh, w, h int, z float64) (int, int) {
+	if sw <= 0 || sh <= 0 {
+		if fill {
+			return 0, 0
+		}
+		return even(float64(w) * z), even(float64(h) * z)
+	}
+	fx, fy := float64(w)/float64(sw), float64(h)/float64(sh)
+	f := math.Min(fx, fy)
+	if fill {
+		f = math.Max(fx, fy)
+	}
+	return even(float64(sw) * f * z), even(float64(sh) * f * z)
 }

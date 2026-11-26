@@ -83,7 +83,11 @@ func runRender(c *Ctx) (*Result, error) {
 	}
 	srcs := map[string]render.Source{}
 	for id, s := range e.p.Sources {
-		srcs[id] = render.Source{Path: e.p.Abs(s), HasAudio: s.Facts.Audio != nil, Size: s.Size, ModTime: s.ModTime, Sync: s.Sync}
+		rs := render.Source{Path: e.p.Abs(s), HasAudio: s.Facts.Audio != nil, Size: s.Size, ModTime: s.ModTime, Sync: s.Sync}
+		if s.Facts.Video != nil {
+			rs.W, rs.H = s.Facts.Video.Width, s.Facts.Video.Height
+		}
+		srcs[id] = rs
 		if s.Facts.Audio != nil {
 			v := srcs[id]
 			v.AudioStart = s.Facts.Audio.Start
