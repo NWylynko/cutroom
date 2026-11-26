@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"github.com/NWylynko/cutroom/internal/perceive"
+	"github.com/NWylynko/cutroom/internal/render"
 	"math"
 	"os"
 	"path/filepath"
@@ -162,7 +163,7 @@ func runShort(c *Ctx) (*Result, error) {
 	if !c.Has("anchor") || c.Str("anchor") == "auto" {
 		ax, frameNote = speakerAnchor(p.Abs(s), a, b-a)
 		tl.FillX = ax
-	} else if sp := perceive.FindSpeaker(p.Abs(s), a, b-a); sp.Found && !cropHolds(ax, sp.X, s.Facts.Video.Width, s.Facts.Video.Height, w, h) {
+	} else if sp := perceive.FindSpeaker(p.Abs(s), a, b-a); sp.Found && !render.CropHolds(ax, sp.X, s.Facts.Video.Width, s.Facts.Video.Height, w, h) {
 		frameNote = fmt.Sprintf("WARN the speaker is at x %.2f, outside a crop centred on %.2f: `cutroom edit frame --anchor auto --project %s` frames them", sp.X, ax, relToCwd(dir))
 	}
 	tl.Keep(src, a, b, "short")
@@ -237,12 +238,4 @@ func speakerAnchor(path string, start, dur float64) (float64, string) {
 		return 0.5, "framing: no speaker found in the picture (nothing skin-coloured moves), so the crop is centred — look at it (`cutroom look --output 1`) and set `edit frame --anchor x,y` if someone should be in it"
 	}
 	return sp.X, fmt.Sprintf("framing: on the speaker, found at x %.2f (skin and movement; check it with `cutroom look --output 1`, move it with `edit frame --anchor x,y`)", sp.X)
-}
-
-// cropHolds says whether a w:h crop of a vw×vh picture centred on ax keeps x (0–1) inside it, with
-// a margin of a tenth of the crop each side.
-func cropHolds(ax, x float64, vw, vh, w, h int) bool {
-	cw := cropHeight(vw, vh, w, h) * float64(w) / float64(h) / float64(vw) // crop width, 0–1
-	lo := math.Max(0, math.Min(1-cw, ax-cw/2))
-	return x >= lo+0.1*cw && x <= lo+0.9*cw
 }

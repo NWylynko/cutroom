@@ -147,3 +147,16 @@ func TestAccentFollowsRoundedCorners(t *testing.T) {
 		t.Errorf("accent bar missing at mid-height: %v", c)
 	}
 }
+
+func TestCropSpanAndHolds(t *testing.T) {
+	lo, hi := CropSpan(0.5, 1920, 1080, 1080, 1920)
+	if lo < 0.34 || lo > 0.35 || hi < 0.65 || hi > 0.66 {
+		t.Errorf("centre crop of 16:9 → 9:16 keeps %.3f–%.3f, want ≈0.342–0.658", lo, hi)
+	}
+	if lo, hi := CropSpan(0.95, 1920, 1080, 1080, 1920); hi != 1 || lo < 0.68 {
+		t.Errorf("a crop near the edge stays inside the picture: %.3f–%.3f", lo, hi)
+	}
+	if CropHolds(0.5, 0.76, 1920, 1080, 1080, 1920) || !CropHolds(0.76, 0.76, 1920, 1080, 1080, 1920) {
+		t.Errorf("a speaker at 0.76: outside a centred crop, inside one centred on them")
+	}
+}

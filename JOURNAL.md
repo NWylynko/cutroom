@@ -2,6 +2,16 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 61 · 2026-11-26 · `check` warns when a cropped render leaves the speaker out
+Did: new check item `framing` for filled (cropped) renders: finds the speaker in the main source over
+the span the edit uses (perceive.FindSpeaker) and compares with the crop (render.CropSpan/CropHolds,
+shared with `short`'s anchor warning). Pass names where they are; warn says the crop span and how
+to fix (`edit frame --anchor auto`); no item when the source has no one in it (screen recordings,
+the colour-bar fixtures).
+Measured: real footage — the desk-framed GitHub short (crop 0.34–0.66, speaker 0.76): WARN; the
+re-framed one (crop 0.60–0.92): ok. make check green; e2e 279/279.
+Next: back to look/feel — real-footage reviews of a styled short end to end (T3 with a look).
+
 ### 60 · 2026-11-26 · Shorts frame the speaker by default (`edit frame --anchor auto`)
 Did: `short` cropped the centre unless told otherwise; on the real footage the speaker sits at
 x≈0.74 and the short showed an empty desk (every check passed). New perceive.FindSpeaker: 16 frames

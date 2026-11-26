@@ -15,6 +15,7 @@ file). It measures the file itself:
 | clipped-word | a cut goes through a word; cut by words instead |
 | stray-sound | sound with no words kept (breath, bump, piece of a cut take) |
 | loudness | integrated loudness / peak vs the render settings |
+| framing | a cropped (vertical) render leaves out the speaker the source shows (found by skin-coloured movement): `edit frame --anchor auto` |
 | stale | the timeline changed after this render: render again |
 
 `PASS` with warnings is not automatically done: read each `WARN` and either fix it or decide it is

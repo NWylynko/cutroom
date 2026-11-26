@@ -8,6 +8,7 @@ import (
 	"bytes"
 	"fmt"
 	"github.com/NWylynko/cutroom/internal/align"
+	"github.com/NWylynko/cutroom/internal/perceive"
 	"math"
 	"os"
 	"os/exec"
@@ -120,6 +121,7 @@ func Check(file string, m *render.Manifest, o Options) (*Report, error) {
 	pictureCheck(file, m, fps, r)
 	overlayCheck(file, m, fps, r)
 	safeZoneCheck(m, r)
+	framingCheck(m, r)
 	toneCheck(file, m, fps, r)
 
 	// 3. sync per segment + 4. words + 5. edges — all need audio
@@ -1299,4 +1301,48 @@ func safeZoneCheck(m *render.Manifest, r *Report) {
 		it.Detail = fmt.Sprintf("%d overlay box(es) inside the vertical safe zones (y %d–%d, x ≤ %d)", n, top, bottom, right)
 	}
 	r.add(it)
+}
+
+// framingCheck: a filled (cropped) render keeps the speaker the source shows in its crop. The
+// speaker is found in the source over the span the edit uses (skin-coloured movement); nothing is
+// said when the source has no one in it.
+func framingCheck(m *render.Manifest, r *Report) {
+	if !m.Fill || len(m.Segments) == 0 {
+		return
+	}
+	dur := map[string]float64{}
+	lo, hi := map[string]float64{}, map[string]float64{}
+	main := ""
+	for _, g := range m.Segments {
+		if _, ok := lo[g.Source]; !ok {
+			lo[g.Source], hi[g.Source] = g.In, g.Out
+		}
+		lo[g.Source], hi[g.Source] = math.Min(lo[g.Source], g.In), math.Max(hi[g.Source], g.Out)
+		dur[g.Source] += g.Out - g.In
+		if main == "" || dur[g.Source] > dur[main] {
+			main = g.Source
+		}
+	}
+	src, ok := m.Sources[main]
+	if !ok {
+		return
+	}
+	_, vw, vh, rot, _ := probeVideo(src.Path)
+	if rot == 90 || rot == 270 {
+		vw, vh = vh, vw
+	}
+	if vw == 0 || vh == 0 {
+		return
+	}
+	sp := perceive.FindSpeaker(src.Path, lo[main], hi[main]-lo[main])
+	if !sp.Found {
+		return
+	}
+	a, b := render.CropSpan(m.FillX, vw, vh, m.Width, m.Height)
+	if render.CropHolds(m.FillX, sp.X, vw, vh, m.Width, m.Height) {
+		r.add(Item{Check: "framing", Status: "pass", Detail: fmt.Sprintf("the speaker (found at x %.2f of %s) is inside the crop (%.2f–%.2f)", sp.X, main, a, b)})
+		return
+	}
+	r.add(Item{Check: "framing", Status: "warn", Detail: fmt.Sprintf("the speaker is at x %.2f of %s, but the crop keeps %.2f–%.2f: they are cut off or out of the picture", sp.X, main, a, b),
+		Fix: "`cutroom edit frame --anchor auto` (or --anchor x,y), render again, look at it"})
 }

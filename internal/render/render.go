@@ -842,3 +842,20 @@ func cardMotion(co ChunkOverlay, w, h int, fps float64) (crop, x, y string) {
 	}
 	return crop, cx, cy
 }
+
+// CropSpan is the part of a vw×vh picture (0–1 across) a w:h fill crop centred on ax keeps.
+func CropSpan(ax float64, vw, vh, w, h int) (lo, hi float64) {
+	cw := 1.0
+	if float64(vw)/float64(vh) > float64(w)/float64(h) {
+		cw = float64(vh) * float64(w) / float64(h) / float64(vw)
+	}
+	lo = math.Max(0, math.Min(1-cw, ax-cw/2))
+	return lo, lo + cw
+}
+
+// CropHolds says whether that crop keeps x inside it, with a tenth of the crop's width spare each side.
+func CropHolds(ax, x float64, vw, vh, w, h int) bool {
+	lo, hi := CropSpan(ax, vw, vh, w, h)
+	m := 0.1 * (hi - lo)
+	return x >= lo+m && x <= hi-m
+}
