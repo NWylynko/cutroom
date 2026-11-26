@@ -2,6 +2,15 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 71 · 2026-11-27 · `short --cut-asides`, and `short` names asides inside its span
+Did: r13's most repeated friction (short ×2, styled-short): `short` kept the "By the way, my cat…"
+aside inside the span and only `timeline` warned. `short` now lists each aside inside the span with a
+pointer to the fix, and `--cut-asides` cuts them in the same call (word-exact CutWords, listed with
+the source range).
+Measured: fixture: with the flag, 7.533 s and the aside gone (3 segments); without, a named line.
+e2e 303/303 (+2).
+Next: `sync` shift-direction sentence; then back to real footage.
+
 ### 70 · 2026-11-27 · Eval round 13: 17/17 PASS; four low friction fixes
 Did: T2 round over all 13 tasks with sonnet + 4 with haiku (evals/results/2026-11-27-13.md). The
 account's usage limit stopped every agent mid-run; resumed after the reset, none restarted. All 17

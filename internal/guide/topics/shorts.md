@@ -25,8 +25,9 @@ Short-form defaults (L41):
   `edit frame --fit` keeps the whole picture with bars instead — `--bars blur` (the picture blurred
   behind itself, as many shorts do), `--bars "#101718"` (a colour) or black.
 - Pads at cuts 0.06 s before / 0.16 s after; every pause tightened to ~0.2 s.
-- Open on the claim and drop every aside: `short` keeps everything between --from and --to, so read
-  `cutroom timeline --project …` sentence by sentence and cut asides as in any edit (`edit cut`).
+- Open on the claim and drop every aside: `short` keeps everything between --from and --to, but
+  names any aside it finds there; `--cut-asides` cuts them in the same call ("By the way, my cat…").
+  Still read `cutroom timeline --project …` sentence by sentence and cut side points (`edit cut`).
   It warns above 60 s.
 - Safe zones: on a vertical frame the app's title bar, buttons and caption area cover the top
   (above y 260 of 1920), the bottom (below y 1490) and the right 120 px. Title, lower-third and

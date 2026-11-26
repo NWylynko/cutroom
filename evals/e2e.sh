@@ -361,8 +361,10 @@ S="$W/shorts"; mkdir -p "$S"; cp $FIX/talk.mp4 "$S/"; pushd "$S" >/dev/null
 cutroom init talk.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null
 expect "short made"                 '1080x1920, picture filled and cropped around 0\.50' cutroom short --from "The first thing you need is an" --to "update command." --name steps --size 1080x1920
 expect "short sizes to a 720p source" 'size 720x1280: the 1280x720 source.s 9:16 crop is 720 px tall' sh -c 'cutroom timeline --project shorts/steps >/dev/null; cutroom short --from "Then install" --to "on it." --name s2'
+expect "short names an aside inside" 'aside inside the short: "By the way' cutroom short --from "The first thing you need is an" --to "update command." --name withaside
+expect "short --cut-asides"          'cut the aside "By the way, my cat'  cutroom short --from "The first thing you need is an" --to "update command." --name noaside --cut-asides
 expect "short exists refused"       'shorts/steps already exists'        cutroom short --from "Then install" --to "on it." --name steps
-expect "status lists shorts"        'shorts: shorts/s2 .*shorts/steps'   cutroom status
+expect "status lists shorts"        'shorts: .*shorts/s2 .*shorts/steps'   cutroom status
 expect "one-token flag split"       'segment'                            cutroom timeline "--project shorts/steps"
 expect "frame fit with blur bars"    'fits 720x1280 \(blur bars'         cutroom edit frame --fit --bars blur --project shorts/s2
 expect "frame bad bars"              'not a colour'                       cutroom edit frame --fit --bars "#zz" --project shorts/s2

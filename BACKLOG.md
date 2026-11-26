@@ -7,8 +7,6 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- [friction r13, low] `short` keeps an aside inside its span (WARN + fix): offer `short --cut-asides`
-  or put its cut first in next: (short sonnet/haiku, styled-short sonnet).
 - [friction r13, low] `sync`: say the shift in one sentence ("mic is shifted 1.700 s later") and show
   per-segment residuals before rendering (recorder haiku).
 - [friction r13, low] `timeline --joins` with each join's listened level (tighten haiku); `check` one

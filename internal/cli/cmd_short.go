@@ -52,6 +52,7 @@ vertical safe zones (nothing above y 260, below y 1490 or in the right 120 px of
 			{Name: "occurrence", Kind: "int", Help: "Pick the Nth --from match when words repeat"},
 			{Name: "source", Kind: "string", Help: "Only match words in this source"},
 			{Name: "look", Kind: "string", Help: "A saved look for its captions and cards (`cutroom style looks`)"},
+			{Name: "cut-asides", Kind: "bool", Help: "Also cut the off-topic asides found inside the span (\"By the way…\"); each is listed"},
 		},
 		Run: runShort,
 	})
@@ -189,6 +190,36 @@ func runShort(c *Ctx) (*Result, error) {
 	}
 	tl.Keep(src, a, b, "short")
 	tr := tl.Tighten(e.tr, shortMinCut)
+	var asideLines []string
+	if tx := e.tr[src]; tx != nil {
+		{
+			for _, su := range tx.Suspects {
+				if su.Kind != "aside" || su.Start < a || su.End > b || !tl.Kept(src, (su.Start+su.End)/2) {
+					continue
+				}
+				i0, j0 := -1, -1
+				for k, w := range tx.Words {
+					if w.Start >= su.Start-0.01 && w.End <= su.End+0.01 {
+						if i0 < 0 {
+							i0 = k
+						}
+						j0 = k
+					}
+				}
+				if i0 < 0 {
+					continue
+				}
+				if !c.Bool("cut-asides") {
+					asideLines = append(asideLines, fmt.Sprintf("  aside inside the short: %q — make it with --cut-asides to cut it, or cut it now (`cutroom timeline --project %s` gives the command)", ellipsize(speech.Text(tx.Words, i0, j0), 60), relToCwd(dir)))
+					continue
+				}
+				r := tl.CutWords(src, tx.Words, i0, j0, "aside")
+				if r.To > r.From {
+					asideLines = append(asideLines, fmt.Sprintf("  cut the aside %q (%s %s–%s; to keep it, make the short without --cut-asides)", speech.Text(tx.Words, i0, j0), src, clock(r.From), clock(r.To)))
+				}
+			}
+		}
+	}
 	if err := timeline.Checkpoint(dir, cacheDir(sp), fmt.Sprintf("short --from %q --to %q", c.Str("from"), c.Str("to"))); err != nil {
 		return nil, err
 	}
@@ -204,6 +235,7 @@ func runShort(c *Ctx) (*Result, error) {
 	if frameNote != "" {
 		lines = append(lines, "  "+frameNote)
 	}
+	lines = append(lines, asideLines...)
 	if soundNote != "" {
 		lines = append(lines, "  "+soundNote)
 	}
