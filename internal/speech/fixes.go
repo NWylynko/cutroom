@@ -1,7 +1,9 @@
 package speech
 
 import (
+	"crypto/sha256"
 	"encoding/json"
+	"fmt"
 	"math"
 	"os"
 	"path/filepath"
@@ -101,4 +103,63 @@ func (t *Transcript) replaceWords(a, b int, to string) {
 		at += d
 	}
 	t.Words = append(t.Words[:a], append(nw, t.Words[b+1:]...)...)
+}
+
+// Vocab is a project's word list: names and terms the recogniser should spell as given (OAuth,
+// iCloud, GitHub). It is the recogniser's prompt, and part of every transcript's cache key.
+func vocabPath(cacheDir string) string { return filepath.Join(cacheDir, "transcripts", "vocab.json") }
+
+// LoadVocab reads the project's word list.
+func LoadVocab(cacheDir string) []string {
+	b, err := os.ReadFile(vocabPath(cacheDir))
+	if err != nil {
+		return nil
+	}
+	var v []string
+	_ = json.Unmarshal(b, &v)
+	return v
+}
+
+// SaveVocab writes the project's word list (empty removes it).
+func SaveVocab(cacheDir string, v []string) error {
+	if len(v) == 0 {
+		err := os.Remove(vocabPath(cacheDir))
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(vocabPath(cacheDir)), 0o755); err != nil {
+		return err
+	}
+	b, _ := json.Marshal(v)
+	return os.WriteFile(vocabPath(cacheDir), append(b, '\n'), 0o644)
+}
+
+// ParseVocab splits "OAuth, iCloud; GitHub" into words.
+func ParseVocab(s string) []string {
+	var out []string
+	for _, f := range strings.FieldsFunc(s, func(r rune) bool { return r == ',' || r == ';' || r == '\n' }) {
+		if f = strings.TrimSpace(f); f != "" {
+			out = append(out, f)
+		}
+	}
+	return out
+}
+
+// VocabPrompt is the recogniser prompt that teaches it the words ("" for none): whisper takes the
+// prompt as text that came before, so a glossary line makes it spell those words that way.
+func VocabPrompt(v []string) string {
+	if len(v) == 0 {
+		return ""
+	}
+	return "Glossary: " + strings.Join(v, ", ") + "."
+}
+
+// KeyWithVocab extends a transcript key with the word list, so a changed list re-transcribes.
+func KeyWithVocab(key string, v []string) string {
+	if len(v) == 0 {
+		return key
+	}
+	return key + "-v" + fmt.Sprintf("%x", sha256.Sum256([]byte(strings.Join(v, "\x00"))))[:8]
 }

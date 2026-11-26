@@ -389,6 +389,9 @@ expect "style undo"                  'undid'                              cutroo
 expect "style animate"               'now set: .*animate=pop'                  cutroom style captions --animate pop --project shorts/steps
 expect "style animate: how to see it" 'to see the motion, render' cutroom style o1 --animate-time 0.4 --project shorts/steps
 expect "style animate cards"         'now set: animate=slide-up'             cutroom style cards --animate slide-up --project shorts/steps
+expect "transcribe --vocab"          'vocabulary \(2\): ThinkPad, Ubuntu' cutroom transcribe --vocab "ThinkPad, Ubuntu" --passes 1 --project shorts/steps
+expect "vocab re-transcribes once"   'talk .*cached'                      cutroom transcribe --passes 1 --project shorts/steps
+expect "vocab cleared"               'vocabulary cleared'                 cutroom transcribe --vocab none --passes 1 --project shorts/steps
 expect "transcript --fix"            'fixed talk "old laptop" → "old ThinkPad"' cutroom transcript --fix "old laptop" --as "old ThinkPad" --project shorts/steps
 expect "fix shows in captions"       'ThinkPad'                           cutroom captions --burn --dry-run --all --project shorts/steps
 expect "fix listed"                  'talk: "old laptop" → "old ThinkPad"' cutroom transcript --fixes --project shorts/steps

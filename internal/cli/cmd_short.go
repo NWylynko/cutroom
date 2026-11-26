@@ -137,6 +137,9 @@ func runShort(c *Ctx) (*Result, error) {
 		return nil, err
 	}
 	speech.CopyFixes(cacheDir(p), cacheDir(sp))
+	if v := speech.LoadVocab(cacheDir(p)); len(v) > 0 {
+		_ = speech.SaveVocab(cacheDir(sp), v)
+	}
 	for id := range e.tr {
 		b, err := os.ReadFile(speech.TranscriptPath(cacheDir(p), id))
 		if err != nil {

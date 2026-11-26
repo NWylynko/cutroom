@@ -269,3 +269,16 @@ func TestBorrowPunctuationFromTheCamera(t *testing.T) {
 		t.Errorf("borrowed %d, words %+v", n, rec.Words)
 	}
 }
+
+func TestVocabKeyAndPrompt(t *testing.T) {
+	v := ParseVocab(" OAuth, iCloud;GitHub ,, ")
+	if len(v) != 3 || v[1] != "iCloud" {
+		t.Fatalf("parsed %q", v)
+	}
+	if KeyWithVocab("k", nil) != "k" || KeyWithVocab("k", v) == "k" || KeyWithVocab("k", v) == KeyWithVocab("k", v[:2]) {
+		t.Errorf("a different word list must give a different transcript key")
+	}
+	if p := VocabPrompt(v); p != "Glossary: OAuth, iCloud, GitHub." {
+		t.Errorf("prompt %q", p)
+	}
+}

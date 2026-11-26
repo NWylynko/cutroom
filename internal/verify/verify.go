@@ -552,7 +552,7 @@ func rms(x []float64) float64 {
 // --- words -----------------------------------------------------------------------------------
 
 func wordCheck(renderWav, tmp string, m *render.Manifest, o Options, r *Report) {
-	raw, err := speech.Whisper(o.Model, renderWav, "", tmp)
+	raw, err := speech.Whisper(o.Model, renderWav, speech.VocabPrompt(speech.LoadVocab(o.CacheDir)), tmp)
 	if err != nil {
 		r.add(Item{Check: "words", Status: "warn", Detail: "could not re-transcribe the render: " + err.Error()})
 		return

@@ -2,6 +2,17 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 67 · 2026-11-26 · Project vocabulary for the recogniser (`transcribe --vocab`)
+Did: names come out wrong first time ("work providers" for OAuth). `cutroom transcribe --vocab
+"OAuth, iCloud, GitHub"` keeps a per-project word list (transcripts/vocab.json; copied into shorts,
+"none" clears) that becomes whisper's prompt ("Glossary: …", also ahead of the disfluency prompt on
+pass 2) and part of the transcript cache key, so a changed list re-transcribes once. `check`'s
+re-transcription uses it too, so its word check hears the same spellings.
+Measured: real securing take-2 (13:26, 31.6 s): "other OAuth providers" (was "other work
+providers"), "passkeys" (was "pass keys"). One over-reach: "auth options" heard as "OAuth options" —
+the guide says to list only words really said. e2e 296/296 (+3).
+Next: back to footage — a horizontal (landscape) edit with the new looks/cards, not only shorts.
+
 ### 66 · 2026-11-26 · Misheard words: flagged before burning, fixed with `transcript --fix`
 Did: r65's reviewer found "work providers" (OAuth) and "greater" (great at) burned into captions.
 `captions --burn` now lists the edit's doubtful words (low confidence, or the two recognition passes

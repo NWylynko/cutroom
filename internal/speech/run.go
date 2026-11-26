@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 )
 
@@ -14,6 +15,7 @@ type Options struct {
 	Passes   int    // 1 or 2
 	CacheDir string // <project>/.cutroom
 	Force    bool
+	Vocab    []string // names and terms to spell as given (the recogniser's prompt)
 }
 
 // Key identifies a transcript's inputs; a different key means re-transcribe.
@@ -88,13 +90,13 @@ func Transcribe(id, src string, audioStart, duration float64, key string, o Opti
 	}
 	defer os.RemoveAll(tmp)
 
-	raw, err := Whisper(o.Model, wav, "", tmp)
+	raw, err := Whisper(o.Model, wav, VocabPrompt(o.Vocab), tmp)
 	if err != nil {
 		return nil, false, err
 	}
 	words, sus := Build(raw, env, audioStart, duration)
 	if o.Passes >= 2 {
-		raw2, err := Whisper(o.Model, wav, DisfluencyPrompt, tmp)
+		raw2, err := Whisper(o.Model, wav, strings.TrimSpace(VocabPrompt(o.Vocab)+" "+DisfluencyPrompt), tmp)
 		if err != nil {
 			return nil, false, err
 		}

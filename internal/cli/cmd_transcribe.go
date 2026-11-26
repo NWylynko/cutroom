@@ -30,11 +30,14 @@ By default two passes run (normal + one prompted to keep stumbles) and their dif
 suspects; --passes 1 halves the time.
 Examples:
   cutroom transcribe
-  cutroom transcribe talk --passes 1`,
+  cutroom transcribe talk --passes 1
+  cutroom transcribe --vocab "OAuth, iCloud, GitHub, Firebase"   names spelt right (re-transcribes;
+                                         kept for the project and for shorts made from it)`,
 		Flags: []Flag{
 			{Name: "passes", Kind: "int", Default: "2", Help: "1 or 2 recognition passes"},
 			{Name: "model", Kind: "string", Help: "whisper.cpp model file (default: best found by `cutroom doctor`)"},
 			{Name: "force", Kind: "bool", Help: "Ignore the cache"},
+			{Name: "vocab", Kind: "string", Help: "Names and terms to spell as given, comma-separated (\"OAuth, iCloud, GitHub\"); kept for the project; \"none\" clears it"},
 		},
 		Run: runTranscribe,
 	})
@@ -115,6 +118,21 @@ func runTranscribe(c *Ctx) (*Result, error) {
 		}
 	}
 	var lines []string
+	vocab := speech.LoadVocab(cacheDir(p))
+	if c.Has("vocab") {
+		vocab = speech.ParseVocab(c.Str("vocab"))
+		if strings.EqualFold(strings.TrimSpace(c.Str("vocab")), "none") {
+			vocab = nil
+		}
+		if err := speech.SaveVocab(cacheDir(p), vocab); err != nil {
+			return nil, err
+		}
+		if len(vocab) > 0 {
+			lines = append(lines, fmt.Sprintf("vocabulary (%d): %s — the recogniser spells these as given", len(vocab), strings.Join(vocab, ", ")))
+		} else {
+			lines = append(lines, "vocabulary cleared")
+		}
+	}
 	type sum struct {
 		ID       string  `json:"id"`
 		Words    int     `json:"words"`
@@ -137,9 +155,9 @@ func runTranscribe(c *Ctx) (*Result, error) {
 			return nil, err
 		}
 		t0 := time.Now()
-		key := speech.Key(s.Size, s.ModTime, model, passes)
+		key := speech.KeyWithVocab(speech.Key(s.Size, s.ModTime, model, passes), vocab)
 		t, cached, err := speech.Transcribe(id, p.Abs(s), s.Facts.Audio.Start, s.Facts.Duration, key,
-			speech.Options{Model: model, Passes: passes, CacheDir: cacheDir(p), Force: c.Bool("force")})
+			speech.Options{Model: model, Passes: passes, CacheDir: cacheDir(p), Force: c.Bool("force"), Vocab: vocab})
 		if err != nil {
 			return nil, Errf(ExitExternal, "transcribe-failed", "run `cutroom doctor`; if it passes, retry with --passes 1", "%s: %v", id, err)
 		}
@@ -174,8 +192,9 @@ func transcribeFile(p *project.Project, path string) (*speech.Transcript, error)
 	}
 	abs, _ := filepath.Abs(path)
 	id := "file-" + speech.Key(st.Size(), st.ModTime(), abs, 1)
-	t, _, err := speech.Transcribe(id, path, f.Audio.Start, f.Duration, speech.Key(st.Size(), st.ModTime(), model, 1),
-		speech.Options{Model: model, Passes: 1, CacheDir: cacheDir(p)})
+	vocab := speech.LoadVocab(cacheDir(p))
+	t, _, err := speech.Transcribe(id, path, f.Audio.Start, f.Duration, speech.KeyWithVocab(speech.Key(st.Size(), st.ModTime(), model, 1), vocab),
+		speech.Options{Model: model, Passes: 1, CacheDir: cacheDir(p), Vocab: vocab})
 	if err != nil {
 		return nil, Errf(ExitExternal, "transcribe-failed", "run `cutroom doctor`", "%v", err)
 	}

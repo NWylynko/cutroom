@@ -1,7 +1,12 @@
 <!-- summary: reading transcripts, suspects, and how far to trust word times -->
 # Perceive: what was said, and where
 
-`cutroom transcribe` makes a word-level transcript of every source with audio (cached). Then:
+`cutroom transcribe` makes a word-level transcript of every source with audio (cached). Names and
+jargon come out wrong ("work providers" for OAuth providers): give them once with `cutroom transcribe
+--vocab "OAuth, iCloud, GitHub"` — the recogniser spells them as given, the list is kept for the
+project (and its shorts), and `check` hears with it too. List only words that are really said: the
+list nudges the recogniser towards them. A single wrong word left over: `transcript --fix` (captions).
+Then:
 
 - `cutroom transcript` — one line per phrase with its time range and the pause after it. Read this
   first; it is the fastest way to understand a recording. Retakes stand out as repeated openings.
