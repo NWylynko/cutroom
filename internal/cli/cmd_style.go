@@ -26,7 +26,7 @@ func init() {
 	setFlags := append(append([]string{}, names...), "reset", "dry-run")
 	Register(&Command{
 		Name:     "style",
-		Args:     "[captions|cards|<overlay id>|fonts] [font query]",
+		Args:     "[captions|cards|<overlay id>|fonts|save|use|looks] [name]",
 		MaxArgs:  2,
 		Category: "edit",
 		Summary:  "The look of burned-in captions and text cards: font, size, colours, box, outline, place",
@@ -38,6 +38,10 @@ func init() {
   style o3 --x 0.3 --y 0.2 --align left    one text card (over the card style)
   style captions --color default           unset one field; --reset unsets them all
   style fonts [avenir]                     installed fonts you can name with --font
+  style save channel                       keep this project's caption + card look as "channel"
+  style use channel                        give another project (or short) that look in one call;
+                                           also: cutroom short … --look channel
+  style looks                              saved looks (a path like looks/brand.json works too)
 Colours: #rrggbb, #rrggbbaa (aa = opacity, e.g. #00000099) or a name; "none" turns a box, outline,
 shadow, accent or highlight off. Sizes are fractions of the frame's short side; --x/--y put the centre
 of the box at that point of the frame (0–1 across, down); --pad/--radius/--outline-width are fractions
@@ -49,6 +53,9 @@ reaches where the apps draw their own buttons (L41).`,
 			"captions": {Usage: "  style captions [--font …] [--size …] [--color …] [--highlight …] [--words …] …   burned-in captions", Flags: setFlags},
 			"cards":    {Usage: "  style cards [--font …] [--box …] [--accent …] …   every text card (each can override: style <id>)", Flags: setFlags},
 			"fonts":    {Usage: "  style fonts [query]   installed fonts (name them with --font)"},
+			"save":     {Usage: "  style save <name|file.json>   keep this project's caption and card look (fonts by file are stored as absolute paths)", Flags: []string{"dry-run"}},
+			"use":      {Usage: "  style use <name|file.json>    replace this project's caption and card look with a saved one (undoable; per-card styles stay)", Flags: []string{"dry-run"}},
+			"looks":    {Usage: "  style looks   saved looks and what each sets"},
 		},
 		Run: runStyle,
 	})
@@ -62,9 +69,77 @@ func runStyle(c *Ctx) (*Result, error) {
 	if what == "fonts" {
 		return styleFonts(c)
 	}
+	if what == "looks" {
+		names := lookNames()
+		if len(names) == 0 {
+			return &Result{Text: fmt.Sprintf("no saved looks in %s: set one up in a project (`cutroom style captions …`), then `cutroom style save <name>`", looksDir())}, nil
+		}
+		lines := []string{fmt.Sprintf("saved looks (%s):", looksDir())}
+		for _, n := range names {
+			lk, _, err := loadLook(n)
+			if err != nil {
+				lines = append(lines, fmt.Sprintf("  %-14s (unreadable: %v)", n, err))
+				continue
+			}
+			lines = append(lines, fmt.Sprintf("  %-14s %s", n, lookSummary(lk)))
+		}
+		return &Result{Text: strings.Join(lines, "\n"), Next: []string{"cutroom style use <name>"}}, nil
+	}
 	e, err := loadEditEnv(c, false)
 	if err != nil {
 		return nil, err
+	}
+	if what == "save" || what == "use" {
+		if len(c.Args) != 2 {
+			return nil, Errf(ExitUsage, "bad-args", fmt.Sprintf("`cutroom style %s channel` (a name, or a file like looks/brand.json)", what), "style %s takes a name", what)
+		}
+		if anyStyleFlag(c) {
+			return nil, Errf(ExitUsage, "bad-flags", "save/use the look first, then change fields with `cutroom style captions …`", "style %s takes no style fields", what)
+		}
+		name := c.Args[1]
+		if what == "save" {
+			if c.Bool("dry-run") {
+				return &Result{Text: fmt.Sprintf("would save %s: %s\nDRY RUN: nothing was written", lookPath(name), lookSummary(Look{e.tl.CaptionStyle, e.tl.CardStyle}))}, nil
+			}
+			p, err := saveLook(name, e.tl, e.p.Dir)
+			if err != nil {
+				return nil, err
+			}
+			lk, _, _ := loadLook(name)
+			return &Result{Text: fmt.Sprintf("saved look %q to %s\n  %s", name, relToCwd(p), lookSummary(lk)),
+				Next: []string{fmt.Sprintf("cutroom style use %s --project <another>   (or: cutroom short … --look %s)", name, name)}}, nil
+		}
+		lk, p, err := loadLook(name)
+		if err != nil {
+			return nil, err
+		}
+		if err := render.CheckStyle(lk.Captions.Over(timeline.Style{}), e.p.Dir); err != nil {
+			return nil, Errf(ExitUsage, "bad-font", "install the font, or change the look's font (`cutroom style captions --font …`, then save again)", "look %q: %v", name, err)
+		}
+		if err := render.CheckStyle(lk.Cards.Over(timeline.Style{}), e.p.Dir); err != nil {
+			return nil, Errf(ExitUsage, "bad-font", "install the font, or change the look's font (`cutroom style cards --font …`, then save again)", "look %q: %v", name, err)
+		}
+		applyLook(e.tl, lk)
+		lines := []string{fmt.Sprintf("look %q (%s): %s", name, relToCwd(p), lookSummary(lk))}
+		if !lk.Captions.Empty() && e.tl.Captions() == nil {
+			lines = append(lines, "note: no captions are burned in yet — the look applies once they are: `cutroom captions --burn`")
+		}
+		for _, is := range e.validate() {
+			if strings.HasPrefix(is.Code, "overlay-") {
+				lines = append(lines, fmt.Sprintf("WARN[%s] %s → %s", is.Code, is.Message, is.Fix))
+			}
+		}
+		if c.Bool("dry-run") {
+			lines = append(lines, "DRY RUN: nothing was changed; run the same command without --dry-run to apply it")
+		} else {
+			if err := timeline.Checkpoint(e.p.Dir, cacheDir(e.p), "style use "+name); err != nil {
+				return nil, err
+			}
+			if err := e.tl.Save(e.p.Dir); err != nil {
+				return nil, err
+			}
+		}
+		return &Result{Text: strings.Join(lines, "\n"), Next: []string{"cutroom look --overlays   (see it)", "cutroom render --preview"}}, nil
 	}
 	if what == "" {
 		if anyStyleFlag(c) {

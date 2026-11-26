@@ -49,6 +49,7 @@ vertical safe zones (nothing above y 260, below y 1490 or in the right 120 px of
 			{Name: "near", Kind: "string", Help: "Pick the --from match closest to this source time when words repeat"},
 			{Name: "occurrence", Kind: "int", Help: "Pick the Nth --from match when words repeat"},
 			{Name: "source", Kind: "string", Help: "Only match words in this source"},
+			{Name: "look", Kind: "string", Help: "A saved look for its captions and cards (`cutroom style looks`)"},
 		},
 		Run: runShort,
 	})
@@ -75,6 +76,14 @@ func runShort(c *Ctx) (*Result, error) {
 	ax, ay, err := parseAnchor(c.Str("anchor"))
 	if err != nil {
 		return nil, err
+	}
+	var look *Look
+	if c.Has("look") {
+		lk, _, err := loadLook(c.Str("look"))
+		if err != nil {
+			return nil, err
+		}
+		look = &lk
 	}
 	dir := filepath.Join(p.Dir, "shorts", name)
 	if _, err := os.Stat(filepath.Join(dir, project.File)); err == nil {
@@ -137,6 +146,9 @@ func runShort(c *Ctx) (*Result, error) {
 	tl := se.tl
 	tl.Width, tl.Height, tl.Fill, tl.FillX, tl.FillY = w, h, true, ax, ay
 	tl.PadBefore, tl.PadAfter = shortPadBefore, shortPadAfter
+	if look != nil {
+		applyLook(tl, *look)
+	}
 	if a := p.Sources[src]; a.Facts.Audio == nil {
 		tl.Audio = "" // a silent video: the parent's audio choice is made in the short with edit audio
 	}
@@ -164,6 +176,9 @@ func runShort(c *Ctx) (*Result, error) {
 		cropH := cropHeight(v.Width, v.Height, w, h)
 		if sizeNote != "" {
 			lines = append(lines, sizeNote)
+		}
+		if look != nil {
+			lines = append(lines, fmt.Sprintf("look %q: %s (burn captions with `cutroom captions --burn --project %s`)", c.Str("look"), lookSummary(*look), relToCwd(dir)))
 		}
 		if up := float64(h) / cropH; up > 1.5 {
 			tip := "a 4K recording keeps a short sharp"

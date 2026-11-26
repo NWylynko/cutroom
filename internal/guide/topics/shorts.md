@@ -31,3 +31,4 @@ Short-form defaults (L41):
   `safe-zones` on the render.
 - The captions' and cards' look is yours: `cutroom style captions --font "…" --highlight "#ffd400"
   --words 2 --case upper --project …` (karaoke highlight, outline, no box, any font) — `cutroom guide style`.
+  Keep it as a look (`cutroom style save channel`) and start the next short with `--look channel`.

@@ -375,6 +375,13 @@ expect "style undo"                  'undid'                              cutroo
 expect "style animate"               'now set: .*animate=pop'                  cutroom style captions --animate pop --project shorts/steps
 expect "style animate: how to see it" 'to see the motion, render' cutroom style o1 --animate-time 0.4 --project shorts/steps
 expect "style animate cards"         'now set: animate=slide-up'             cutroom style cards --animate slide-up --project shorts/steps
+export CUTROOM_LOOKS="$W/looks"
+expect "style save look"             'saved look "channel"'               cutroom style save channel --project shorts/steps
+expect "style looks lists it"        'channel +captions: .*animate=pop'   cutroom style looks
+expect "short --look"                'look "channel": captions: '         cutroom short --from "Then install" --to "on it." --name lookd --look channel
+expect "short got the look"          'animate +pop +set'                  cutroom style captions --project shorts/lookd
+expect "style use unknown"           'did you mean "channel"' cutroom style use chanel --project shorts/lookd
+expect "style use a file"            'look "looks/x.json"'                sh -c 'mkdir -p looks; cp "$CUTROOM_LOOKS/channel.json" looks/x.json; cutroom style use looks/x.json --project shorts/s2'
 expect "styled render"               '1080x1920'                          cutroom render out/styled.mp4 --project shorts/steps
 expect "styled check: captions"      'ok   captions +burned-in captions: [0-9]+ groups' cutroom check out/styled.mp4 --project shorts/steps
 expect "styled check: safe zones"    'ok   safe-zones'                    cutroom check out/styled.mp4 --project shorts/steps

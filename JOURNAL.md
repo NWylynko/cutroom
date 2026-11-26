@@ -2,6 +2,20 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 59 · 2026-11-26 · Named looks: `style save/use/looks`, `short --look`
+Did: r12 haiku's "one change" — a channel look took ~10 style calls per short. `style save <name>`
+keeps the project's caption + card style (font files made absolute) in the user config folder
+($CUTROOM_LOOKS overrides; a path like looks/brand.json keeps it with the project);
+`style use <name>` applies it (undoable; per-card styles stay); `style looks` lists them; `short
+--look <name>` starts a short with it. Unknown names suggest the closest saved one.
+Measured: saved the real short's look, made a new short from another moment of the real footage with
+`--look channel`: captions (Avenir Black, yellow highlight, pop) and card (light rounded, slide-up)
+as saved; render + `check` PASS. make check green; e2e 278/278.
+Surprises: that new short framed the empty desk — `short` crops the centre by default and the
+speaker sits at x≈0.74, so he is mostly off the right edge; every check passed. Framing is the next
+real-footage problem.
+Next: find the speaker and frame them by default (and let `check` notice a frame with nobody in it).
+
 ### 58 · 2026-11-26 · Eval r12 styled-short: both pass; friction fixed (burn hint, compact style, 720p shorts)
 Did: new T2 task `styled-short` (a channel look the short must match) and grader check
 `caption_color` (pixels of the asked colour in sampled frames; selftest: a pink-boxed short passes,

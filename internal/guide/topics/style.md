@@ -36,6 +36,19 @@ Fields (`cutroom style --help` lists them all; `--x default` unsets one, `--rese
   and go out with it, on top of their `--fade` (`overlay set o1 --fade 0` for motion only).
   **animate-time**: seconds it takes (captions 0.15, cards 0.3).
 
+## Looks: one channel look for every short
+
+Set captions and cards up once, then keep them as a named look and apply it anywhere:
+```
+$ cutroom style save channel                 # this project's caption + card style
+$ cutroom short --from "…" --to "…" --name tip --look channel   # a new short with that look
+$ cutroom style use channel --project shorts/old   # or give an existing one the look (undoable)
+$ cutroom style looks                        # what's saved
+```
+Looks live in your user config folder (`$CUTROOM_LOOKS` to choose another); give a path instead of a
+name (`style save looks/brand.json`) to keep one next to your project and share it. A look replaces
+the project's caption and card style; per-card styles (`style o3 …`) stay.
+
 Look before rendering (`cutroom look --output <time>` draws them as the render will). On vertical
 video `timeline` and `check` warn `overlay-unsafe` when text reaches where the apps draw their own
 buttons (L41) — that is a warning, not a rule: move it (`--y`), shrink it, or keep it if you mean it.
