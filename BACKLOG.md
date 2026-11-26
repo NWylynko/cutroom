@@ -7,8 +7,7 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- [friction r13, low] `sync`: say the shift in one sentence ("mic is shifted 1.700 s later") and show
-  per-segment residuals before rendering (recorder haiku).
+- [friction r13, low] `sync`: per-segment residuals before rendering (recorder haiku).
 - [friction r13, low] `timeline --joins` with each join's listened level (tighten haiku); `check` one
   line of removed phrases (pickup, tighten sonnet); `overlay add` warns at once when --to is too short (titles).
 - [r69] Face box from skin heuristics is rough (warm walls read as skin); a real face detector

@@ -120,6 +120,7 @@ func runSync(c *Ctx) (*Result, error) {
 		fmt.Sprintf("  mapping: %s time = %+.3f s + %s time × (1 %+.1f ppm)", other.ID, s.Offset, ref.ID, s.PPM),
 		fmt.Sprintf("  offset %+.3f s; clock drift %+.1f ppm (%.1f ms over the %s of %s)", s.Offset, s.PPM, driftMS, clock(dur), ref.ID),
 		fmt.Sprintf("  fit: %d windows, %d rejected, residual %.2f ms", s.Windows, s.Rejected, s.Residual),
+		fmt.Sprintf("  in plain words: the same moment is %s in %s and %s in %s — cutroom lines them up for you (`edit audio %s`); nothing to shift by hand", clock(dur/2), ref.ID, clock(s.Offset+dur/2*(1+s.Drift)), other.ID, other.ID),
 	}
 	var warn []string
 	if s.Overlap[0] > 0.05 || s.Overlap[1] < dur-0.05 {

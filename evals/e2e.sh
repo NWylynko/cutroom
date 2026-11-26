@@ -137,6 +137,7 @@ python3 -c "import json;t=json.load(open('timeline.json'));t['audio']='mic';json
 expect "render refuses hand-set unsynced audio" 'audio-not-synced|have not been aligned|is not aligned to' cutroom render
 cutroom edit undo >/dev/null; cutroom edit tighten >/dev/null
 expect "sync measures offset"         'mic started recording 1\.70[01] s before talk' cutroom sync mic
+expect "sync says it in plain words"  'in plain words: the same moment is 0:15\.1[0-9]+ in talk and 0:16\.8' cutroom sync mic
 expect "edit audio after sync"        'takes its sound from mic'        cutroom edit audio mic
 expect "timeline shows audio source"  'sound from mic'                  cutroom timeline
 expect "render with recorder audio"   'wrote out/final.mp4'             cutroom render

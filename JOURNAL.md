@@ -2,6 +2,12 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 72 · 2026-11-27 · `sync` says the alignment in plain words
+Did: r13 recorder-haiku: "the sign convention is only clear after reading the mapping line". `sync`
+now adds "in plain words: the same moment is 12:55.555 in video and 11:10.711 in audio — cutroom
+lines them up for you; nothing to shift by hand".
+Measured: real my-personal camera + recorder; e2e 304/304 (+1).
+
 ### 71 · 2026-11-27 · `short --cut-asides`, and `short` names asides inside its span
 Did: r13's most repeated friction (short ×2, styled-short): `short` kept the "By the way, my cat…"
 aside inside the span and only `timeline` warned. `short` now lists each aside inside the span with a
