@@ -2,6 +2,17 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 79 · 2026-11-27 · SVG icons drawn directly (Lucide and other stroke icon sets)
+Did: r78's icons needed PNGs and nothing here converts SVG. New raster/svg.go: a small stroke-SVG
+renderer — viewBox, path (M L H V C S Q T A Z, relative and absolute, compact arc flags), circle,
+ellipse, line, rect (rx), polyline, polygon; curves and arcs flattened; strokes drawn as thick
+segments with round caps/joins, all polygons wound one way so overlaps union. `--icon x.svg` renders
+it at 192 px as a glyph (tinted like a transparent PNG).
+Measured: 12 real Lucide icons (house, shield-check, cloud, waypoints, brain, database, github,
+file-text, bot-off, monitor-smartphone, messages-square, rocket) render correctly on a sheet; the
+deploying cards carry house and wallet icons in accent tiles. Tests: circle/line/arc coverage, no
+fill, empty-SVG error, compact arc flags. e2e 311/311.
+
 ### 78 · 2026-11-27 · Card icons: `overlay --icon` (tinted glyph in an accent tile)
 Did: the house style puts an accent-coloured icon in a tinted tile beside each point. `overlay
 add/set text … --icon file.png`: a PNG with transparency is drawn as a glyph in the card's accent

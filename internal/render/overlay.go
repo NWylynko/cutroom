@@ -1,6 +1,7 @@
 package render
 
 import (
+	"bytes"
 	"crypto/sha256"
 	"fmt"
 	"image"
@@ -282,14 +283,22 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 		var icon image.Image
 		ts := 0 // icon tile size (px), and the room it takes left of the text
 		if o.Icon != "" {
-			f, err := os.Open(absIn(projDir, o.Icon))
+			data, err := os.ReadFile(absIn(projDir, o.Icon))
 			if err != nil {
 				return nil, r, fmt.Errorf("overlay %s: icon: %w", o.ID, err)
 			}
-			icon, _, err = image.Decode(f)
-			f.Close()
-			if err != nil {
-				return nil, r, fmt.Errorf("overlay %s: icon %s is not a PNG or JPEG (convert an SVG first, e.g. with rsvg-convert): %w", o.ID, o.Icon, err)
+			if raster.IsSVG(data) { // a stroke icon (Lucide and the like): drawn here as a glyph
+				m, err := raster.SVGMask(data, 192)
+				if err != nil {
+					return nil, r, fmt.Errorf("overlay %s: icon %s: %w", o.ID, o.Icon, err)
+				}
+				g := image.NewNRGBA(m.Bounds())
+				for i, a := range m.Pix {
+					g.Pix[4*i], g.Pix[4*i+1], g.Pix[4*i+2], g.Pix[4*i+3] = 255, 255, 255, a
+				}
+				icon = g
+			} else if icon, _, err = image.Decode(bytes.NewReader(data)); err != nil {
+				return nil, r, fmt.Errorf("overlay %s: icon %s is not an SVG, PNG or JPEG: %w", o.ID, o.Icon, err)
 			}
 			ts = int(math.Round(1.15 * float64(lineH(l.face))))
 			mw -= ts + int(0.45*l.size)

@@ -7,8 +7,6 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- [r78] SVG icons (Lucide is stroke-based SVG): rasterise simple SVG (path/circle/line/rect/polyline,
-  stroke-width, round caps) so `--icon name.svg` works without a converter.
 - [friction r13, low] `sync`: per-segment residuals before rendering (recorder haiku).
 - [friction r13, low] `timeline --joins` with each join's listened level (tighten haiku); `check` one
   line of removed phrases (pickup, tighten sonnet); `overlay add` warns at once when --to is too short (titles).
