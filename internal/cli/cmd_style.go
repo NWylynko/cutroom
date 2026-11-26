@@ -144,7 +144,22 @@ func runStyle(c *Ctx) (*Result, error) {
 	}
 	label := fmt.Sprintf("style %s %s", what, strings.Join(changed, " "))
 	lines := []string{fmt.Sprintf("%s: %s", what, strings.Join(changed, ", "))}
-	lines = append(lines, styleLines(*target, full(), kind, e.p.Dir)...)
+	if *target != nil {
+		lines = append(lines, "now set: "+setSummary(*target)+" (the rest default; `cutroom style "+what+"` shows every field)")
+	} else {
+		lines = append(lines, "all back to cutroom's default look")
+	}
+	for _, f := range timeline.StyleFields {
+		if f.Kind == "font" && c.Has(f.Name) && c.Str(f.Name) != "default" {
+			lines = append(lines, fmt.Sprintf("%s → %s", f.Name, render.FontName(c.Str(f.Name), e.p.Dir)))
+		}
+	}
+	if kind == "captions" && e.tl.Captions() == nil {
+		lines = append(lines, "note: no captions are burned in yet — the style applies once they are: `cutroom captions --burn`")
+	}
+	if c.Has("animate") || c.Has("animate-time") {
+		lines = append(lines, "`look` draws text settled; to see the motion, render and look at the frames: `cutroom render --preview`, then `cutroom look --file out/preview.mp4 <start>-<start+0.5> --count 8`")
+	}
 	for _, is := range e.validate() {
 		if strings.HasPrefix(is.Code, "overlay-") {
 			lines = append(lines, fmt.Sprintf("WARN[%s] %s → %s", is.Code, is.Message, is.Fix))

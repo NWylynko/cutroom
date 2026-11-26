@@ -7,15 +7,14 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
+- [friction r12, medium-low] Named looks: `style save <name>` / `style use <name>` (captions + cards,
+  stored per user, e.g. ~/.config/cutroom/looks/) so a channel look is one call per short (haiku:
+  "repeated `style` calls made the setup long").
 - [style] Per-word pop for karaoke captions (each word bumps as it is said), if asked for.
-- [style] T2 eval task whose brief asks for a specific caption look (font, highlight, position) —
-  checks agents find `cutroom style` from the guide.
 - [style] Per-card text formatting beyond title/sub (a third line, an inline accent word).
 - v1 is golden (2026-11-25, iteration 52): see RELEASE_NOTES.md. Publishing is the maintainer's call.
 - export: validate the .otio with the real OpenTimelineIO reader once it can be installed (it isn't
   a declared dependency); today's guarantee is the round-trip tests.
-- [friction r11, low] `short` on a 720p source: default to 720x1280 instead of warning about a 2.7x
-  upscale (short sonnet + haiku).
 - [friction r11, low] `tighten` could offer the retake/aside cuts in one step (broll, tighten, social).
 - [friction r11, low] suggested commands mix output time (`@4.09`) and source time (`--near 6.31`)
   without labels (resume-haiku, pickup-haiku).

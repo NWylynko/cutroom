@@ -44,7 +44,7 @@ vertical safe zones (nothing above y 260, below y 1490 or in the right 120 px of
 			{Name: "from", Kind: "string", Help: "First words of the short (quoted from the transcript)"},
 			{Name: "to", Kind: "string", Help: "Last words of the short"},
 			{Name: "name", Kind: "string", Default: "short", Help: "Its folder: shorts/<name>"},
-			{Name: "size", Kind: "string", Default: "1080x1920", Help: "Output size WxH (vertical)"},
+			{Name: "size", Kind: "string", Help: "Output size WxH (vertical; default 1080x1920, or 720x1280 when the source is too small to fill 1080x1920 sharply)"},
 			{Name: "anchor", Kind: "string", Default: "0.5,0.5", Help: "Point of the source kept in frame (0–1 across, down)"},
 			{Name: "near", Kind: "string", Help: "Pick the --from match closest to this source time when words repeat"},
 			{Name: "occurrence", Kind: "int", Help: "Pick the Nth --from match when words repeat"},
@@ -66,9 +66,11 @@ func runShort(c *Ctx) (*Result, error) {
 	if !project.ValidID(name) {
 		return nil, Errf(ExitUsage, "bad-name", "a short name: letters, digits, - and _ (e.g. --name laptop)", "bad --name %q", name)
 	}
-	var w, h int
-	if _, err := fmt.Sscanf(c.Str("size"), "%dx%d", &w, &h); err != nil || w < 64 || h < 64 || w%2+h%2 != 0 {
-		return nil, Errf(ExitUsage, "bad-flag-value", "--size WxH with even numbers, e.g. 1080x1920", "bad --size %q", c.Str("size"))
+	w, h := 1080, 1920
+	if c.Has("size") {
+		if _, err := fmt.Sscanf(c.Str("size"), "%dx%d", &w, &h); err != nil || w < 64 || h < 64 || w%2+h%2 != 0 {
+			return nil, Errf(ExitUsage, "bad-flag-value", "--size WxH with even numbers, e.g. 1080x1920", "bad --size %q", c.Str("size"))
+		}
 	}
 	ax, ay, err := parseAnchor(c.Str("anchor"))
 	if err != nil {
@@ -99,6 +101,13 @@ func runShort(c *Ctx) (*Result, error) {
 		return nil, Errf(ExitUsage, "no-video", "quote words from a video source (the transcript of a recorder is not a picture)", "%s has no picture", src)
 	}
 	ws := e.tr[src].Words
+	sizeNote := ""
+	if v := s.Facts.Video; v != nil && !c.Has("size") {
+		if ch := cropHeight(v.Width, v.Height, w, h); ch < 1080*0.75 { // a 720p-class source
+			w, h = 720, 1280
+			sizeNote = fmt.Sprintf("size 720x1280: the %dx%d source's 9:16 crop is %.0f px tall, so 1080x1920 would enlarge it %.1f× and look soft (--size 1080x1920 to have it anyway)", v.Width, v.Height, ch, 1920/ch)
+		}
+	}
 
 	// the short's own project: same sources (paths rewritten for its folder), same transcripts
 	sp := project.New(dir)
@@ -152,12 +161,16 @@ func runShort(c *Ctx) (*Result, error) {
 	}
 	if v := s.Facts.Video; v != nil {
 		// how much the 9:16 crop of the source is enlarged (L40: above ~1.5× it looks soft)
-		cropH := float64(v.Height)
-		if float64(v.Width)/float64(v.Height) < float64(w)/float64(h) {
-			cropH = float64(v.Width) * float64(h) / float64(w)
+		cropH := cropHeight(v.Width, v.Height, w, h)
+		if sizeNote != "" {
+			lines = append(lines, sizeNote)
 		}
 		if up := float64(h) / cropH; up > 1.5 {
-			lines = append(lines, fmt.Sprintf("WARN the %dx%d source is enlarged %.1f× to fill %dx%d: it will look soft (a 4K recording keeps a short sharp; --size 720x1280 halves the enlargement)", v.Width, v.Height, up, w, h))
+			tip := "a 4K recording keeps a short sharp"
+			if h > 1280 {
+				tip += "; --size 720x1280 enlarges it less"
+			}
+			lines = append(lines, fmt.Sprintf("WARN the %dx%d source is enlarged %.1f× to fill %dx%d: it will look soft (%s)", v.Width, v.Height, up, w, h, tip))
 		}
 	}
 	for _, x := range se.validate() {
@@ -177,4 +190,12 @@ func parseAnchor(s string) (float64, float64, error) {
 		return 0, 0, Errf(ExitUsage, "bad-anchor", "--anchor x,y with 0–1 across and down, e.g. 0.4,0.5", "bad --anchor %q", s)
 	}
 	return x, y, nil
+}
+
+// cropHeight is the height of the largest w:h crop of a vw×vh picture.
+func cropHeight(vw, vh, w, h int) float64 {
+	if float64(vw)/float64(vh) < float64(w)/float64(h) {
+		return float64(vw) * float64(h) / float64(w)
+	}
+	return float64(vh)
 }

@@ -2,6 +2,19 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 58 · 2026-11-26 · Eval r12 styled-short: both pass; friction fixed (burn hint, compact style, 720p shorts)
+Did: new T2 task `styled-short` (a channel look the short must match) and grader check
+`caption_color` (pixels of the asked colour in sampled frames; selftest: a pink-boxed short passes,
+the plain short fails — yellow was useless because the fixture's colour bars contain it, so the
+brief uses #FF5FA2). Fresh sonnet and haiku both PASS with 0 cutroom errors (evals/results/
+2026-11-26-12.md). Fixed their friction: `style captions` without burned captions says
+`captions --burn`; style changes print a one-line "now set" instead of the full table; --animate
+says how to see the motion; `short` picks 720×1280 for a 720p-class source (and the soft-source tip
+no longer suggests the size it already uses); `captions --burn` mentions lower thirds only when
+there are some.
+Measured: grader selftest 28/28; make check green; e2e 272/272.
+Next: named looks (save a style set once, apply it to every short) — haiku's "one change".
+
 ### 57 · 2026-11-26 · Accent bars follow a rounded card's corners
 Did: on `style cards --radius …` the lower-third accent bar was its own little pill sitting on the
 panel's curve. It is now the left strip of the panel's own rounded shape (FillRoundPart), a little

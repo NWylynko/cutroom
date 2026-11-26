@@ -348,8 +348,8 @@ popd >/dev/null
 # shorts: a vertical sub-project with short-form defaults, framing, safe zones
 S="$W/shorts"; mkdir -p "$S"; cp $FIX/talk.mp4 "$S/"; pushd "$S" >/dev/null
 cutroom init talk.mp4 >/dev/null; cutroom transcribe --passes 1 >/dev/null
-expect "short made"                 '1080x1920, picture filled and cropped around 0\.50' cutroom short --from "The first thing you need is an" --to "update command." --name steps
-expect "short warns soft source"    'enlarged 2\.7× to fill 1080x1920'    sh -c 'cutroom timeline --project shorts/steps >/dev/null; cutroom short --from "Then install" --to "on it." --name s2'
+expect "short made"                 '1080x1920, picture filled and cropped around 0\.50' cutroom short --from "The first thing you need is an" --to "update command." --name steps --size 1080x1920
+expect "short sizes to a 720p source" 'size 720x1280: the 1280x720 source.s 9:16 crop is 720 px tall' sh -c 'cutroom timeline --project shorts/steps >/dev/null; cutroom short --from "Then install" --to "on it." --name s2'
 expect "short exists refused"       'shorts/steps already exists'        cutroom short --from "Then install" --to "on it." --name steps
 expect "status lists shorts"        'shorts: shorts/s2 .*shorts/steps'   cutroom status
 expect "one-token flag split"       'segment'                            cutroom timeline "--project shorts/steps"
@@ -364,16 +364,17 @@ expect "short check: safe zones"    'ok   safe-zones +[0-9]+ overlay box\(es\) i
 
 # style: captions and cards take the look you set (no house style forced)
 expect "style shows defaults"        'highlight +none +default'           cutroom style --project shorts/steps
-expect "style captions set"          'highlight +#ffd400 +set'            cutroom style captions --highlight "#ffd400" --box none --outline black --case upper --words 2 --project shorts/steps
+expect "style captions set"          'now set: highlight=#ffd400 box=none'            cutroom style captions --highlight "#ffd400" --box none --outline black --case upper --words 2 --project shorts/steps
 expect "style bad colour refused"    'not a colour'                       cutroom style captions --color "#zzz" --project shorts/steps
 expect "style unknown font refused"  'no font "No Such Font".*style fonts' cutroom style captions --font "No Such Font" --project shorts/steps
 expect "style field for captions only" 'words is for captions'            cutroom style cards --words 2 --project shorts/steps
 expect "style fonts lists built-ins" 'built in .*bold, regular, mono'     cutroom style fonts
-expect "style one card"              'y +0.3 +set'                        cutroom style o1 --y 0.3 --box "#ffffffee" --color "#101718" --radius 0.4 --project shorts/steps
+expect "style one card"              'now set: .*y=0.3'                        cutroom style o1 --y 0.3 --box "#ffffffee" --color "#101718" --radius 0.4 --project shorts/steps
 expect "style unsafe warned"         'overlay-unsafe.*burned-in captions.*style captions --y' cutroom style captions --y 0.95 --project shorts/steps
 expect "style undo"                  'undid'                              cutroom edit undo --project shorts/steps
-expect "style animate"               'animate +pop +set'                  cutroom style captions --animate pop --project shorts/steps
-expect "style animate cards"         'animate +slide-up +set'             cutroom style cards --animate slide-up --project shorts/steps
+expect "style animate"               'now set: .*animate=pop'                  cutroom style captions --animate pop --project shorts/steps
+expect "style animate: how to see it" 'to see the motion, render' cutroom style o1 --animate-time 0.4 --project shorts/steps
+expect "style animate cards"         'now set: animate=slide-up'             cutroom style cards --animate slide-up --project shorts/steps
 expect "styled render"               '1080x1920'                          cutroom render out/styled.mp4 --project shorts/steps
 expect "styled check: captions"      'ok   captions +burned-in captions: [0-9]+ groups' cutroom check out/styled.mp4 --project shorts/steps
 expect "styled check: safe zones"    'ok   safe-zones'                    cutroom check out/styled.mp4 --project shorts/steps

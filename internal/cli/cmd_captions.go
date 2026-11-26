@@ -193,7 +193,13 @@ func burnCaptions(c *Ctx, e *editEnv, ws []captions.Word, dur float64, o caption
 		if err := e.tl.Save(e.p.Dir); err != nil {
 			return nil, err
 		}
-		lines = append(lines, fmt.Sprintf("added %s: burned-in captions over the whole edit (lower thirds move up above them); remove with `cutroom overlay rm %s`", id, id))
+		raise := ""
+		for _, o := range e.tl.Overlays {
+			if o.Kind != "captions" && (o.Layout == "lower-third" || o.Layout == "") {
+				raise = " (lower thirds move up clear of them)"
+			}
+		}
+		lines = append(lines, fmt.Sprintf("added %s: burned-in captions over the whole edit%s; remove with `cutroom overlay rm %s`", id, raise, id))
 		lines = append(lines, "their look (font, size, colours, box, outline, position, words at a time, highlighted word) is yours to set: `cutroom style captions --help`")
 	}
 	// the sidecar file comes with it: burned captions for muted viewers, the file for YouTube
