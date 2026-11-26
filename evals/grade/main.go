@@ -47,6 +47,9 @@ type spec struct {
 	// Cards: a card (text or image overlay) must cover the picture while each phrase's line is said;
 	// Clean: no card while these lines are said (burned captions in the bottom band excepted).
 	Cards []string `json:"cards,omitempty"`
+	// CardColor: a colour the cards must add (their panel) while each card
+	// phrase is said — pixels near it in frames sampled there.
+	CardColor string `json:"card_color,omitempty"`
 	Clean []string `json:"clean,omitempty"`
 	// BurnedCaptions: the bottom band carries captions while lines are said.
 	BurnedCaptions bool `json:"burned_captions,omitempty"`
@@ -359,6 +362,27 @@ func frameAndSync(out string, sp spec, add func(string, bool, string, ...any)) {
 		for _, ph := range sp.Cards {
 			n, c, _ := during(ph)
 			add("card during: "+ph, n > 0 && float64(c) >= 0.6*float64(n), "%d of %d sampled frames while it is said carry a card", c, n)
+			if sp.CardColor != "" {
+				var ts, rs []float64
+				for _, l := range lines {
+					if !strings.Contains(strings.Join(tokens(l.Say), " "), strings.Join(tokens(ph), " ")) {
+						continue
+					}
+					for _, m := range ms {
+						if m.ref == 0 && m.refT > l.Start+0.3 && m.refT < l.End-0.3 {
+							ts, rs = append(ts, m.outT), append(rs, m.refT)
+						}
+					}
+				}
+				best := 0
+				for k, t := range ts {
+					if k%max(1, len(ts)/3) == 0 {
+						// what the card adds: the colour in the render minus the same moment of the source
+						best = max(best, colorAt(out, t, sp.CardColor)-colorAt(ref, rs[k], sp.CardColor))
+					}
+				}
+				add("card colour during: "+ph, best >= 400, "%s: %d px more than the source shows there (most in a sampled frame)", sp.CardColor, best)
+			}
 		}
 		for _, ph := range sp.Clean {
 			n, c, _ := during(ph)
@@ -1041,4 +1065,25 @@ func colorFrames(p, hex string) (n, hit, best int) {
 		}
 	}
 	return
+}
+
+// colorAt counts pixels of p's frame at t (480 px wide) within a small distance of hex.
+func colorAt(p string, t float64, hex string) int {
+	var r, g, b int
+	if _, err := fmt.Sscanf(strings.TrimPrefix(hex, "#"), "%02x%02x%02x", &r, &g, &b); err != nil {
+		return 0
+	}
+	px, err := exec.Command("ffmpeg", "-v", "error", "-ss", fmt.Sprintf("%.3f", t), "-i", p, "-frames:v", "1",
+		"-vf", "scale=480:-2", "-pix_fmt", "rgb24", "-f", "rawvideo", "-").Output()
+	if err != nil {
+		return 0
+	}
+	c := 0
+	for k := 0; k+2 < len(px); k += 3 {
+		dr, dg, db := int(px[k])-r, int(px[k+1])-g, int(px[k+2])-b
+		if dr*dr+dg*dg+db*db < 40*40 {
+			c++
+		}
+	}
+	return c
 }

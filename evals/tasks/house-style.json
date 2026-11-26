@@ -1,0 +1,12 @@
+{
+  "fixtures": ["talk.mp4"],
+  "setup": "mkdir -p icons && printf '<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"><path d=\"M12 19h8\"/><path d=\"m4 17 6-6-6-6\"/></svg>' > icons/terminal.svg",
+  "output": "out/final.mp4",
+  "must_contain": ["first thing you need is an old laptop", "install Linux on it", "open the terminal and run the update command"],
+  "must_not_contain": ["um", "my cat"],
+  "duration": [12.0, 18.5],
+  "cards": ["install Linux on it", "open the terminal and run the update command"],
+  "card_color": "#f3f6f7",
+  "clean": ["first thing you need is an old laptop"],
+  "checks": ["av_sync"]
+}
