@@ -413,7 +413,7 @@ func (t *Timeline) Validate(durations map[string]float64, tr Transcripts) []Issu
 				if len(tr) > 1 {
 					cmd += " --source " + src
 				}
-				fix = "keep the last take: `" + cmd + "` removes the earlier take, " + gone + " (--near is a source time; add --dry-run to check the join first)"
+				fix = "cut the false start: `" + cmd + "` removes " + gone + " (--near is a source time; add --dry-run to check the join first)"
 			}
 			msg := fmt.Sprintf("%q is still said %d× in the timeline (a retake?)", g[0].s.Text, len(g[0].s.Related))
 			if len(g) > 1 {
@@ -623,7 +623,7 @@ func (t *Timeline) retakeCut(tx *speech.Transcript, src string, group []speech.S
 		}
 		return fi, fl, bd
 	}
-	type occ struct{ fi, fl, ni int }
+	type occ struct{ fi, fl, ni, nl int }
 	var os []occ
 	for _, s := range group {
 		var takes []float64
@@ -639,19 +639,27 @@ func (t *Timeline) retakeCut(tx *speech.Transcript, src string, group []speech.S
 		if fi < 0 || bd > 0.5 {
 			continue
 		}
-		ni, _, bd2 := nearest(s.Text, takes[1])
+		ni, nl, bd2 := nearest(s.Text, takes[1])
 		if bd2 > 0.5 || ni <= fl {
 			ni = -1
 		}
-		os = append(os, occ{fi, fl, ni})
+		os = append(os, occ{fi, fl, ni, nl})
 	}
 	if len(os) == 0 {
 		return "", ""
 	}
+	// The later take is the false start when it breaks off ("you don't need to care about worrying–")
+	// and the earlier one runs on to a full sentence (r68: keeping "the last take" would have cut the
+	// complete sentence and kept the stumble). Then cut the later one, to the word it broke off on.
+	if len(os) == 1 && os[0].ni >= 0 {
+		if bf, bn := brokenAfter(ws, os[0].fl, kept), brokenAfter(ws, os[0].nl, kept); bf < 0 && bn >= 0 {
+			return t.retakeCutRange(ws, src, os[0].ni, bn, kept)
+		}
+	}
 	// An editor cuts the whole first attempt: from the start of the sentence that holds its first
 	// repeated phrase to the start of the sentence where the next attempt begins (T3: real retakes
 	// repeat a sentence's tail, and one retake repeats several phrases).
-	from, fromLast, firstLast, next := len(ws), -1, -1, len(ws)
+	from, firstLast, next := len(ws), -1, len(ws)
 	for _, o := range os {
 		from = min(from, sentenceStart(ws, o.fi, kept))
 		firstLast = max(firstLast, o.fl)
@@ -682,7 +690,27 @@ func (t *Timeline) retakeCut(tx *speech.Transcript, src string, group []speech.S
 			return "", ""
 		}
 	}
-	fromLast = min(from+4, j)
+	return t.retakeCutRange(ws, src, from, j, kept)
+}
+
+// brokenAfter finds where speech breaks off after word k: the first word ending in a dash ("worrying–")
+// before the sentence ends, within 10 words; -1 when the sentence runs on to its end.
+func brokenAfter(ws []speech.Word, k int, kept func(int) bool) int {
+	for j := k; j < len(ws) && j <= k+10 && kept(j); j++ {
+		t := strings.TrimSpace(ws[j].Text)
+		if strings.HasSuffix(t, "–") || strings.HasSuffix(t, "—") || strings.HasSuffix(t, "-") {
+			return j
+		}
+		if endsSentence(t) {
+			return -1
+		}
+	}
+	return -1
+}
+
+// retakeCutRange is the `edit cut` command that removes words from..j (and what it removes).
+func (t *Timeline) retakeCutRange(ws []speech.Word, src string, from, j int, kept func(int) bool) (cmd, removes string) {
+	fromLast := min(from+4, j)
 	fromText := speech.Text(ws, from, fromLast)
 	for n := 1; n <= 6 && j-n+1 > from; n++ {
 		phrase := speech.Text(ws, j-n+1, j)

@@ -12,7 +12,9 @@ look at it: `cutroom look --output 7.75`
 
 - `--duration 3` (default 4) or `--to "on it."` (until those words end).
 - Layouts: `lower-third` (text default: left, above the bottom), `title` and `center` (big, centred),
-  `top`, `corner` (top right; image default). `--sub` adds a smaller second line to text.
+  `top`, `corner` (top right; image default), `left` / `right` (vertically centred at that side — the
+  empty side of the frame). `--sub` adds a smaller second line, `--eyebrow "Step 3"` a small label
+  above the title (capitals, in the card style's accent colour).
 - `cutroom overlay add image logo.png --at "Finally" --duration 4 [--size 0.2]` — PNG or JPEG (alpha
   kept); `--size` is its width as a fraction of the frame.
 - `cutroom overlay add clip terminal.mp4 --at "open the terminal" --to "update command." [--clip-in 2.5]`

@@ -66,7 +66,7 @@ expect "tighten names lost sound"   'would also remove the sound with no words a
 expect "tighten creates timeline"   'created timeline from talk'      cutroom edit tighten
 expect "tighten flags retake"       'retake-kept'                     cutroom timeline
 expect "ambiguous --from lists"     'occurs 2 times'                  cutroom edit cut --from "The first thing you need is" --to "thing."
-fixcmd=$(cutroom timeline | grep -o 'keep the last take: `[^`]*`' | sed 's/^keep the last take: `//; s/`$//')
+fixcmd=$(cutroom timeline | grep -o 'cut the false start: `[^`]*`' | sed 's/^cut the false start: `//; s/`$//')
 expect "retake warning has a cut command" '^cutroom edit cut --from' echo "$fixcmd"
 expect "its cut removes the false start"  'removed\): "The first thing you need is, UM, the first thing\."' sh -c "$fixcmd"
 cutroom edit undo >/dev/null
@@ -278,6 +278,9 @@ expect "overlay list"              'o2 +image "logo.png" +corner'        cutroom
 expect "overlay set duration"      'set o1: --duration 1; now output .*\(1\.000 s\)' cutroom overlay set o1 --duration 1
 expect "short card warned"         'overlay-short.*o1.*overlay set o1 --duration' cutroom timeline
 expect "overlay set keeps the id"  'set o1: --duration 2\.5'               cutroom overlay set o1 --duration 2.5
+expect "overlay eyebrow + left"      'text "Two steps", left'             cutroom overlay add text "Two steps" --eyebrow "Step 1" --at "Then install" --duration 1.5 --layout left --dry-run
+expect "eyebrow on an image refused" 'no --sub or --eyebrow'              cutroom overlay add image logo.png --eyebrow "x" --at "Finally" --duration 1 --dry-run
+expect "overlay set eyebrow"         'set o1: --eyebrow "Step 2"'         cutroom overlay set o1 --eyebrow "Step 2" --dry-run
 expect "overlay set nothing"       'nothing to change'                   cutroom overlay set o1
 expect "overlay sub-help"          'cutroom overlay add'                 sh -c 'cutroom overlay add --help | head -1'
 t1=$(cutroom overlay list --json | python3 -c 'import json,sys;o=json.load(sys.stdin)["result"]["overlays"][0];print(round((o["output_start"]+o["output_end"])/2,2))')
@@ -414,7 +417,7 @@ expect "file really in cwd"           'short\.mp4'                       ls out
 expect "check cwd path + project"     '^PASS out/short\.mp4'             cutroom check out/short.mp4 --project shorts/steps
 expect "frame --size"                 'fills 720x1280'                   cutroom edit frame --size 720x1280 --project shorts/steps
 expect "no-timeline names shorts"     'work on a short: --project shorts/' cutroom timeline
-expect "retake range = its cut"       'removes the earlier take, source 0:06\.200–0:09\.433' sh -c 'cutroom edit tighten >/dev/null; cutroom timeline'
+expect "retake range = its cut"       'removes source 0:06\.200–0:09\.433' sh -c 'cutroom edit tighten >/dev/null; cutroom timeline'
 expect "look <source-id> <time>"      'frame 90 of talk at 0:03\.000'    cutroom look talk 3.0
 expect "look a render whole"          '12 frame\(s\) of out/short\.mp4 at 0:00\.000–'  cutroom look --file out/short.mp4 --project shorts/steps
 expect "render transcript by sentence" '^0:0[0-9.]+–0:0[0-9.]+  [Tt]hen install Linux on it' cutroom transcript --file out/short.mp4 --project shorts/steps

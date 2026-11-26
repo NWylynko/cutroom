@@ -31,7 +31,8 @@ words). It is anchored to the words, not to a time, so later cuts never move it 
   overlay set o2 --duration 2.2   change one in place (also --to, --at, --layout, --text, --sub, --fade, --size)
   overlay list                    every overlay with its output time, or why it won't show
   overlay rm o2
-Layouts: lower-third (default for text), title, top, corner (default for images), center;
+Layouts: lower-third (default for text), title, top, corner (default for images), center, left,
+right (vertically centred at that side: the empty side of the frame);
 full (clips only, their default).
 Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rendering:
 ` + "`cutroom look --output <time>`" + ` shows the edit with its overlays.`,
@@ -40,7 +41,8 @@ Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rend
 			{Name: "to", Kind: "string", Help: "Words it disappears after (instead of --duration)"},
 			{Name: "duration", Kind: "float", Help: "Seconds on screen (default 4)"},
 			{Name: "sub", Kind: "string", Help: "text: a smaller second line"},
-			{Name: "layout", Kind: "string", Help: "lower-third | title | top | corner | center"},
+			{Name: "eyebrow", Kind: "string", Help: "text: a small label above the title, e.g. \"STEP 3\" (accent colour, capitals)"},
+			{Name: "layout", Kind: "string", Help: "lower-third | title | top | corner | center | left | right"},
 			{Name: "size", Kind: "float", Help: "image: width as a fraction of the frame (default 0.25)"},
 			{Name: "fade", Kind: "float", Default: "0.2", Help: "Fade in/out seconds (0 = cut in and out)"},
 			{Name: "near", Kind: "string", Help: "Pick the --at match closest to this source time when words repeat"},
@@ -56,11 +58,11 @@ Text is drawn by cutroom (no ffmpeg text filters needed); look at it before rend
   overlay set o2 --at "Then install"   move it to other words
   overlay set o2 --layout top --text "Step 2" --sub "…" --fade 0
 Changes only what you give; the id stays.`,
-				Flags: []string{"duration", "to", "at", "near", "occurrence", "source", "layout", "text", "sub", "fade", "size", "clip-in", "dry-run"}},
+				Flags: []string{"duration", "to", "at", "near", "occurrence", "source", "layout", "text", "sub", "eyebrow", "fade", "size", "clip-in", "dry-run"}},
 			"add": {Usage: `  overlay add text "Install Linux" --at "Then install" [--duration 3 | --to "on it."] [--sub "…"]
   overlay add image logo.png --at "Finally" --duration 4 [--layout corner] [--size 0.2]
   overlay add clip broll.mp4 --at "open the terminal" [--to "…" | --duration 3] [--clip-in 2.5] [--layout full|corner] [--size 0.35]`,
-				Flags: []string{"at", "to", "duration", "sub", "layout", "size", "fade", "clip-in", "near", "occurrence", "source", "dry-run"}},
+				Flags: []string{"at", "to", "duration", "sub", "eyebrow", "layout", "size", "fade", "clip-in", "near", "occurrence", "source", "dry-run"}},
 			"list": {Usage: `  overlay list   every overlay: id, kind, output time, layout, anchor words`},
 			"rm":   {Usage: `  overlay rm o2  remove an overlay (undo-able with ` + "`cutroom edit undo`" + `)`, Flags: []string{"dry-run"}},
 		},
@@ -178,7 +180,7 @@ func (e *editEnv) overlayFromFlags(c *Ctx) (timeline.Overlay, error) {
 	if len(c.Args) != 3 {
 		return timeline.Overlay{}, Errf(ExitUsage, "bad-args", `overlay add text "Install Linux" --at "Then install"  or  overlay add image logo.png --at "…"`, "overlay add takes a kind (text|image) and its content")
 	}
-	o := timeline.Overlay{Kind: c.Args[1], Fade: c.Float("fade"), Duration: 4, Layout: c.Str("layout"), Sub: c.Str("sub"), Size: c.Float("size")}
+	o := timeline.Overlay{Kind: c.Args[1], Fade: c.Float("fade"), Duration: 4, Layout: c.Str("layout"), Sub: c.Str("sub"), Eyebrow: c.Str("eyebrow"), Size: c.Float("size")}
 	switch o.Kind {
 	case "text":
 		o.Text = c.Args[2]
@@ -200,8 +202,8 @@ func (e *editEnv) overlayFromFlags(c *Ctx) (timeline.Overlay, error) {
 			p = abs
 		}
 		o.Path = p
-		if o.Sub != "" {
-			return o, Errf(ExitUsage, "bad-flag", "--sub is for text overlays", "%s overlays have no --sub", o.Kind)
+		if o.Sub != "" || o.Eyebrow != "" {
+			return o, Errf(ExitUsage, "bad-flag", "--sub/--eyebrow are for text overlays", "%s overlays have no --sub or --eyebrow", o.Kind)
 		}
 		if o.Layout == "" {
 			o.Layout = "corner"
@@ -346,7 +348,7 @@ func (e *editEnv) overlaySet(c *Ctx, o timeline.Overlay) (timeline.Overlay, []st
 		o.Layout = c.Str("layout")
 		ch = append(ch, "--layout "+o.Layout)
 	}
-	if c.Has("text") || c.Has("sub") {
+	if c.Has("text") || c.Has("sub") || c.Has("eyebrow") {
 		if o.Kind != "text" {
 			return o, nil, Errf(ExitUsage, "bad-flag", "--text/--sub are for text overlays", "%s is an image overlay", o.ID)
 		}
@@ -360,6 +362,10 @@ func (e *editEnv) overlaySet(c *Ctx, o timeline.Overlay) (timeline.Overlay, []st
 		if c.Has("sub") {
 			o.Sub = c.Str("sub")
 			ch = append(ch, fmt.Sprintf("--sub %q", o.Sub))
+		}
+		if c.Has("eyebrow") {
+			o.Eyebrow = c.Str("eyebrow")
+			ch = append(ch, fmt.Sprintf("--eyebrow %q", o.Eyebrow))
 		}
 	}
 	if c.Has("fade") {

@@ -12,7 +12,8 @@ by your first edit as the whole first video source. Sources are never touched.
 3. `cutroom timeline` — every segment with its words, plus problems cutroom found
    (`retake-kept`, `kept-sound`, `edge-in-word`, …). Fix each one or decide it is intended.
    A `retake-kept` warning right after tighten is expected: it prints a ready `edit cut` that
-   removes the earlier take(s) and keeps the last; run it with `--dry-run` first to see the join.
+   removes the false start — usually the earlier take(s), but the later one when it breaks off ("…
+   worrying–") after a complete sentence; run it with `--dry-run` first to see the join.
 4. `cutroom timeline --joins` — every cut point with the words either side and the pause across it.
    Read them like a viewer would hear them. `cutroom listen` any join you doubt.
 

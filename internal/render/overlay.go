@@ -140,7 +140,7 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 
 // cardKey hashes everything a card depends on, including the bytes of a referenced image (L19).
 func cardKey(o timeline.Overlay, projDir string, w, h int) (string, error) {
-	parts := []any{CardVersion, w, h, o.Kind, o.Text, o.Sub, o.Layout, o.Size, o.Path, o.CapBox}
+	parts := []any{CardVersion, w, h, o.Kind, o.Text, o.Sub, o.Layout, o.Size, o.Path, o.CapBox, o.Eyebrow}
 	if o.Kind == "text" {
 		l, err := resolve(o.Style.Over(CardDefaults(o.Layout)), projDir, w, h)
 		if err != nil {
@@ -214,6 +214,16 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 			mw = min(mw, right-2*margin)
 		}
 		var lines []line
+		if o.Eyebrow != "" { // a small label above the title, in the accent colour (or the sub-line's)
+			c := l.accent
+			if c == nil {
+				c = l.subColor
+			}
+			ef := raster.RefFace(l.fontRef, math.Round(0.5*l.size))
+			for _, t := range wrapText(ef, strings.ToUpper(o.Eyebrow), mw) {
+				lines = append(lines, line{t, ef, c})
+			}
+		}
 		for _, t := range wrapText(l.face, l.text(o.Text), mw) {
 			lines = append(lines, line{t, l.face, l.color})
 		}
@@ -318,6 +328,10 @@ func place(layout string, W, H, w, h, margin int) (int, int) {
 			return max(0, (right-w)/2), top
 		case "corner":
 			return right - w, top
+		case "left": // vertically centred in the safe area, at the left margin
+			return margin, max(top, top+(bottom-top-h)/2)
+		case "right":
+			return max(0, right-w), max(top, top+(bottom-top-h)/2)
 		case "lower-third-raised":
 			return margin, int(captionTop(W, H)) - int(0.02*float64(H)) - h
 		default: // lower-third: above the bottom zone
@@ -331,6 +345,10 @@ func place(layout string, W, H, w, h, margin int) (int, int) {
 		return (W - w) / 2, int(0.08 * float64(H))
 	case "corner":
 		return W - margin - w, int(0.06 * float64(H))
+	case "left": // vertically centred, on the left (the empty side of the frame, say)
+		return int(0.0375 * float64(W)), (H - h) / 2
+	case "right":
+		return W - int(0.0375*float64(W)) - w, (H - h) / 2
 	case "lower-third-raised": // above burned-in captions
 		return margin, int(captionTop(W, H)) - int(0.03*float64(H)) - h
 	default: // lower-third
@@ -360,7 +378,7 @@ func wrapText(f font.Face, s string, mw int) []string {
 }
 
 // Layouts are the overlay positions.
-var Layouts = []string{"lower-third", "title", "top", "corner", "center"}
+var Layouts = []string{"lower-third", "title", "top", "corner", "center", "left", "right"}
 
 // --- burned-in captions (L48) ----------------------------------------------------------------
 

@@ -2,6 +2,22 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 68 · 2026-11-26 · Landscape edit in the house style: eyebrow, left/right layouts, retake direction
+Did: a 16:9 edit from deploying take-2 (1080p VFR, vocab for Coolify/Hetzner/…): keep a section,
+tighten, decide warnings. Retake bug: "You don't need to care about having high availability…" then
+"You don't need to care about worrying–" — the suggestion cut the complete first sentence and kept
+the stumble. Now when the later take breaks off (a word ending in a dash) and the earlier sentence
+completes, the fix cuts the later one; the wording is "cut the false start" either way. Then the
+GRAPHICS.md house card (Platinum panel, Onyx text, Turf Green accent, rounded, left, eyebrow): new
+`overlay --eyebrow "Step 3"` (small capitals in the accent colour above the title) and layouts
+`left`/`right` (vertically centred at that side).
+Measured: the edit: 3 segments, both false starts out, complete sentences kept; render + `check`
+PASS with 0 warnings (two cards visible over their windows, sync 0 ms with the +85 ms audio offset).
+The cards look like the published house style (Avenir Next standing in for SF Pro). e2e 299/299.
+Surprises: SF Pro is a variable font (SFNS.ttf); the Go font package draws only its default
+instance, so its 800 weight is out of reach.
+Next: warn when a card covers the speaker's face; variable-font weights.
+
 ### 67 · 2026-11-26 · Project vocabulary for the recogniser (`transcribe --vocab`)
 Did: names come out wrong first time ("work providers" for OAuth). `cutroom transcribe --vocab
 "OAuth, iCloud, GitHub"` keeps a per-project word list (transcripts/vocab.json; copied into shorts,

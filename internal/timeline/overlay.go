@@ -21,6 +21,7 @@ type Overlay struct {
 	AnchorText string  `json:"anchor_text,omitempty"` // the quoted words, for display
 	Text       string  `json:"text,omitempty"`        // text: first line
 	Sub        string  `json:"sub,omitempty"`         // text: smaller second line
+	Eyebrow    string  `json:"eyebrow,omitempty"`     // text: a small label above the title ("STEP 3")
 	Path       string  `json:"path,omitempty"`        // image: file (relative to the project)
 	Layout     string  `json:"layout"`                // lower-third | title | top | corner | center
 	Size       float64 `json:"size,omitempty"`        // image: width as a fraction of the frame
