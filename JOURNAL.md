@@ -2,6 +2,18 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 53 · 2026-11-26 · Fill crop centres on its anchor (vertical shorts framed the speaker off-edge)
+Did: a real-footage short (speaker at x≈0.74, `edit frame --anchor 0.70,0.40`) came out with the face
+against the right edge and the mic hand cut off. FrameFit cropped at `(iw-ow)*fx`: the anchor was a slide
+position, while `short`/`edit frame` help says "point of the source kept in frame" and ZoomCrop centres
+on its anchor. FrameFit now centres too: `clip(fx*iw-ow/2,0,iw-ow)` (and y). The grader's verticalRef
+and the selftest's known-good short use the same rule; shorts guide says the crop centres on the point.
+Measured: at 0.70 on a 1920×1080 source the old window was centred on 0.64; the face sat at ~83% of
+the width. Re-rendered: face centred, `check` passes. 0.5 is unchanged. make check green; e2e 257/257;
+grader selftest 26/26.
+Surprises: `check` can't see framing — every check passed on the badly framed short.
+Next: styling — captions and cards should take the look the user wants, not one house style.
+
 ### 52 · 2026-11-25 · Golden: eval round 11 24/24, all five criteria in the same round
 Did: eval round 11 — 12 tasks × sonnet + haiku, fresh agents (brief + "Start with `cutroom guide`").
 Sonnet 12/12, haiku 12/12 on the independent grader; every friction item rated low (round summary

@@ -112,7 +112,7 @@ func TestL41_VerticalLayoutsInSafeZones(t *testing.T) {
 			t.Errorf("caption %q: %v outside the safe zone", txt, r)
 		}
 	}
-	if f := FrameFit(true, 0.6, 0.5, 1080, 1920); !strings.Contains(f, "force_original_aspect_ratio=increase") || !strings.Contains(f, "crop=1080:1920:(iw-ow)*0.600000") {
+	if f := FrameFit(true, 0.6, 0.5, 1080, 1920); !strings.Contains(f, "force_original_aspect_ratio=increase") || !strings.Contains(f, "crop=1080:1920:'clip(0.600000*iw-ow/2,0,iw-ow)'") {
 		t.Errorf("fill: %s", f)
 	}
 }

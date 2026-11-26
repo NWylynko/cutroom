@@ -156,9 +156,9 @@ for l in keep:
 PY
 )"
 full_segs=$segs; segs=$SHORTSEGS
-cut $FIX/talk.mp4 "$W/short/out/short.mp4" "crop=ih*9/16:ih:(iw-ow)*0.6:0,scale=1080:1920,drawbox=x=140:y=1300:w=800:h=140:color=black@0.75:t=fill:enable='$SHORTSPEECH'"
+cut $FIX/talk.mp4 "$W/short/out/short.mp4" "crop=ih*9/16:ih:'clip(0.6*iw-ow/2,0,iw-ow)':0,scale=1080:1920,drawbox=x=140:y=1300:w=800:h=140:color=black@0.75:t=fill:enable='$SHORTSPEECH'"
 want PASS short "$W/short"
-cut $FIX/talk.mp4 "$W/shortlow/out/short.mp4" "crop=ih*9/16:ih:(iw-ow)*0.6:0,scale=1080:1920,drawbox=x=140:y=1700:w=800:h=140:color=black@0.75:t=fill:enable='$SHORTSPEECH'"
+cut $FIX/talk.mp4 "$W/shortlow/out/short.mp4" "crop=ih*9/16:ih:'clip(0.6*iw-ow/2,0,iw-ow)':0,scale=1080:1920,drawbox=x=140:y=1700:w=800:h=140:color=black@0.75:t=fill:enable='$SHORTSPEECH'"
 want FAIL short "$W/shortlow" "safe_bottom"
 cut $FIX/talk.mp4 "$W/shortwide/out/short.mp4" "drawbox=x=300:y=520:w=680:h=60:color=black@0.75:t=fill:enable='$SHORTSPEECH'"
 want FAIL short "$W/shortwide" "vertical_9x16"

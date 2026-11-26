@@ -956,7 +956,7 @@ func verticalRef(ref, out string) ([][]byte, float64) {
 	var bestFr [][]byte
 	for k := 0; k <= 20; k++ {
 		a := float64(k) / 20
-		fr := greyFrames(ref, fmt.Sprintf("crop=ih*9/16:ih:(iw-ow)*%.2f:0", a))
+		fr := greyFrames(ref, fmt.Sprintf("crop=ih*9/16:ih:'clip(%.2f*iw-ow/2,0,iw-ow)':0", a))
 		t := 0.0
 		for _, i := range probe {
 			e := math.Inf(1)

@@ -753,12 +753,13 @@ func round3(f float64) float64 { return math.Round(f*1e3) / 1e3 }
 func even(x float64) int { return int(math.Round(x/2)) * 2 }
 
 // FrameFit puts a (zoomed) source picture into the w×h output: fitted with bars, or — fill — scaled
-// to cover it and cropped around (fx, fy) (0–1 across, down), as a vertical short from landscape.
+// to cover it and cropped centred on (fx, fy) (0–1 across, down; the same meaning as ZoomCrop's
+// anchor), clamped inside the picture, as a vertical short from landscape.
 func FrameFit(fill bool, fx, fy float64, w, h int) string {
 	if !fill {
 		return fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1", w, h, w, h)
 	}
-	return fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d:(iw-ow)*%s:(ih-oh)*%s,setsar=1", w, h, w, h, f6(fx), f6(fy))
+	return fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d:'clip(%s*iw-ow/2,0,iw-ow)':'clip(%s*ih-oh/2,0,ih-oh)',setsar=1", w, h, w, h, f6(fx), f6(fy))
 }
 
 // PictureVF is the filter that turns a source frame into what the render shows in a segment, before
