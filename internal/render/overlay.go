@@ -230,13 +230,20 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 		accent := 0
 		if l.accent != nil && (o.Layout == "lower-third" || o.Layout == "" || o.Layout == "lower-third-raised") {
 			accent = int(math.Max(4, 0.006*float64(w)))
+			if l.radius > 0.5 { // wide enough to show inside the rounded corners
+				accent = max(accent, int(math.Min(l.radius*0.5, 0.02*float64(w))))
+			}
 		}
 		bw, bh := tw+2*l.padX+accent+2*l.outlineW, th+2*l.padY
 		x, y := placeCard(o, w, h, bw, bh, margin)
 		r = l.boxAt(w, h, bw, bh, x, y)
 		l.drawBox(img, r)
 		if accent > 0 {
-			raster.FillRound(img, image.Rect(r.Min.X, r.Min.Y, r.Min.X+accent, r.Max.Y), math.Min(l.radius, float64(accent)/2), l.accent)
+			if l.radius > 0.5 { // a rounded panel: the bar follows its left corners
+				raster.FillRoundPart(img, r, l.radius, l.accent, accent)
+			} else {
+				raster.Fill(img, image.Rect(r.Min.X, r.Min.Y, r.Min.X+accent, r.Max.Y), l.accent)
+			}
 		}
 		cy := r.Min.Y + l.padY
 		for _, ln := range lines {

@@ -132,3 +132,18 @@ func TestAnimFrameScalesAroundCentre(t *testing.T) {
 		}
 	}
 }
+
+func TestAccentFollowsRoundedCorners(t *testing.T) {
+	st := (&timeline.Style{Radius: 0.6, Accent: "#ff0000", Box: "#ffffff"}).Over(CardDefaults("lower-third"))
+	o := timeline.Overlay{Kind: "text", Text: "Hi", Layout: "lower-third", Style: &st}
+	img, r, err := Card(o, "", 1920, 1080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := img.NRGBAAt(r.Min.X, r.Min.Y).A; a != 0 {
+		t.Errorf("the accent bar pokes out of the rounded corner (alpha %d)", a)
+	}
+	if c := img.NRGBAAt(r.Min.X+2, (r.Min.Y+r.Max.Y)/2); c != (color.NRGBA{255, 0, 0, 255}) {
+		t.Errorf("accent bar missing at mid-height: %v", c)
+	}
+}

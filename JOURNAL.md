@@ -2,6 +2,15 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 57 · 2026-11-26 · Accent bars follow a rounded card's corners
+Did: on `style cards --radius …` the lower-third accent bar was its own little pill sitting on the
+panel's curve. It is now the left strip of the panel's own rounded shape (FillRoundPart), a little
+wider on rounded panels so it shows inside the corner; square panels unchanged.
+Measured: real short card at radius 0.5, accent #307351: the bar curves with the corner (looked at
+full resolution); test asserts the corner pixel is clear and mid-height is the accent. make check
+green; e2e 271/271.
+Next: T2 eval task whose brief asks for a specific look (fresh sonnet + haiku).
+
 ### 56 · 2026-11-26 · Animated captions and cards: pop, slide, fade (`style --animate`)
 Did: cards could only alpha-fade, captions only cut in. New style fields `animate` (none | fade | pop |
 slide-up/down/left/right) and `animate-time`. Captions: each group's first frames are drawn as

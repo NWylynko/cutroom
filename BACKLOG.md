@@ -7,7 +7,6 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- [style] A rounded card's accent bar sits on the curve of the panel; inset it or follow the corner.
 - [style] Per-word pop for karaoke captions (each word bumps as it is said), if asked for.
 - [style] T2 eval task whose brief asks for a specific caption look (font, highlight, position) —
   checks agents find `cutroom style` from the guide.

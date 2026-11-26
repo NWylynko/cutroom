@@ -13,8 +13,14 @@ import (
 
 // FillRound fills r with c, corners rounded to radius px (anti-aliased; 0 = square).
 func FillRound(dst draw.Image, r image.Rectangle, radius float64, c color.Color) {
+	FillRoundPart(dst, r, radius, c, r.Dx())
+}
+
+// FillRoundPart fills only the left w px of the rounded rect r (an accent bar that follows the
+// panel's corners).
+func FillRoundPart(dst draw.Image, r image.Rectangle, radius float64, c color.Color, w0 int) {
 	if radius <= 0.5 {
-		Fill(dst, r, c)
+		Fill(dst, image.Rect(r.Min.X, r.Min.Y, r.Min.X+w0, r.Max.Y), c)
 		return
 	}
 	w, h := float32(r.Dx()), float32(r.Dy())
@@ -33,7 +39,7 @@ func FillRound(dst draw.Image, r image.Rectangle, radius float64, c color.Color)
 	z.ClosePath()
 	mask := image.NewAlpha(image.Rect(0, 0, r.Dx(), r.Dy()))
 	z.Draw(mask, mask.Bounds(), image.Opaque, image.Point{})
-	draw.DrawMask(dst, r, image.NewUniform(c), image.Point{}, mask, image.Point{}, draw.Over)
+	draw.DrawMask(dst, image.Rect(r.Min.X, r.Min.Y, r.Min.X+w0, r.Max.Y), image.NewUniform(c), image.Point{}, mask, image.Point{}, draw.Over)
 }
 
 // Run is a piece of a line drawn in one colour.
