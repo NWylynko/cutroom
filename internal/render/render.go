@@ -321,6 +321,11 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 			// start on chunk frame From (transparent before it)
 			chain = fmt.Sprintf("[%d:v]", in) + sdr.Chain(fmt.Sprintf("fps=fps=%s:round=near,scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d,setsar=1,setparams=colorspace=bt709:color_primaries=bt709:color_trc=bt709:range=tv,format=yuva420p,tpad=stop=-1:stop_mode=clone,trim=end_frame=%d,setpts=PTS-STARTPTS,tpad=start=%d:start_mode=add:color=black@0",
 				fps, bw, bh, bw, bh, n, co.From))
+			if co.P.Radius > 0 { // a styled inset: rounded corners (alpha outside the rounded rectangle)
+				rr := co.P.Radius
+				geq := fmt.Sprintf("geq=lum='lum(X,Y)':cb='cb(X,Y)':cr='cr(X,Y)':a='if(lte(pow(max(0,max(%[1]g-X,X-(W-1-%[1]g))),2)+pow(max(0,max(%[1]g-Y,Y-(H-1-%[1]g))),2),%[2]g),255,0)'", rr, rr*rr)
+				chain = strings.Replace(chain, "format=yuva420p,tpad=stop=-1", "format=yuva420p,"+geq+",tpad=stop=-1", 1)
+			}
 		} else {
 			args = append(args, "-loop", "1", "-framerate", fps, "-t", f6(float64(c.Frames+3)/tl.Rate()), "-i", co.P.PNG)
 			chain = fmt.Sprintf("[%d:v]format=rgba", in)

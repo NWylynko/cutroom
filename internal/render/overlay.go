@@ -25,7 +25,7 @@ import (
 )
 
 // CardVersion changes whenever card drawing changes, so cached cards are redrawn.
-const CardVersion = 5 // 5: eyebrow tracking 0.14 by default; 4: 4: highlight box drawn over the outline; 3: clips relabelled bt709 like sources (newer ffmpeg converted untagged clips from bt601)
+const CardVersion = 6 // 6: card sub-lines keep their case; 5: 5: eyebrow tracking 0.14 by default; 4: 4: highlight box drawn over the outline; 3: clips relabelled bt709 like sources (newer ffmpeg converted untagged clips from bt601)
 
 // Placement is one overlay as rendered: a full-frame RGBA PNG shown over output [Start, End),
 // fading in and out over Fade seconds. Box is the drawn area as fractions of the frame
@@ -46,7 +46,8 @@ type Placement struct {
 	Clip    string  `json:"clip,omitempty"`
 	ClipIn  float64 `json:"clip_in,omitempty"`
 	ClipDur float64 `json:"clip_duration,omitempty"`
-	Full    bool    `json:"full,omitempty"` // covers the whole frame
+	Full    bool    `json:"full,omitempty"`   // covers the whole frame
+	Radius  float64 `json:"radius,omitempty"` // clip: rounded corners (px)
 	// Anim: a card's motion in and out (pop, slide-…; "" or fade = none) over AnimTime seconds
 	Anim     string  `json:"anim,omitempty"`
 	AnimTime float64 `json:"anim_time,omitempty"`
@@ -94,8 +95,39 @@ func Placements(tl *timeline.Timeline, tr timeline.Transcripts, projDir, cacheDi
 				return nil, fmt.Errorf("overlay %s: %w", o.ID, err)
 			}
 			r := clipBox(o, w, h)
-			ps = append(ps, Placement{ID: o.ID, Kind: "clip", Start: a, End: b, Fade: o.Fade, Name: o.Path, Clip: abs, ClipIn: o.ClipIn, ClipDur: o.ClipDur, Full: o.Layout == "full",
-				Key: hash([]any{CardVersion, "clip", abs, st.Size(), st.ModTime().UnixNano(), o.ClipIn, o.Layout, o.Size, w, h}),
+			radius := 0.0
+			if o.Layout != "full" && !o.Style.Empty() {
+				// a styled inset: its frame (shadow, border) is a still layer under it; the clip itself
+				// gets rounded corners in the render
+				ms := MediaLook(*o.Style, r.Dx(), r.Dy())
+				r = ms.place(w, h, r)
+				r = image.Rect(r.Min.X&^1, r.Min.Y&^1, r.Min.X&^1+r.Dx(), r.Min.Y&^1+r.Dy())
+				radius = ms.Radius
+				if ms.Shadow != nil || ms.Border > 0 {
+					fkey := hash([]any{CardVersion, "clip-frame", r, *o.Style, w, h})
+					fpng := filepath.Join(cacheDir, "overlays", fkey+".png")
+					if _, err := os.Stat(fpng); err != nil {
+						img := image.NewNRGBA(image.Rect(0, 0, w, h))
+						ms.drawFrame(img, r)
+						if err := ensureDir(fpng); err != nil {
+							return nil, err
+						}
+						if err := raster.SavePNG(fpng, img); err != nil {
+							return nil, err
+						}
+					}
+					sz := float64(min(r.Dx(), r.Dy()))
+					reach := int(ms.Border)
+					if ms.Shadow != nil { // the shadow's blur spreads 2× blur, moved down by its offset
+						reach += int(0.16*sz) + int(0.04*sz)
+					}
+					fr := r.Inset(-reach).Intersect(image.Rect(0, 0, w, h))
+					ps = append(ps, Placement{ID: o.ID, Kind: "frame", PNG: fpng, Key: fkey, Start: a, End: b, Fade: o.Fade, Name: o.Path + " (frame)",
+						Box: [4]float64{float64(fr.Min.X) / float64(w), float64(fr.Min.Y) / float64(h), float64(fr.Max.X) / float64(w), float64(fr.Max.Y) / float64(h)}})
+				}
+			}
+			ps = append(ps, Placement{ID: o.ID, Kind: "clip", Start: a, End: b, Fade: o.Fade, Name: o.Path, Clip: abs, ClipIn: o.ClipIn, ClipDur: o.ClipDur, Full: o.Layout == "full", Radius: radius,
+				Key: hash([]any{CardVersion, "clip", abs, st.Size(), st.ModTime().UnixNano(), o.ClipIn, o.Layout, o.Size, w, h, r, radius}),
 				Box: [4]float64{float64(r.Min.X) / float64(w), float64(r.Min.Y) / float64(h), float64(r.Max.X) / float64(w), float64(r.Max.Y) / float64(h)}})
 			continue
 		}
@@ -147,6 +179,8 @@ func cardKey(o timeline.Overlay, projDir string, w, h int) (string, error) {
 			return "", fmt.Errorf("overlay %s: %w", o.ID, err)
 		}
 		parts = append(parts, l.key)
+	} else if !o.Style.Empty() {
+		parts = append(parts, *o.Style)
 	}
 	if o.Kind == "image" {
 		b, err := os.ReadFile(absIn(projDir, o.Path))
@@ -200,7 +234,19 @@ func Card(o timeline.Overlay, projDir string, w, h int) (img *image.NRGBA, r ima
 		}
 		x, y := placeCard(o, w, h, iw, ih, margin)
 		r = image.Rect(x, y, x+iw, y+ih)
-		xdraw.CatmullRom.Scale(img, r, src, src.Bounds(), draw.Over, nil)
+		if o.Style.Empty() {
+			xdraw.CatmullRom.Scale(img, r, src, src.Bounds(), draw.Over, nil)
+			return img, r, nil
+		}
+		// a styled image: placed by --x/--y, rounded corners, a border and a soft shadow
+		ms := MediaLook(*o.Style, iw, ih)
+		r = ms.place(w, h, r)
+		ms.drawFrame(img, r)
+		pic := image.NewNRGBA(image.Rect(0, 0, iw, ih))
+		xdraw.CatmullRom.Scale(pic, pic.Bounds(), src, src.Bounds(), draw.Src, nil)
+		mask := image.NewAlpha(pic.Bounds())
+		raster.FillRound(mask, mask.Bounds(), ms.Radius, image.Opaque)
+		draw.DrawMask(img, r, pic, image.Point{}, mask, image.Point{}, draw.Over)
 		return img, r, nil
 	case "text":
 		l, err := resolve(o.Style.Over(CardDefaults(o.Layout)), projDir, w, h)

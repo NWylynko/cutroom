@@ -350,6 +350,8 @@ expect "clip add: full by default"  'added o1: clip "broll.mp4", full, output .*
 expect "clip add: HDR inset"        'added o2: clip "talk-hdr.mov", corner'  cutroom overlay add clip talk-hdr.mov --at "Hi, today" --layout corner --size 0.3 --duration 2 --clip-in 1
 expect "clip-short warned"          'clip-short.*o1.*last frame is held' sh -c 'cutroom overlay set o1 --duration 4 >/dev/null; cutroom timeline'
 expect "clip: bad clip-in"          'outside the clip'                   cutroom overlay add clip broll.mp4 --at "Finally" --clip-in 9
+expect "style an inset clip"        'now set: .*radius=0.1'               cutroom style o2 --radius 0.1 --outline white --box-shadow "#00000066"
+expect "style a clip: text fields refused" "doesn't apply to an image or clip" cutroom style o2 --font bold
 expect "look shows the clip"        'with overlay\(s\) o2 drawn'          cutroom look --output 1
 expect "render with clips"          '^wrote out/final\.mp4'               cutroom render
 expect "check: clip frames (full)"  'ok   overlay +o1 .*shows the clip.s own frames from 0\.00 s' cutroom check

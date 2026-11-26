@@ -1108,6 +1108,9 @@ func overlayCheck(file string, m *render.Manifest, fps float64, r *Report) {
 		return mseMasked(frames[f], burst[bj], [][4]int{box}, true), true
 	}
 	for _, p := range m.Overlays {
+		if p.Kind == "frame" {
+			continue // a styled clip's border and shadow: checked with the clip
+		}
 		if p.Kind == "captions" {
 			captionCheck(p, fps, diffIn, r)
 			continue
@@ -1228,6 +1231,12 @@ func clipFrames(file string, m *render.Manifest, p render.Placement, fps float64
 	W, H := float64(m.Width), float64(m.Height)
 	bx, by := int(math.Round(p.Box[0]*W)), int(math.Round(p.Box[1]*H))
 	bw, bh := evenInt(p.Box[2]*W-float64(bx)), evenInt(p.Box[3]*H-float64(by))
+	// a styled inset has rounded corners: compare the part inside them
+	in := 0
+	if p.Radius > 0 {
+		in = int(math.Ceil(0.3*p.Radius)) + 2
+	}
+	inner := fmt.Sprintf("crop=%d:%d:%d:%d", bw-2*in, bh-2*in, in, in)
 	sw := 64
 	sh := max(8, int(math.Round(float64(sw)*float64(bh)/float64(bw))))
 	// luma planes as stored: no colour-matrix conversion on either side (a tagged render and an
@@ -1237,14 +1246,14 @@ func clipFrames(file string, m *render.Manifest, p render.Placement, fps float64
 	worst, n := 0.0, 0
 	for _, f := range []int{fa + (fb-fa)/4, (fa + fb) / 2, fa + 3*(fb-fa)/4} {
 		r, err := deps.Run("ffmpeg", "-v", "error", "-ss", strconv.FormatFloat((float64(f)-0.5)/fps, 'f', 5, 64), "-i", file,
-			"-vf", fmt.Sprintf("crop=%d:%d:%d:%d,%s", bw, bh, bx, by, small), "-frames:v", "1", "-f", "rawvideo", "-")
+			"-vf", fmt.Sprintf("crop=%d:%d:%d:%d,%s,%s", bw, bh, bx, by, inner, small), "-frames:v", "1", "-f", "rawvideo", "-")
 		if err != nil || len(r) < sw*sh {
 			continue
 		}
 		t := p.ClipIn + float64(f-fa)/fps
 		sdr := media.ReadSDR(p.Clip, 0, 0)
 		args := append([]string{"-v", "error", "-ss", strconv.FormatFloat(math.Max(0, t-2/fps), 'f', 5, 64)}, sdr.Pre...)
-		args = append(args, "-i", p.Clip, "-vf", sdr.Chain(fmt.Sprintf("fps=%g,scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,%s", fps, bw, bh, bw, bh, small)),
+		args = append(args, "-i", p.Clip, "-vf", sdr.Chain(fmt.Sprintf("fps=%g,scale=%d:%d:force_original_aspect_ratio=increase,crop=%d:%d,%s,%s", fps, bw, bh, bw, bh, inner, small)),
 			"-frames:v", "5", "-f", "rawvideo", "-")
 		b, err := deps.Run("ffmpeg", args...)
 		if err != nil || len(b) < sw*sh {

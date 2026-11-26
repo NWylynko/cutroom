@@ -2,6 +2,19 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 77 · 2026-11-27 · Styled images and inset clips: rounded corners, border, shadow, placement
+Did: image and inset-clip overlays were bare rectangles. `cutroom style o2 --radius … --outline …
+--outline-width … --box-shadow … --x/--y` now applies to them (radius/border as fractions of the
+box's short side; text fields refused with the list that applies). Images are drawn masked to a
+rounded rect over a border and soft shadow. Inset clips get rounded corners in the render (alpha via
+geq on yuva420p) and their border+shadow as a still "frame" placement under them (its box covers the
+shadow's reach so `check` compares around it). `check`'s clip-frames comparison skips the rounded
+corners; `look` de-duplicates the frame layer's id. CardVersion 6 (also re-draws sub-lines whose
+case iteration 76 changed — the cache had kept them upper-case).
+Measured: real deploying edit: a styled screenshot image and a styled B-roll inset from my-personal
+footage (rounded, white border, shadow) — range render + `check` PASS 0 warnings after the shadow-box
+fix (first run: picture FAIL 61.5 where the shadow spread past the box). e2e 309/309 (+2).
+
 ### 76 · 2026-11-27 · Letter-spacing: `tracking`, `eyebrow-tracking` (0.14 by default, as the house style)
 Did: style field `tracking` (captions and card titles, fraction of the font size) and
 `eyebrow-tracking` (cards, default 0.14 — the house style's eyebrow). Implemented as a face wrapper

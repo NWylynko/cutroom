@@ -292,7 +292,13 @@ func lookEdit(c *Ctx) (*Result, error) {
 					}
 				}
 			}
-			desc += "; with overlay(s) " + strings.Join(ids, ", ") + " drawn as rendered (+oN in the label)"
+			var uniq []string
+			for _, id := range ids {
+				if len(uniq) == 0 || uniq[len(uniq)-1] != id {
+					uniq = append(uniq, id)
+				}
+			}
+			desc += "; with overlay(s) " + strings.Join(uniq, ", ") + " drawn as rendered (+oN in the label)"
 		}
 	}
 	img, err := perceive.Cells(cells, cols)

@@ -40,6 +40,12 @@ Fields (`cutroom style --help` lists them all; `--x default` unsets one, `--rese
   and go out with it, on top of their `--fade` (`overlay set o1 --fade 0` for motion only).
   **animate-time**: seconds it takes (captions 0.15, cards 0.3).
 
+## Images and inset clips
+`cutroom style o2 --radius 0.08 --outline white --outline-width 0.015 --box-shadow "#00000066"`
+gives an image or an inset clip (not a full-frame cutaway) rounded corners, a border and a soft
+shadow; `--x/--y` place it; radius and outline-width are fractions of its short side. Text fields
+(font, colours of text…) don't apply to them.
+
 ## Looks: one channel look for every short
 
 Set captions and cards up once, then keep them as a named look and apply it anywhere:

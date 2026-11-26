@@ -211,3 +211,34 @@ func TestTrackingWidensText(t *testing.T) {
 		t.Errorf("tracking 0.1 on 5 letters: width %d, want ≥ %d (untracked %d)", b, want, a)
 	}
 }
+
+func TestStyledImageOverlay(t *testing.T) {
+	dir := t.TempDir()
+	pic := image.NewNRGBA(image.Rect(0, 0, 200, 100))
+	for i := range pic.Pix {
+		pic.Pix[i] = 255 // white, opaque
+	}
+	for y := range 100 {
+		for x := range 200 {
+			pic.SetNRGBA(x, y, color.NRGBA{0, 0, 255, 255})
+		}
+	}
+	if err := raster.SavePNG(dir+"/p.png", pic); err != nil {
+		t.Fatal(err)
+	}
+	st := timeline.Style{Radius: 0.3, Outline: "#ff0000", OutlineWidth: 0.05}
+	o := timeline.Overlay{ID: "o1", Kind: "image", Path: "p.png", Layout: "corner", Size: 0.25, Style: &st}
+	img, r, err := Card(o, dir, 1920, 1080)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if a := img.NRGBAAt(r.Min.X, r.Min.Y).A; a != 0 {
+		t.Errorf("rounded corner still drawn (alpha %d)", a)
+	}
+	if c := img.NRGBAAt((r.Min.X+r.Max.X)/2, r.Min.Y-2); c != (color.NRGBA{255, 0, 0, 255}) {
+		t.Errorf("border above the image: %v", c)
+	}
+	if c := img.NRGBAAt((r.Min.X+r.Max.X)/2, (r.Min.Y+r.Max.Y)/2); c != (color.NRGBA{0, 0, 255, 255}) {
+		t.Errorf("picture inside: %v", c)
+	}
+}

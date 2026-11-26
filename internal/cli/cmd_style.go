@@ -180,8 +180,16 @@ func runStyle(c *Ctx) (*Result, error) {
 		case "text":
 			target = &o.Style
 			full = func() timeline.Style { return render.CardStyle(e.tl, *o) }
+		case "image", "clip":
+			target, kind = &o.Style, "media"
+			full = func() timeline.Style {
+				if o.Style == nil {
+					return timeline.Style{}
+				}
+				return *o.Style
+			}
 		default:
-			return nil, Errf(ExitUsage, "not-text", fmt.Sprintf("an %s overlay is drawn from its file: change the file, or its --layout/--size with `cutroom overlay set %s`", o.Kind, o.ID), "%s is an %s overlay, not text", o.ID, o.Kind)
+			return nil, Errf(ExitUsage, "not-text", "style captions, cards or a text/image/clip overlay", "%s can't be styled", o.ID)
 		}
 	}
 	if !anyStyleFlag(c) && !c.Bool("reset") {
@@ -201,7 +209,10 @@ func runStyle(c *Ctx) (*Result, error) {
 		if !c.Has(f.Name) {
 			continue
 		}
-		if f.For != "" && f.For != kind {
+		if kind == "media" && !contains(render.MediaStyleFields, f.Name) {
+			return nil, Errf(ExitUsage, "wrong-field", "an image or clip takes "+strings.Join(render.MediaStyleFields, ", ")+" (--radius and --outline-width are fractions of its short side)", "--%s doesn't apply to an image or clip", f.Name)
+		}
+		if f.For != "" && f.For != kind && kind != "media" {
 			return nil, Errf(ExitUsage, "wrong-field", fmt.Sprintf("--%s is for %s", f.Name, f.For), "--%s doesn't apply to %s", f.Name, kind)
 		}
 		if err := st.Set(f.Name, c.Str(f.Name)); err != nil {
@@ -277,7 +288,7 @@ func anyStyleFlag(c *Ctx) bool {
 func styleLines(set *timeline.Style, full timeline.Style, kind, dir string) []string {
 	var out []string
 	for _, f := range timeline.StyleFields {
-		if f.For != "" && f.For != kind {
+		if (f.For != "" && f.For != kind && kind != "media") || (kind == "media" && !contains(render.MediaStyleFields, f.Name)) {
 			continue
 		}
 		v := full.Get(f.Name)

@@ -249,3 +249,54 @@ func mixedCase(w string) bool {
 	first, _ := utf8.DecodeRuneInString(w)
 	return low > 0 && (up > 0 || unicode.IsLower(first) && strings.ContainsFunc(w, unicode.IsUpper))
 }
+
+// Media is the look of an image or inset clip: corner radius, border and shadow (px), and where it
+// goes. Radius and border are fractions of the box's short side.
+type Media struct {
+	Radius, Border float64
+	BorderC        color.Color
+	Shadow         color.Color
+	X, Y           *float64
+}
+
+// MediaLook resolves an image/clip overlay's own style for a w×h box.
+func MediaLook(st timeline.Style, w, h int) Media {
+	short := float64(min(w, h))
+	m := Media{Radius: st.Radius * short, BorderC: colorOf(st.Outline), Shadow: colorOf(st.BoxShadow), X: st.X, Y: st.Y}
+	if m.BorderC != nil {
+		bw := st.OutlineWidth
+		if bw == 0 {
+			bw = 0.02
+		}
+		m.Border = math.Max(1, math.Round(bw*short))
+	}
+	return m
+}
+
+// MediaStyleFields are the style fields an image or clip overlay takes.
+var MediaStyleFields = []string{"radius", "outline", "outline-width", "box-shadow", "x", "y", "animate", "animate-time"}
+
+func (m Media) place(w, h int, r image.Rectangle) image.Rectangle {
+	x, y := r.Min.X, r.Min.Y
+	if m.X != nil {
+		x = int(math.Round(*m.X*float64(w))) - r.Dx()/2
+	}
+	if m.Y != nil {
+		y = int(math.Round(*m.Y*float64(h))) - r.Dy()/2
+	}
+	x, y = max(0, min(x, w-r.Dx())), max(0, min(y, h-r.Dy()))
+	return image.Rect(x, y, x+r.Dx(), y+r.Dy())
+}
+
+// drawFrame draws the shadow and the border round r (the picture goes inside r).
+func (m Media) drawFrame(img *image.NRGBA, r image.Rectangle) {
+	b := int(m.Border)
+	outer := r.Inset(-b)
+	if m.Shadow != nil {
+		sz := float64(min(r.Dx(), r.Dy()))
+		raster.SoftShadow(img, outer, m.Radius+float64(b), int(0.04*sz), int(0.08*sz), m.Shadow)
+	}
+	if m.BorderC != nil && b > 0 {
+		raster.FillRound(img, outer, m.Radius+float64(b), m.BorderC)
+	}
+}
