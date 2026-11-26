@@ -187,3 +187,15 @@ func TestUpperKeepNames(t *testing.T) {
 		t.Errorf("got %q", got)
 	}
 }
+
+func TestCaptionHighlightBox(t *testing.T) {
+	st := (&timeline.Style{HighlightBox: "#00ff00", Highlight: "#ff0000", Box: "none", Outline: "black"}).Over(CaptionDefaults)
+	l, _ := resolve(st, "", 1080, 1920)
+	img, r := captionCard([]string{"one", "two"}, 1, l, 1080, 1920)
+	if n := countColor(img, r, color.NRGBA{0, 255, 0, 255}); n < 500 {
+		t.Errorf("highlight box: %d green px", n)
+	}
+	if n := countColor(img, r, color.NRGBA{255, 0, 0, 255}); n < 100 {
+		t.Errorf("the boxed word's letters are drawn on top of the box: %d red px", n)
+	}
+}

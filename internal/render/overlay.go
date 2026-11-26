@@ -25,7 +25,7 @@ import (
 )
 
 // CardVersion changes whenever card drawing changes, so cached cards are redrawn.
-const CardVersion = 3 // 3: clips relabelled bt709 like sources (newer ffmpeg converted untagged clips from bt601)
+const CardVersion = 4 // 4: highlight box drawn over the outline; 3: clips relabelled bt709 like sources (newer ffmpeg converted untagged clips from bt601)
 
 // Placement is one overlay as rendered: a full-frame RGBA PNG shown over output [Start, End),
 // fading in and out over Fade seconds. Box is the drawn area as fractions of the frame
@@ -470,7 +470,7 @@ func captionPlacement(tl *timeline.Timeline, tr timeline.Transcripts, o timeline
 	}
 	for _, g := range captions.Groups(ws, GroupOptions(st), tl.Duration()) {
 		words := strings.Fields(g.Text)
-		if l.highlight == nil || len(words) != g.Last-g.First+1 {
+		if (l.highlight == nil && l.hiBox == nil) || len(words) != g.Last-g.First+1 {
 			if err := add(g, words, -1, g.Start, g.End, true); err != nil {
 				return p, err
 			}
@@ -587,6 +587,27 @@ func captionCard(words []string, active int, l look, w, h int) (*image.NRGBA, im
 			runs = append(runs, raster.Run{S: s, C: c})
 		}
 		raster.StyledLine(img, l.face, x, y, runs, l.textStyle())
+		if l.hiBox != nil { // a rounded box over the outline of the word being said, its letters on top
+			pre := ""
+			for j, k := range ln {
+				if j > 0 {
+					pre += " "
+				}
+				if k == active {
+					wx := x + raster.Measure(l.face, pre)
+					ww := raster.Measure(l.face, words[k])
+					px, py := int(0.18*l.size), int(0.08*l.size)
+					raster.FillRound(img, image.Rect(wx-px, y-m.Ascent.Round()-py, wx+ww+px, y+m.Descent.Round()+py), 0.22*l.size, l.hiBox)
+					c := l.color
+					if l.highlight != nil {
+						c = l.highlight
+					}
+					raster.Text(img, l.face, wx, y, c, words[k])
+					break
+				}
+				pre += words[k]
+			}
+		}
 		y += lh + gap
 	}
 	return img, r

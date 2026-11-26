@@ -22,6 +22,7 @@ type Style struct {
 	Color        string   `json:"color,omitempty"`         // text colour
 	SubColor     string   `json:"sub_color,omitempty"`     // cards: second line colour
 	Highlight    string   `json:"highlight,omitempty"`     // captions: colour of the word being said ("none" = off)
+	HighlightBox string   `json:"highlight_box,omitempty"` // captions: a rounded box behind the word being said ("none" = off)
 	Box          string   `json:"box,omitempty"`           // background colour, or none
 	Accent       string   `json:"accent,omitempty"`        // cards: bar on the left of lower thirds, or none
 	Outline      string   `json:"outline,omitempty"`       // text outline colour, or none
@@ -52,6 +53,7 @@ var StyleFields = []StyleField{
 	{"size", "num", "text height as a fraction of the frame's short side (captions default 0.068)", ""},
 	{"color", "color", "text colour: #rrggbb, #rrggbbaa or a name (white, black, yellow, …)", ""},
 	{"highlight", "color", "colour of the word being said, karaoke style (none = off)", "captions"},
+	{"highlight-box", "color", "a rounded box in this colour behind the word being said (none = off)", "captions"},
 	{"box", "color", "background box colour (with alpha: #00000099), or none", ""},
 	{"outline", "color", "outline round the letters, or none", ""},
 	{"outline-width", "num", "outline thickness as a fraction of the font size (default 0.08 when an outline is set)", ""},

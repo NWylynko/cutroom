@@ -397,6 +397,7 @@ expect "style unsafe warned"         'overlay-unsafe.*burned-in captions.*style 
 expect "style undo"                  'undid'                              cutroom edit undo --project shorts/steps
 expect "style animate"               'now set: .*animate=pop'                  cutroom style captions --animate pop --project shorts/steps
 expect "style animate: how to see it" 'to see the motion, render' cutroom style o1 --animate-time 0.4 --project shorts/steps
+expect "style highlight box"         'highlight-box=#ffd400'              cutroom style captions --highlight-box "#ffd400" --project shorts/steps
 expect "style animate cards"         'now set: animate=slide-up'             cutroom style cards --animate slide-up --project shorts/steps
 expect "transcribe --vocab"          'vocabulary \(2\): ThinkPad, Ubuntu' cutroom transcribe --vocab "ThinkPad, Ubuntu" --passes 1 --project shorts/steps
 expect "vocab re-transcribes once"   'talk .*cached'                      cutroom transcribe --passes 1 --project shorts/steps

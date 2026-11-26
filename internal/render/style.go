@@ -19,7 +19,7 @@ import (
 
 // CaptionDefaults is cutroom's caption look: bold white on a translucent black box (L48).
 var CaptionDefaults = timeline.Style{Font: "bold", Size: 0.068, Color: "#ffffff", Box: "#000000aa", Pad: 0.3,
-	Highlight: "none", Outline: "none", Shadow: "none", BoxShadow: "none", Case: "as-is", Align: "center", Chars: 20, Animate: "none", AnimateTime: 0.15}
+	Highlight: "none", HighlightBox: "none", Outline: "none", Shadow: "none", BoxShadow: "none", Case: "as-is", Align: "center", Chars: 20, Animate: "none", AnimateTime: 0.15}
 
 // CardDefaults is cutroom's text-card look for a layout: white on a dark translucent panel, an amber
 // bar on lower thirds.
@@ -39,18 +39,18 @@ func CardDefaults(layout string) timeline.Style {
 
 // look is a style resolved for drawing at one frame size: faces, pixel sizes, colours (nil = off).
 type look struct {
-	face, subFace                                                   font.Face
-	size                                                            float64
-	color, subColor, highlight, box, accent, outln, shade, boxShade color.Color
-	outlineW, shadowOff                                             int
-	radius                                                          float64
-	padX, padY                                                      int
-	upper, lower, keepNames                                         bool
-	align                                                           string
-	x, y                                                            *float64
-	width                                                           int
-	key                                                             string // for caches: the style and its font files
-	fontRef                                                         raster.FontRef
+	face, subFace                                                          font.Face
+	size                                                                   float64
+	color, subColor, highlight, hiBox, box, accent, outln, shade, boxShade color.Color
+	outlineW, shadowOff                                                    int
+	radius                                                                 float64
+	padX, padY                                                             int
+	upper, lower, keepNames                                                bool
+	align                                                                  string
+	x, y                                                                   *float64
+	width                                                                  int
+	key                                                                    string // for caches: the style and its font files
+	fontRef                                                                raster.FontRef
 }
 
 func colorOf(s string) color.Color {
@@ -82,7 +82,7 @@ func resolve(st timeline.Style, dir string, w, h int) (look, error) {
 		subSize = math.Round(0.65 * size)
 	}
 	l := look{fontRef: fr, face: raster.RefFace(fr, size), subFace: raster.RefFace(sr, subSize), size: size,
-		color: colorOf(st.Color), subColor: colorOf(st.SubColor), highlight: colorOf(st.Highlight), box: colorOf(st.Box),
+		color: colorOf(st.Color), subColor: colorOf(st.SubColor), highlight: colorOf(st.Highlight), hiBox: colorOf(st.HighlightBox), box: colorOf(st.Box),
 		accent: colorOf(st.Accent), outln: colorOf(st.Outline), shade: colorOf(st.Shadow), boxShade: colorOf(st.BoxShadow),
 		radius: st.Radius * size, padX: int(st.Pad * size), padY: int(0.6 * st.Pad * size),
 		upper: st.Case == "upper" || st.Case == "upper-keep-names", lower: st.Case == "lower", keepNames: st.Case == "upper-keep-names", align: st.Align, x: st.X, y: st.Y,

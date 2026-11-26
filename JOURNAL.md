@@ -2,6 +2,15 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 75 · 2026-11-27 · Caption `highlight-box`: a rounded box behind the word being said
+Did: another common shorts caption look — the spoken word on a coloured rounded box. New style field
+`highlight-box` (karaoke cards per word, like `highlight`); drawn after the line's outline and shadow,
+then the word's letters on top, so dark text on the box stays crisp (first try smeared the black
+outline over it). CardVersion 4 so cached caption cards redraw.
+Measured: real my-personal short, Avenir Black upper, outline, `--highlight-box "#ffd400"
+--highlight "#111111"`: the box follows each word (looked at 4 frames, cropped full-size). Test
+asserts box and on-top letters. e2e 306/306.
+
 ### 74 · 2026-11-27 · A wordless sound inside a sentence: listen and keep, don't cut
 Did: r73's real edit had a jump cut inside "a $10 a month | server." from applying a kept-sound fix.
 `listen` there: the isolated clip hears "months server" — the sound was the end of "months" (or a

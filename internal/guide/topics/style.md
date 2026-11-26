@@ -25,6 +25,8 @@ Fields (`cutroom style --help` lists them all; `--x default` unsets one, `--rese
   under the box), **accent** (the bar on lower thirds), **highlight**: `#rrggbb`, `#rrggbbaa` (aa =
   opacity: `#00000099`) or a name; `none` turns that part off.
 - **highlight** (captions): karaoke — each word turns this colour while it is said.
+- **highlight-box** (captions): a rounded box in this colour behind the word being said (with
+  `--highlight` for its letters, e.g. `--highlight-box "#ffd400" --highlight "#111111"`).
 - **words** / **chars** (captions): how much shows at once (default 3 words, 20 characters).
 - **case** (upper | lower | as-is), **align** (left | center | right), **radius** and **pad**
   (fractions of the font size), **outline-width** (fraction of the font size, default 0.08).
