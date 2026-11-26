@@ -232,6 +232,9 @@ func Plan(tl *timeline.Timeline, srcs map[string]Source, o Options) []Chunk {
 			ovs = append(ovs, []any{p.Key, from, to, co.FadeIn, co.FadeOut, p.Fade, pa - c0, pb - c0, p.Anim, p.AnimTime, co.AnimIn, co.AnimOut})
 		}
 		parts := []any{Version, tl.FPS, w, h, o.Preview, encArgs(o.Preview), segs, tl.Grid}
+		if tl.Bars != "" && !tl.Fill {
+			parts = append(parts, []any{"bars", tl.Bars})
+		}
 		if tl.Fill { // keys of fitted timelines are unchanged
 			parts = append(parts, []any{"fill", tl.FillX, tl.FillY})
 		}
@@ -274,7 +277,7 @@ func chunkCmd(tl *timeline.Timeline, srcs map[string]Source, c Chunk, preview bo
 			ax, ay := g.Anchor()
 			chain += "," + ZoomCrop(z, ax, ay)
 		}
-		chain += "," + FrameFit(tl.Fill, tl.FillX, tl.FillY, w, h)
+		chain += "," + FrameFit(tl.Fill, tl.FillX, tl.FillY, tl.Bars, fmt.Sprintf("s%d", n), w, h)
 		chain += ",format=yuv420p" + fmt.Sprintf("[v%d]", n)
 		fc = append(fc, chain)
 		labels += fmt.Sprintf("[v%d]", n)
@@ -770,9 +773,22 @@ func even(x float64) int { return int(math.Round(x/2)) * 2 }
 // FrameFit puts a (zoomed) source picture into the w×h output: fitted with bars, or — fill — scaled
 // to cover it and cropped centred on (fx, fy) (0–1 across, down; the same meaning as ZoomCrop's
 // anchor), clamped inside the picture, as a vertical short from landscape.
-func FrameFit(fill bool, fx, fy float64, w, h int) string {
+//
+// A fitted picture's bars are black, a colour (bars "#rrggbb"), or "blur": the picture itself scaled
+// to cover the frame, blurred and darkened, under the fitted one (tag keeps the graph's labels
+// unique when several segments are in one graph).
+func FrameFit(fill bool, fx, fy float64, bars, tag string, w, h int) string {
 	if !fill {
-		return fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1", w, h, w, h)
+		fit := fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=decrease:flags=lanczos", w, h)
+		switch {
+		case bars == "blur":
+			blur := max(8, min(w, h)/24)
+			return fmt.Sprintf("split=2[%[1]sfg][%[1]sbg];[%[1]sbg]scale=%[2]d:%[3]d:force_original_aspect_ratio=increase,crop=%[2]d:%[3]d,boxblur=%[4]d:2,eq=brightness=-0.1:saturation=0.9[%[1]sbb];[%[1]sfg]%[5]s[%[1]sff];[%[1]sbb][%[1]sff]overlay=(W-w)/2:(H-h)/2,setsar=1",
+				tag, w, h, blur, fit)
+		case strings.HasPrefix(bars, "#"):
+			return fmt.Sprintf("%s,pad=%d:%d:(ow-iw)/2:(oh-ih)/2:color=0x%s,setsar=1", fit, w, h, strings.TrimPrefix(bars, "#"))
+		}
+		return fmt.Sprintf("%s,pad=%d:%d:(ow-iw)/2:(oh-ih)/2,setsar=1", fit, w, h)
 	}
 	return fmt.Sprintf("scale=%d:%d:force_original_aspect_ratio=increase:flags=lanczos,crop=%d:%d:'clip(%s*iw-ow/2,0,iw-ow)':'clip(%s*ih-oh/2,0,ih-oh)',setsar=1", w, h, w, h, f6(fx), f6(fy))
 }
@@ -780,13 +796,13 @@ func FrameFit(fill bool, fx, fy float64, w, h int) string {
 // PictureVF is the filter that turns a source frame into what the render shows in a segment, before
 // any final scaling: the punch-in crop, then (fill timelines) the crop to the output's shape.
 // Comparisons (look, check) run source frames through it so they see what the render saw.
-func PictureVF(zoom, ax, ay float64, fill bool, fx, fy float64, w, h int) string {
+func PictureVF(zoom, ax, ay float64, fill bool, fx, fy float64, bars string, w, h int) string {
 	var vf []string
 	if zoom > 1.001 {
 		vf = append(vf, ZoomCrop(zoom, ax, ay))
 	}
-	if fill {
-		vf = append(vf, FrameFit(true, fx, fy, w, h))
+	if fill || bars != "" { // a fitted frame with bars of its own: compare with them drawn
+		vf = append(vf, FrameFit(fill, fx, fy, bars, "pv", w, h))
 	}
 	return strings.Join(vf, ",")
 }

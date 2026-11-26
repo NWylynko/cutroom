@@ -22,7 +22,8 @@ Short-form defaults (L41):
   speaker, found at x 0.74`) or that it found no one (then it is centred; a screen recording, say).
   `cutroom edit frame --anchor auto` finds them again after re-cutting; `--anchor 0.4,0.5` centres the crop
   on that point of the source, e.g. the speaker's face (0–1 across, down) — look with `cutroom look --output <time> --project …`.
-  `edit frame --fit` keeps the whole picture with bars instead.
+  `edit frame --fit` keeps the whole picture with bars instead — `--bars blur` (the picture blurred
+  behind itself, as many shorts do), `--bars "#101718"` (a colour) or black.
 - Pads at cuts 0.06 s before / 0.16 s after; every pause tightened to ~0.2 s.
 - Open on the claim and drop every aside: `short` keeps everything between --from and --to, so read
   `cutroom timeline --project …` sentence by sentence and cut asides as in any edit (`edit cut`).

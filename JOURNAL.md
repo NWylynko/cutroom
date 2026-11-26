@@ -2,6 +2,17 @@
 
 One entry per loop iteration, newest first. Format: `### N · YYYY-MM-DD · title`, then Did / Measured / Surprises / Next.
 
+### 64 · 2026-11-26 · Fitted frames: blurred or coloured bars (`edit frame --fit --bars blur|#rrggbb`)
+Did: looked again at r63's "captions over the mouth" — at full size the captions sit just below the
+chin, not on the mouth: dropped. Next forced look: a fitted (whole-picture) vertical frame always had
+black bars. `edit frame --bars blur` puts the picture itself, scaled to cover, blurred and darkened,
+behind the fitted picture (the common shorts look); `--bars "#rrggbb"` any colour; black stays the
+default. Timeline/manifest `bars`; FrameFit builds the split/blur/overlay graph with per-segment
+labels; PictureVF now draws a fitted frame's bars too, so `check` compares like with like.
+Measured: real 4K camera short, fit + blur: render + `check` PASS (picture worst 30.7 — the blurred
+bars; captions, overlay, sync 0 ms). e2e 288/288 (+7: blur, colour, bad colour, back to fill).
+Next: more of the look — a progress bar / per-short chrome? Or T3 reviewer pass on styled shorts.
+
 ### 63 · 2026-11-26 · Real camera + recorder short: three false alarms fixed
 Did: styled short from my-personal-software (4K HEVC 59.94 fps camera + separate recorder, synced:
 offset −104.8 s, drift −24.5 ppm), `--look channel`, `edit audio audio`, card, captions. Three

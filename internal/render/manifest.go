@@ -33,6 +33,7 @@ type Manifest struct {
 	Fill         bool               `json:"fill,omitempty"`
 	FillX        float64            `json:"fill_x,omitempty"`
 	FillY        float64            `json:"fill_y,omitempty"`
+	Bars         string             `json:"bars,omitempty"`
 	TimelineHash string             `json:"timeline_hash"`
 	RenderedAt   time.Time          `json:"rendered_at"`
 }
@@ -84,6 +85,9 @@ func TimelineHash(tl *timeline.Timeline) string {
 	if tl.Fill {
 		parts = append(parts, []any{"fill", tl.FillX, tl.FillY})
 	}
+	if tl.Bars != "" && !tl.Fill {
+		parts = append(parts, []any{"bars", tl.Bars})
+	}
 	return hash(parts)
 }
 
@@ -99,7 +103,7 @@ func writeManifest(tl, vtl *timeline.Timeline, srcs map[string]Source, chunks []
 	m := Manifest{Version: Version, Output: res.Output, Project: o.ProjDir, Preview: o.Preview, FPS: tl.FPS, Width: res.Width, Height: res.Height,
 		Audio: tl.Audio, Sources: map[string]MSource{}, Loudness: o.Loudness, TruePeak: o.TruePeak, Chain: o.Chain,
 		Frames: res.Frames, Duration: res.Duration, RangeStart: res.RangeStart, Partial: o.Range[1] > 0, Overlays: res.Overlays,
-		Fill: tl.Fill, FillX: tl.FillX, FillY: tl.FillY,
+		Fill: tl.Fill, FillX: tl.FillX, FillY: tl.FillY, Bars: tl.Bars,
 		TimelineHash: TimelineHash(tl), RenderedAt: time.Now().UTC().Truncate(time.Second)}
 	for _, c := range chunks {
 		for _, k := range c.Segments {
@@ -137,5 +141,5 @@ func LoadManifest(out string) (*Manifest, error) {
 // SegVF is the PictureVF for a manifest segment (what look/check must apply to source frames).
 func (m *Manifest) SegVF(g MSeg) string {
 	ax, ay := g.Anchor()
-	return PictureVF(g.Zoom, ax, ay, m.Fill, m.FillX, m.FillY, m.Width, m.Height)
+	return PictureVF(g.Zoom, ax, ay, m.Fill, m.FillX, m.FillY, m.Bars, m.Width, m.Height)
 }

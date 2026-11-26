@@ -399,5 +399,5 @@ func listenFile(c *Ctx) (*Result, error) {
 // what the render will.
 func segVF(tl *timeline.Timeline, g timeline.Segment) string {
 	ax, ay := g.Anchor()
-	return render.PictureVF(g.ZoomOf(), ax, ay, tl.Fill, tl.FillX, tl.FillY, tl.Width, tl.Height)
+	return render.PictureVF(g.ZoomOf(), ax, ay, tl.Fill, tl.FillX, tl.FillY, tl.Bars, tl.Width, tl.Height)
 }

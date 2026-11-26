@@ -67,6 +67,7 @@ never moves them.`,
 			{Name: "reason", Kind: "string", Help: "Why (stored with the edit; shown in the timeline)"},
 			{Name: "min-cut", Kind: "float", Default: "0.4", Help: "tighten: only shorten pauses where at least this much can go"},
 			{Name: "anchor", Kind: "string", Help: "zoom: point to zoom on as x,y in 0–1 (default 0.5,0.4); frame: where a filled frame is cropped"},
+			{Name: "bars", Kind: "string", Help: "frame: what fills the frame around a fitted picture — black (default), blur, or a colour #rrggbb"},
 			{Name: "for", Kind: "string", Help: "audio: only for segments from this video source (multi-take)"},
 			{Name: "with", Kind: "string", Help: "replace: the source whose version of the words goes in (a pickup or another take)"},
 			{Name: "after", Kind: "string", Help: "add/move: put it after this segment id (or \"start\")"},
@@ -83,8 +84,10 @@ never moves them.`,
 			"frame": {Usage: `  edit frame --anchor 0.4,0.5   a filled frame (a vertical short) is cropped around this point of the
                                 source (0–1 across, down): move it onto the speaker
   edit frame --fill | --fit     fill the output frame (crop) or fit the whole picture (bars)
+  edit frame --fit --bars blur  the bars around a fitted picture: black, blur (the picture blurred
+                                behind itself) or a colour #rrggbb
   edit frame --size 720x1280    change the output size (overlays and captions follow)
-Look at the result with ` + "`cutroom look --output <time>`" + `.`, Flags: []string{"anchor", "fill", "fit", "size", "dry-run"}},
+Look at the result with ` + "`cutroom look --output <time>`" + `.`, Flags: []string{"anchor", "fill", "fit", "bars", "size", "dry-run"}},
 			"cut": {Usage: `  edit cut --text "um, so"                       remove exactly these words (cut lands in the pauses)
   edit cut --from "By the way" --to "keyboard."  remove from the first words through the last words
   edit cut 16.9-17.4 [--source id]               remove a source time range (seconds or m:ss.mmm)
@@ -479,8 +482,26 @@ func runEdit(c *Ctx) (*Result, error) {
 		label = desc
 		lines = append(lines, res...)
 	case "frame":
-		if !c.Has("anchor") && !c.Bool("fill") && !c.Bool("fit") && !c.Has("size") {
-			return nil, Errf(ExitUsage, "missing-flag", "`cutroom edit frame --anchor 0.4,0.5` (where to crop a filled frame), --fill, --fit or --size 720x1280", "edit frame needs --anchor, --fill, --fit or --size")
+		if !c.Has("anchor") && !c.Bool("fill") && !c.Bool("fit") && !c.Has("size") && !c.Has("bars") {
+			return nil, Errf(ExitUsage, "missing-flag", "`cutroom edit frame --anchor 0.4,0.5` (where to crop a filled frame), --fill, --fit [--bars blur], or --size 720x1280", "edit frame needs --anchor, --fill, --fit, --bars or --size")
+		}
+		if c.Has("bars") {
+			b := strings.ToLower(c.Str("bars"))
+			switch {
+			case b == "black" || b == "default":
+				b = ""
+			case b == "blur":
+			default:
+				col, err := timeline.ParseColor(b)
+				if err != nil {
+					return nil, Errf(ExitUsage, "bad-bars", "--bars black, blur, or a colour like #101718", "%v", err)
+				}
+				b = fmt.Sprintf("#%02x%02x%02x", col[0], col[1], col[2])
+			}
+			e.tl.Bars = b
+			if !c.Bool("fill") && !c.Has("anchor") {
+				e.tl.Fill = false // bars only show around a fitted picture
+			}
 		}
 		if c.Has("size") {
 			w, h, err := parseSize(c.Str("size"), e.tl.Width, e.tl.Height)
@@ -517,7 +538,11 @@ func runEdit(c *Ctx) (*Result, error) {
 		if e.tl.Fill {
 			lines = append(lines, fmt.Sprintf("frame: the picture fills %dx%d, cropped around %.2f,%.2f (0–1 across, down) — check it with `cutroom look --output <time>`", e.tl.Width, e.tl.Height, e.tl.FillX, e.tl.FillY))
 		} else {
-			lines = append(lines, fmt.Sprintf("frame: the whole picture fits %dx%d (bars where the shapes differ)", e.tl.Width, e.tl.Height))
+			bars := "black"
+			if e.tl.Bars != "" {
+				bars = e.tl.Bars
+			}
+			lines = append(lines, fmt.Sprintf("frame: the whole picture fits %dx%d (%s bars where the shapes differ; --bars blur|black|#rrggbb)", e.tl.Width, e.tl.Height, bars))
 		}
 	case "split":
 		src, at := "", 0.0

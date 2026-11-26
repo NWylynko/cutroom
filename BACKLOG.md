@@ -7,8 +7,6 @@ Move done items to the journal, not here.
 - (none) — name `cutroom` and Apache-2.0 confirmed 2026-11-24; target is the full SPEC v1.
 
 ## NOW
-- [real footage r63] Captions over the mouth when the face is large (4K crop): place the caption
-  band clear of the speaker's face by default (FindSpeaker could give the face's y), or warn.
 - [framing] Speakers who move across the frame: per-segment anchors (follow them) instead of one crop.
 - [style] Per-word pop for karaoke captions (each word bumps as it is said), if asked for.
 - [style] Per-card text formatting beyond title/sub (a third line, an inline accent word).

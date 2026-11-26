@@ -56,6 +56,9 @@ type Timeline struct {
 	Fill  bool    `json:"fill,omitempty"`
 	FillX float64 `json:"fill_x,omitempty"`
 	FillY float64 `json:"fill_y,omitempty"`
+	// Bars: what fills the frame around a fitted picture — "" or black, blur (the picture itself,
+	// blurred and darkened), or a colour (#rrggbb)
+	Bars string `json:"bars,omitempty"`
 	// The look of burned-in captions and of text cards (unset fields: cutroom's defaults).
 	CaptionStyle *Style `json:"caption_style,omitempty"`
 	CardStyle    *Style `json:"card_style,omitempty"`
